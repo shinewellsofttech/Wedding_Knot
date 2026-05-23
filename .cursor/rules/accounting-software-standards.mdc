@@ -1,0 +1,49 @@
+---
+description: Data fetching, API, and page UI standards for Accounting Software
+alwaysApply: true
+---
+
+# Accounting Software – Project Standards
+
+## 1. API & Data Fetching
+
+- **Base URL**: Never hardcode full API URL. Saga prepends `API_WEB_URLS.BASE`. Use relative paths like `API_WEB_URLS.MASTER + "/0/token/..."` or `UserMaster/0/token` (see existing pages).
+- **List/GET**: Use `Fn_FillListData(dispatch, setState, gridName, apiURL)` from `src/store/Functions.js`. Returns a Promise; response is in `response.data.dataList` or similar.
+- **Single record (edit)**: Use `Fn_DisplayData(dispatch, setState, id, apiURL)` – GET by id; result is set in `state.formData`.
+- **Save (Add/Edit)**: Use `Fn_AddEditData(dispatch, setState, { arguList }, apiURL, isMultiPart, getid, navigate, forwardPath)`.
+  - Multipart (forms with files): `arguList = { id: number, formData: FormData }`. Append all fields to FormData; include `Id`, `UserId` (from localStorage user) where needed.
+  - API URL for save: no BASE (saga adds it). Examples: `UserMaster/0/token`, `PageMaster/0/token`, `UserRights/${userId}/${userToken}`.
+- **Reports (POST with FormData)**: Use `Fn_GetReport(dispatch, setState, gridName, apiURL, { arguList }, true)` with `arguList.formData`.
+- **Delete**: Use `Fn_DeleteData(dispatch, setState, id, deleteApiURL, listApiURL)` then optionally `loadData()` to refresh list.
+- **Toasts**: Prefer `showToastWithCloseButton("success"|"error"|"warning", message)` from `store/Functions.js`; direct `toast.success/error` from `react-toastify` is also used in some pages.
+
+## 2. Page Layout & UI
+
+- **Wrapper**: Every page content is wrapped in `<div className="page-body">`.
+- **Breadcrumbs**: First child: `<Breadcrumbs mainTitle="Page Title" parent="Section" />` – only these two props (no `title`).
+- **Layout**: `Container fluid` → `Row` → `Col xs="12"` → `Card` (or single Card with header/body).
+- **Card header**: Use `CardHeaderCommon` from `CommonElements/CardHeaderCommon`: `<CardHeaderCommon title="Card Title" tagClass="card-title mb-0" />`. For custom headers use `<CardHeader>`.
+- **Card body**: `<CardBody>` for main content; `<CardFooter>` for buttons when needed.
+- **Forms**: Use reactstrap `Form`, `FormGroup`, `Label`, `Input`, `Row`, `Col`. Add/Edit forms use **Formik** + **Yup** for validation and submit; `handleEnterToNextField` from `utils/formUtils` for Enter-to-next-field.
+- **Buttons**: Use `Btn` from `../../AbstractElements` (or `../../../AbstractElements` from Pages subfolders): `<Btn color="primary" onClick={...}>Label</Btn>`.
+- **Loading**: Show spinner when `state.isProgress` or local `loading`; use `table-responsive` and reactstrap `Table bordered hover striped` for list tables.
+
+## 3. File & Naming
+
+- **Pages**: Prefer `.tsx` for new pages. Existing exceptions: `BankReconcilation.jsx`, `InterestCalculation.jsx`.
+- **List pages**: `PageList_*` (e.g. `PageList_AdminMaster`, `PageList_Warehouse`). Add/Edit: `AddEdit_*`.
+- **API constants**: Define at top of file, e.g. `const API_URL_SAVE = ...`, `const LIST_API_URL = ...` using `API_WEB_URLS` from `constants/constAPI`.
+
+## 4. Navigation & State
+
+- **Navigate to Add**: `navigate("/addEditXyz", { state: { Id: 0 } })`.
+- **Navigate to Edit**: `navigate("/addEditXyz", { state: { Id: id } })`.
+- **Read id in Add/Edit**: `const recordId = (location.state as { Id?: number })?.Id ?? 0;` with `useLocation()`.
+
+## 5. Add/Edit Form Submit Pattern
+
+- Build `FormData`, append Id, UserId, and all form values.
+- Call `Fn_AddEditData(dispatch, () => undefined, { arguList: { id: state.id, formData } }, API_URL_SAVE, true, "memberid", navigate, "/listRoute")`.
+- On success, toast and redirect are handled inside `Fn_AddEditData`; use `setSubmitting(false)` in `finally`.
+
+Follow these patterns for any new pages, forms, or API calls so the codebase stays consistent.

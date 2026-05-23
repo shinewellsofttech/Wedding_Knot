@@ -1,0 +1,81 @@
+// Bootstrap Scss //
+@import 'bootstrap/dist/css/bootstrap.min.css';
+@import 'font-awesome/css/font-awesome.min.css';
+
+// simplebar
+@import 'simplebar-react/dist/simplebar.min.css';
+
+// ico icon
+@import './vendors/icofont.scss';
+
+// Feather icons
+@import './vendors/feather-icon/feather-icon';
+
+// react date-piker
+@import "react-datepicker/dist/react-datepicker.css";
+
+// Timeline-calender
+// @import "react-calendar-timeline/lib/Timeline.css";
+
+//react-calendar
+@import 'react-calendar/dist/Calendar.css';
+
+// Flag icon
+@import './vendors/flag-icon.scss';
+@import "/node_modules/flag-icons/css/flag-icons.min.css";
+
+// WeatherIcons
+@import './vendors/whether-icon.scss';
+
+// Themefiy Awesome
+@import './vendors/themify/themify-icons';
+
+//react-perfect-scrollbar
+@import "react-perfect-scrollbar/dist/css/styles.css";
+
+//filepond
+@import 'filepond/dist/filepond.min.css';
+
+// ReactToastify
+@import '~react-toastify/dist/ReactToastify.css';
+
+//react-dropzone
+@import './pages/dropzone';
+
+// react-photoswipe-gallery
+@import 'photoswipe/dist/photoswipe.css';
+
+//react-bootstrap-typeahead
+@import 'react-bootstrap-typeahead/css/Typeahead.css';
+
+// react-simplemde-editor
+@import "easymde/dist/easymde.min.css";
+
+// Carousel
+@import "react-responsive-carousel/lib/styles/carousel.min.css";
+
+//LeafLet
+@import "~leaflet/dist/leaflet.css";
+
+// Style Scss //
+@import './style.scss';
+
+// Responsive Scss //
+@import './responsive.scss';
+
+//slick
+@import "~slick-carousel/slick/slick.css";
+@import "~slick-carousel/slick/slick-theme.css";
+@import "~slick-carousel/slick/slick-theme.css";
+
+//treeview
+@import "@progress/kendo-theme-default/dist/all.css";
+
+//Swiper
+@import "swiper/swiper.css";
+@import "swiper/css/navigation";
+@import "swiper/css/pagination";
+@import 'swiper/css/effect-fade';
+
+//tour
+@import "@sjmc11/tourguidejs/src/scss/tour.scss";
