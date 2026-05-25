@@ -20,7 +20,10 @@ interface ItemRow {
   photos: (ItemPhoto | null)[];
   videoFile: File | null;
   videoName: string;
-  size: string;
+  length: string;
+  width: string;
+  height: string;
+  weight: string;
   price: string;
   barcode: string;
   stock: string;
@@ -44,7 +47,7 @@ const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const makeRow = (): ItemRow => ({
   id: uid(), photos: [null, null, null, null, null],
-  videoFile: null, videoName: "", size: "", price: "", barcode: "", stock: "0",
+  videoFile: null, videoName: "", length: "", width: "", height: "", weight: "", price: "", barcode: "", stock: "0",
 });
 
 const makeSection = (): ItemSection => ({
@@ -232,7 +235,10 @@ const AddEdit_ItemMaster = () => {
                     ],
                     videoFile: null,
                     videoName: d.VideoLink || "",
-                    size: d.SizeName || "",
+                    length: d.Length || "",
+                    width: d.Width || "",
+                    height: d.Height || "",
+                    weight: d.Weight || "",
                     price: d.SalePrice ? String(d.SalePrice) : "",
                     barcode: d.Barcode || "",
                     stock: d.OpeningStock ? String(d.OpeningStock) : "0"
@@ -507,7 +513,10 @@ const AddEdit_ItemMaster = () => {
                   <th style={{ width: 45 }}>#</th>
                   <th style={{ width: 240 }}>Photo (5)</th>
                   <th style={{ width: 70 }}>Video</th>
-                  <th style={{ width: 120 }}>Size</th>
+                  <th style={{ width: 80 }}>Length</th>
+                  <th style={{ width: 80 }}>Width</th>
+                  <th style={{ width: 80 }}>Height</th>
+                  <th style={{ width: 80 }}>Weight</th>
                   <th style={{ width: 110 }}>Price</th>
                   <th style={{ width: 200 }}>Barcode</th>
                   <th style={{ width: 110 }}>Stock</th>
@@ -517,7 +526,7 @@ const AddEdit_ItemMaster = () => {
               <tbody>
                 {sections.length === 0 ? (
                   <tr>
-                    <td colSpan={8}>
+                    <td colSpan={11}>
                       <div className="im-empty">
                         <div className="im-empty-icon">📋</div>
                         <h4>No items yet</h4>
@@ -535,7 +544,7 @@ const AddEdit_ItemMaster = () => {
                       <React.Fragment key={section.id}>
                         {/* Section Header Row inside the Table */}
                         <tr className="im-section-header-row" id={`item-section-${section.id}`}>
-                          <td colSpan={8} className="text-start">
+                          <td colSpan={11} className="text-start">
                             <div className="im-section-info-grid">
                               <div className="im-section-info-field">
                                 <label>Item Name <span className="req">*</span></label>
@@ -731,20 +740,54 @@ const AddEdit_ItemMaster = () => {
                                 />
                               </td>
 
-                              {/* Size */}
+                              {/* Length */}
                               <td>
                                 <input
                                   className="im-cell-input"
-                                  placeholder="e.g. S, M, L"
-                                  value={row.size}
+                                  placeholder="Len"
+                                  value={row.length}
                                   onChange={e => {
-                                    updateRow(secIdx, rowIdx, { size: e.target.value });
-                                    handleFieldUpdate(row.id, "ItemDesignMaster", "SizeName", e.target.value);
+                                    updateRow(secIdx, rowIdx, { length: e.target.value });
+                                    handleFieldUpdate(row.id, "ItemDesignMaster", "Length", e.target.value);
                                   }}
-                                  disabled={!hasSizeColumnPresent}
-                                  style={{
-                                    opacity: hasSizeColumnPresent ? 1 : 0.5,
-                                    background: hasSizeColumnPresent ? "#fff" : "#f1f5f9"
+                                />
+                              </td>
+
+                              {/* Width */}
+                              <td>
+                                <input
+                                  className="im-cell-input"
+                                  placeholder="Wid"
+                                  value={row.width}
+                                  onChange={e => {
+                                    updateRow(secIdx, rowIdx, { width: e.target.value });
+                                    handleFieldUpdate(row.id, "ItemDesignMaster", "Width", e.target.value);
+                                  }}
+                                />
+                              </td>
+
+                              {/* Height */}
+                              <td>
+                                <input
+                                  className="im-cell-input"
+                                  placeholder="Hgt"
+                                  value={row.height}
+                                  onChange={e => {
+                                    updateRow(secIdx, rowIdx, { height: e.target.value });
+                                    handleFieldUpdate(row.id, "ItemDesignMaster", "Height", e.target.value);
+                                  }}
+                                />
+                              </td>
+
+                              {/* Weight */}
+                              <td>
+                                <input
+                                  className="im-cell-input"
+                                  placeholder="Wgt"
+                                  value={row.weight}
+                                  onChange={e => {
+                                    updateRow(secIdx, rowIdx, { weight: e.target.value });
+                                    handleFieldUpdate(row.id, "ItemDesignMaster", "Weight", e.target.value);
                                   }}
                                 />
                               </td>

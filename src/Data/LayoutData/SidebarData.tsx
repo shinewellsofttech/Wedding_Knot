@@ -45,6 +45,22 @@ export const MenuList: MenuItem[] = [
         type: "link", 
         bookmark: true 
       },
+      {
+        id: 5,
+        title: "State Master",
+        path: `${process.env.PUBLIC_URL}/stateMaster`,
+        icon: "User",
+        type: "link",
+        bookmark: true
+      },
+      {
+        id: 6,
+        title: "City Master",
+        path: `${process.env.PUBLIC_URL}/cityMaster`,
+        icon: "User",
+        type: "link",
+        bookmark: true
+      }
       // {
       //   id: 5, title: "Tax Group Master",
       //   path: `${process.env.PUBLIC_URL}/taxGroupMaster`,

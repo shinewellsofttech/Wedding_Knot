@@ -15,12 +15,16 @@ interface GridRow {
   ItemCode: string;
   F_ItemGroupMaster: string;
   F_ItemMaster: string;
+  F_ItemDesignMaster?: string;
+  ItemName?: string;
+  DesignPhoto?: string;
   F_ColorMaster?: string;
   F_WarehouseMaster: string;
   F_BatchMaster?: string;
   Qty: string;
   Rate: string;
   Variant?: string;
+  Photos?: string[];
   ItemData: any[] | null;
   AvailableQty?: number;
   F_PurchaseOrderH?: string | number;
@@ -59,9 +63,9 @@ function PurchaseEntry() {
   const API_URL_SAVE = "PurchaseEntry/0/token";
   const API_URL_EDIT = API_WEB_URLS.MASTER + "/0/token/PurchaseEntryH/Id";
   const API_URL_LINES = API_WEB_URLS.MASTER + "/0/token/PurchaseEntryL/Id";
-  const API_URL_ITEMGROUP = API_WEB_URLS.MASTER + "/0/token/ItemGroup/Id/0";
+  const API_URL_ITEMGROUP = API_WEB_URLS.MASTER + "/0/token/CategoryMaster/Id/0";
   const API_URL_ITEMS = API_WEB_URLS.MASTER + "/0/token/ItemMaster/Id";
-  const API_URL_VENDOR = API_WEB_URLS.MASTER + "/0/token/GetLedgerNamesForPoSoApproval/Id/0";
+  const API_URL_VENDOR = API_WEB_URLS.MASTER + "/0/token/PartyLedgerMaster/Id/0";
   const API_URL_WAREHOUSE = API_WEB_URLS.MASTER + "/0/token/WarehouseMaster/Id/0";
   const API_URL_COLOR = API_WEB_URLS.MASTER + "/0/token/ColorMaster/Id/0";
   const API_URL_BATCH = API_WEB_URLS.MASTER + "/0/token/BatchMaster/Id/0";
@@ -105,6 +109,7 @@ function PurchaseEntry() {
       F_WarehouseMaster: "",
       F_BatchMaster: "",
       Variant: "",
+      Photos: [],
       Qty: "",
       Rate: "",
       ItemData: null,
@@ -141,57 +146,6 @@ function PurchaseEntry() {
       try {
         const itemGroups = await Fn_FillListData(dispatch, setState, "ItemGroupMaster", API_URL_ITEMGROUP);
         const vendors = await Fn_FillListData(dispatch, setState, "VendorMaster", API_URL_VENDOR);
-        const warehouses = await Fn_FillListData(dispatch, setState, "WarehouseMaster", API_URL_WAREHOUSE);
-        const colors = await Fn_FillListData(dispatch, setState, "ColorMaster", API_URL_COLOR);
-        const batches = await Fn_FillListData(dispatch, setState, "BatchMaster", API_URL_BATCH);
-        const globalOptions = await Fn_FillListData(dispatch, setState, "GlobalOptions", API_URL_GLOBALOPTIONS);
-
-        let isBatchAllowed = false;
-        if (Array.isArray(globalOptions) && globalOptions.length > 0) {
-          const option = globalOptions[0];
-          isBatchAllowed = option.IsBatchAllowed === true || option.IsBatchAllowed === 1 || option.IsBatchAllowed === "1";
-        }
-
-        const API_URL_PO_LIST = API_WEB_URLS.MASTER + "/0/token/PurchaseOrderData/Id/0";
-        const poData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_PO_LIST);
-        
-        let poDataArray: any[] = [];
-        if (Array.isArray(poData)) poDataArray = poData;
-        else if (poData?.data?.dataList && Array.isArray(poData.data.dataList)) poDataArray = poData.data.dataList;
-        else if (poData?.dataList && Array.isArray(poData.dataList)) poDataArray = poData.dataList;
-        else if (poData?.data?.response && Array.isArray(poData.data.response)) poDataArray = poData.data.response;
-
-        let parsedHeaders: any[] = [];
-        let allLinesMap: Record<string, any[]> = {};
-
-        poDataArray.forEach((item: any) => {
-          if (item.Header) {
-            try {
-              const headerArr = JSON.parse(item.Header);
-              const linesArr = item.Lines ? JSON.parse(item.Lines) : [];
-              const approvedLines = (Array.isArray(linesArr) ? linesArr : []).filter(l => String(l.F_StatusMaster) === "1");
-
-              if (Array.isArray(headerArr)) {
-                headerArr.forEach((hdr: any) => {
-                  const hdrLines = approvedLines.filter(l => String(l.F_PurchaseOrderH) === String(hdr.Id));
-                  if (hdrLines.length > 0) {
-                    parsedHeaders.push(hdr);
-                    allLinesMap[String(hdr.Id)] = hdrLines;
-                  }
-                });
-              } else if (headerArr) {
-                const hdrLines = approvedLines.filter(l => String(l.F_PurchaseOrderH) === String(headerArr.Id));
-                if (hdrLines.length > 0) {
-                  parsedHeaders.push(headerArr);
-                  allLinesMap[String(headerArr.Id)] = hdrLines;
-                }
-              }
-            } catch (e) {
-              console.error("Error parsing PO Data", e);
-            }
-          }
-        });
-
         const API_URL_PE_LIST = API_WEB_URLS.MASTER + "/0/token/PurchaseEntryData/Id/0";
         const peData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_PE_LIST);
         
@@ -201,49 +155,13 @@ function PurchaseEntry() {
         else if (peData?.dataList && Array.isArray(peData.dataList)) peDataArray = peData.dataList;
         else if (peData?.data?.response && Array.isArray(peData.data.response)) peDataArray = peData.data.response;
 
-        let parsedPEHeaders: any[] = [];
-        let peLinesMap: Record<string, any[]> = {};
-
-        peDataArray.forEach((item: any) => {
-          if (item.Header) {
-            try {
-              const headerArr = JSON.parse(item.Header);
-              const linesArr = item.Lines ? JSON.parse(item.Lines) : [];
-              
-              if (Array.isArray(headerArr)) {
-                headerArr.forEach((hdr: any) => {
-                  const hdrLines = (Array.isArray(linesArr) ? linesArr : []).filter(l => String(l.F_PurchaseEntryH) === String(hdr.Id));
-                  parsedPEHeaders.push(hdr);
-                  peLinesMap[String(hdr.Id)] = hdrLines;
-                });
-              } else if (headerArr) {
-                const hdrLines = (Array.isArray(linesArr) ? linesArr : []).filter(l => String(l.F_PurchaseEntryH) === String(headerArr.Id));
-                parsedPEHeaders.push(headerArr);
-                peLinesMap[String(headerArr.Id)] = hdrLines;
-              }
-            } catch (e) {
-              console.error("Error parsing PE Data", e);
-            }
-          }
-        });
-
         const extractArray = (data: any) => Array.isArray(data) ? data : (data?.data?.dataList || data?.dataList || data?.data?.response || data?.response || []);
 
         setState((prev) => ({
           ...prev,
           ItemGroupMaster: extractArray(itemGroups),
           VendorMaster: extractArray(vendors),
-          WarehouseMaster: extractArray(warehouses),
-          ColorMaster: extractArray(colors),
-          BatchMaster: extractArray(batches),
-          IsBatchAllowed: isBatchAllowed,
-          DefaultWarehouse: extractArray(warehouses)?.[0] || null,
-          DefaultColor: extractArray(colors)?.[0] || null,
-          CreatedPurchaseOrders: parsedHeaders,
-          PurchaseOrderLinesMap: allLinesMap,
-          CreatedPurchaseEntries: parsedPEHeaders,
-          PurchaseEntryLinesMap: peLinesMap,
-          GlobalOptions: extractArray(globalOptions),
+          CreatedPurchaseEntries: peDataArray,
         }));
 
         const params = new URLSearchParams(location.search);
@@ -307,6 +225,7 @@ function PurchaseEntry() {
         F_WarehouseMaster: l.F_WarehouseMaster || prevState.DefaultWarehouse?.Id || "",
         F_BatchMaster: l.F_BatchMaster || "",
         Variant: l.Variant || l.Varient || "",
+        Photos: [],
         Qty: String(l.ApprovedQty || l.OrderedQty || l.Qty || ""),
         Rate: l.Rate ? String(l.Rate) : "",
         ItemData: groupItemsMap[String(l.F_ItemGroupMaster)] || null,
@@ -333,54 +252,56 @@ function PurchaseEntry() {
   const fetchPEDataAndPopulateGrid = async (peId: string) => {
     if (!peId) return;
     const prevState = state;
-    const lines = prevState.PurchaseEntryLinesMap?.[peId] || [];
-    if (lines.length > 0) {
-      // Fetch item data for each unique group first to avoid empty items list
-      const uniqueGroupIds = Array.from(new Set(lines.map((l: any) => l.F_ItemGroupMaste || l.F_ItemGroupMaster).filter(Boolean)));
-      const groupItemsMap: Record<string, any[]> = {};
-      await Promise.all(
-        uniqueGroupIds.map(async (groupId) => {
-          try {
-            const data = await Fn_FillListData(dispatch, setState, `itemData_${groupId}`, API_URL_ITEMS + "/" + groupId);
-            const extractArray = (d: any) => Array.isArray(d) ? d : (d?.data?.dataList || d?.dataList || d?.data?.response || d?.response || []);
-            groupItemsMap[String(groupId)] = extractArray(data);
-          } catch (e) {
-            console.error("Error fetching items for group in PE load:", e);
-          }
-        })
-      );
+    const pe = prevState.CreatedPurchaseEntries?.find((p: any) => String(p.Id) === String(peId));
+    if (!pe) return;
 
+    let lines: any[] = [];
+    try {
+      if (pe.PurchaseLDetails) {
+        const parsed = typeof pe.PurchaseLDetails === "string" ? JSON.parse(pe.PurchaseLDetails) : pe.PurchaseLDetails;
+        lines = Array.isArray(parsed) ? parsed : [];
+      }
+    } catch (e) {
+      console.error("Error parsing PurchaseLDetails", e);
+    }
+
+    setState((prev) => ({
+      ...prev,
+      isEditMode: true,
+      id: pe.Id,
+      formData: {
+        ...prev.formData,
+        PONo: pe.EntryNo || "",
+        PODate: pe.EntryDate ? pe.EntryDate.split('T')[0] : "",
+        F_VendorMaster: pe.F_LedgerMaster || "",
+        Remarks: pe.Remarks || "",
+        F_PurchaseEntryH: pe.Id,
+      }
+    }));
+
+    if (lines.length > 0) {
       const mappedRows: GridRow[] = lines.map((l: any) => ({
-        ItemCode: l.Code || l.ItemCode || "",
-        F_ItemGroupMaster: l.F_ItemGroupMaste || l.F_ItemGroupMaster || "",
-        F_ItemMaster: l.F_ItemMaster || "",
-        F_ColorMaster: l.F_ColorMaster || prevState.DefaultColor?.Id || "",
-        F_WarehouseMaster: l.F_WarehouseMaster || prevState.DefaultWarehouse?.Id || "",
-        F_BatchMaster: l.F_BatchMaster || "",
+        ItemCode: l.Barcode || "",
+        F_ItemGroupMaster: String(l.F_CategoryMaster || ""),
+        F_ItemMaster: String(l.F_ItemMaster || ""),
+        F_ItemDesignMaster: String(l.F_ItemDesignMaster || ""),
+        F_ColorMaster: state.DefaultColor?.Id || "",
+        F_WarehouseMaster: state.DefaultWarehouse?.Id || "",
+        F_BatchMaster: "",
+        ItemName: l.ItemName || "",
+        DesignPhoto: l.DesignPhoto || "",
         Variant: l.Variant || l.Varient || "",
-        Qty: String(l.ReceivedQty ?? l.Qty ?? ""),
-        Rate: String(l.Rate ?? ""),
-        ItemData: groupItemsMap[String(l.F_ItemGroupMaste || l.F_ItemGroupMaster)] || null,
+        Photos: l.DesignPhoto ? [l.DesignPhoto] : [],
+        Qty: String(l.Qty || ""),
+        Rate: l.Rate ? String(l.Rate) : "",
+        ItemData: [{ Id: l.F_ItemMaster, ItemName: l.ItemName || "Scanned Item" }],
         AvailableQty: 0,
-        F_PurchaseOrderH: l.F_PurchaseOrderH || "",
-        F_PurchaseOrderL: l.F_PurchaseOrderL || "",
+        F_PurchaseOrderH: 0,
+        F_PurchaseOrderL: 0,
       }));
       setGridRows(mappedRows);
-      const peHeader = prevState.CreatedPurchaseEntries?.find((p: any) => String(p.Id) === String(peId));
-      setState((prev) => ({
-        ...prev,
-        isEditMode: true,
-        id: parseInt(peId),
-        formData: {
-          ...prev.formData,
-          PONo: peHeader?.EntryNo || prev.formData.PONo,
-          PODate: peHeader?.EntryDate ? String(peHeader.EntryDate).split("T")[0] : prev.formData.PODate,
-          Remarks: peHeader?.Remarks ?? prev.formData.Remarks,
-          F_VendorMaster: peHeader?.F_LedgerMaster ? String(peHeader.F_LedgerMaster) : prev.formData.F_VendorMaster,
-          F_PurchaseEntryH: peId
-        }
-      }));
     } else {
+      setGridRows([{ ItemCode: "", F_ItemGroupMaster: "", F_ItemMaster: "", F_WarehouseMaster: state.DefaultWarehouse?.Id || "", F_BatchMaster: "", Variant: "", Qty: "", Rate: "", Photos: [], ItemData: null }]);
       alert("No lines found for the selected Purchase Entry.");
     }
   };
@@ -418,6 +339,7 @@ function PurchaseEntry() {
                 F_WarehouseMaster: line.F_WarehouseMaster || "",
                 F_BatchMaster: line.F_BatchMaster || "",
                 Variant: line.Variant || line.Varient || "",
+                Photos: [],
                 Qty: line.Qty || "",
                 Rate: line.Rate || "",
                 ItemData: extractArray(itemData) || [],
@@ -439,7 +361,7 @@ function PurchaseEntry() {
   const addRow = () => {
     setGridRows((prevRows) => [
       ...prevRows,
-      { ItemCode: "", F_ItemGroupMaster: "", F_ItemMaster: "", F_ColorMaster: state.DefaultColor?.Id || "", F_WarehouseMaster: state.DefaultWarehouse?.Id || "", F_BatchMaster: "", Variant: "", Qty: "", Rate: "", ItemData: null, AvailableQty: 0 },
+      { ItemCode: "", F_ItemGroupMaster: "", F_ItemMaster: "", F_ColorMaster: state.DefaultColor?.Id || "", F_WarehouseMaster: state.DefaultWarehouse?.Id || "", F_BatchMaster: "", Variant: "", Photos: [], Qty: "", Rate: "", ItemData: null, AvailableQty: 0 },
     ]);
   };
 
@@ -537,6 +459,59 @@ function PurchaseEntry() {
       }
     }
     setGridRows(updatedRows);
+  };
+
+  const handleBarcodeFetch = async (index: number, barcode: string) => {
+    if (!barcode) return;
+    try {
+      const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");
+      const userId = authUser?.uid ?? authUser?.Id ?? "0";
+      const userToken = authUser?.Token ?? authUser?.token ?? "token";
+      const url = `GetItemDetailByBarcode/${userId}/${userToken}`;
+      const formData = new FormData();
+      formData.append("Barcode", barcode);
+
+      const res = await Fn_GetReport(dispatch, () => {}, "ignored", url, { arguList: { id: 0, formData } }, true);
+      let list: any[] = [];
+      if (Array.isArray(res)) list = res;
+      else if (res && typeof res === "object") {
+        if (Array.isArray(res.response)) list = res.response;
+        else if (res.data && Array.isArray(res.data.response)) list = res.data.response;
+      }
+
+      if (list && list.length > 0) {
+        const item = list[0];
+        const groupId = item.F_CategoryMaster || item.F_ItemGroupMaster || "";
+        const itemId = item.F_ItemMaster || item.Id || "";
+        const designId = item.Id || "";
+        
+        const photos = [];
+        if (item.DesignPhoto) photos.push(item.DesignPhoto);
+        if (item.DesignPhoto2) photos.push(item.DesignPhoto2);
+        if (item.DesignPhoto3) photos.push(item.DesignPhoto3);
+        if (item.DesignPhoto4) photos.push(item.DesignPhoto4);
+        if (item.DesignPhoto5) photos.push(item.DesignPhoto5);
+        
+        const updatedRows = [...gridRows];
+        updatedRows[index] = {
+          ...updatedRows[index],
+          ItemCode: item.Barcode || barcode,
+          F_ItemGroupMaster: String(groupId),
+          F_ItemMaster: String(itemId),
+          F_ItemDesignMaster: String(designId),
+          ItemName: item.ItemName || "Scanned Item",
+          DesignPhoto: item.DesignPhoto || "",
+          Rate: String(item.SalePrice || 0),
+          Variant: item.SizeName || "",
+          Photos: photos,
+          ItemData: [{ Id: itemId, ItemName: item.ItemName || "Scanned Item" }]
+        };
+        
+        setGridRows(updatedRows);
+      }
+    } catch (e) {
+      console.error("Error fetching barcode details:", e);
+    }
   };
 
   const openQuickItemModal = (rowIndex: number) => {
@@ -681,19 +656,14 @@ function PurchaseEntry() {
     try {
       const obj = JSON.parse(localStorage.getItem("user") || "{}");
       const jsonDataArray = gridRows.map((row) => ({
-        F_PurchaseOrderH: Number(row.F_PurchaseOrderH) || Number(state.formData.F_PurchaseOrderH) || 0,
-        F_PurchaseOrderL: Number(row.F_PurchaseOrderL) || 0,
-        F_ItemGroupMaster: Number(row.F_ItemGroupMaster) || 0,
+        F_ItemDesignMaster: Number(row.F_ItemDesignMaster) || 0,
+        F_CategoryMaster: Number(row.F_ItemGroupMaster) || 0,
         F_ItemMaster: Number(row.F_ItemMaster) || 0,
-        Code: row.ItemCode || "",
-        F_ColorMaster: Number(row.F_ColorMaster) || 0,
-        F_WarehouseMaster: Number(row.F_WarehouseMaster) || 0,
-        ReceivedQty: Number(row.Qty) || 0,
+        Barcode: row.ItemCode || "",
+        ItemName: row.ItemName || row.ItemData?.[0]?.ItemName || "",
+        DesignPhoto: row.DesignPhoto || row.Photos?.[0] || "",
+        Qty: Number(row.Qty) || 0,
         Rate: Number(row.Rate) || 0,
-        Amount: (Number(row.Qty) || 0) * (Number(row.Rate) || 0),
-        BarCodeId: "",
-        BatchNo: row.F_BatchMaster || "",
-        Variant: row.Variant || "",
       }));
       const headerFormData = new FormData();
       headerFormData.append("EntryDate", state.formData.PODate);
@@ -827,6 +797,7 @@ function PurchaseEntry() {
                       defaultColor={state.DefaultColor}
                       itemColorApplyMap={state.itemColorApplyMap}
                       onQuickAddItem={openQuickItemModal}
+                      onBarcodeFetch={handleBarcodeFetch}
                     />
                   </Col>
                 </Row>

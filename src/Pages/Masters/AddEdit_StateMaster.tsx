@@ -14,12 +14,12 @@ import { getCurrentUserId, handleEnterToNextField } from "../../utils/formUtils"
 
 interface FormValues {
   Name: string;
-  F_CountryMaster: string;
+  StateCode: string;
 }
 
 const initialValues: FormValues = {
   Name: "",
-  F_CountryMaster: "",
+  StateCode: "",
 };
 
 interface StateMasterState {
@@ -38,10 +38,9 @@ interface DropdownState {
 
 const API_URL_SAVE = `${API_WEB_URLS.StateMaster}/0/token`;
 const API_URL_EDIT = API_WEB_URLS.MASTER + `/0/token/${API_WEB_URLS.StateMaster}/Id`;
-const COUNTRY_LIST_URL = `${API_WEB_URLS.MASTER}/0/token/${API_WEB_URLS.CountryMaster}/Id/0`;
 
 /**
- * Add/Edit form for State master with country selection.
+ * Add/Edit form for State master.
  */
 const AddEdit_StateMaster = () => {
   const dispatch = useDispatch();
@@ -54,11 +53,6 @@ const AddEdit_StateMaster = () => {
     isProgress: false,
   });
 
-  const [dropdowns, setDropdowns] = useState<DropdownState>({
-    countries: [],
-    isProgress: false,
-  });
-
   const isEditMode = stateMaster.id > 0;
 
   /**
@@ -68,19 +62,10 @@ const AddEdit_StateMaster = () => {
     () =>
       Yup.object({
         Name: Yup.string().trim().required("Name is required"),
-        F_CountryMaster: Yup.string().trim().required("Country is required"),
+        StateCode: Yup.string().trim(),
       }),
     []
   );
-
-  /**
-   * Load country options on mount.
-   */
-  useEffect(() => {
-    Fn_FillListData(dispatch, setDropdowns, "countries", COUNTRY_LIST_URL).catch((error) => {
-      console.error("Failed to fetch countries:", error);
-    });
-  }, [dispatch]);
 
   /**
    * Detect edit mode and fetch record if necessary.
@@ -109,7 +94,7 @@ const AddEdit_StateMaster = () => {
   const initialFormValues: FormValues = {
     ...initialValues,
     Name: toStringOrEmpty(stateMaster.formData.Name || stateMaster.formData.StateName),
-    F_CountryMaster: toStringOrEmpty(stateMaster.formData.F_CountryMaster),
+    StateCode: toStringOrEmpty(stateMaster.formData.StateCode),
   };
 
   /**
@@ -120,7 +105,7 @@ const AddEdit_StateMaster = () => {
       const formData = new FormData();
       formData.append("Id", String(stateMaster.id ?? 0));
       formData.append("Name", values.Name || "");
-      formData.append("F_CountryMaster", values.F_CountryMaster || "");
+      formData.append("StateCode", values.StateCode || "");
       formData.append("UserId", getCurrentUserId());
       formData.append("F_CompanyMaster", (() => { try { const a = JSON.parse(localStorage.getItem("authUser")||"{}"); return String(a?.F_CompanyMaster ?? a?.CompanyId ?? a?.F_Company ?? "0"); } catch(e){return "0";} })());
 
@@ -183,24 +168,18 @@ const AddEdit_StateMaster = () => {
                           <Col md="6">
                             <FormGroup>
                               <Label>
-                                Country <span className="text-danger">*</span>
+                                State Code
                               </Label>
                               <Input
-                                type="select"
-                                name="F_CountryMaster"
-                                value={values.F_CountryMaster}
+                                type="text"
+                                name="StateCode"
+                                placeholder="Enter state code"
+                                value={values.StateCode}
                                 onChange={handleChange}
                                 onBlur={handleBlur}
-                                invalid={touched.F_CountryMaster && !!errors.F_CountryMaster}
-                              >
-                                <option value="">Select country</option>
-                                {dropdowns.countries.map((country) => (
-                                  <option key={country?.Id} value={country?.Id ?? ""}>
-                                    {country?.Name || `Country ${country?.Id ?? ""}`}
-                                  </option>
-                                ))}
-                              </Input>
-                              <ErrorMessage name="F_CountryMaster" component="div" className="text-danger small" />
+                                invalid={touched.StateCode && !!errors.StateCode}
+                              />
+                              <ErrorMessage name="StateCode" component="div" className="text-danger small" />
                             </FormGroup>
                           </Col>
                         </Row>

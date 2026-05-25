@@ -101,7 +101,11 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/addEditTaxGroupMaster`, Component: <AddEdit_GSTGroup /> },
   { path: `${process.env.PUBLIC_URL}/ledgerMaster`, Component: <PageList_LedgerMaster /> },
  { path: `${process.env.PUBLIC_URL}/addEditLedgerMaster`, Component: <AddEdit_LedgerMaster /> },
-   { path: `${process.env.PUBLIC_URL}/purchaseEntry`, Component: <PurchaseEntry /> }
+   { path: `${process.env.PUBLIC_URL}/purchaseEntry`, Component: <PurchaseEntry /> },
+    { path: `${process.env.PUBLIC_URL}/addEditStateMaster`, Component: <AddEdit_StateMaster /> },
+  { path: `${process.env.PUBLIC_URL}/stateMaster`, Component: <PageList_StateMaster /> },
+    { path: `${process.env.PUBLIC_URL}/addEditCityMaster`, Component: <AddEdit_CityMaster /> },
+  { path: `${process.env.PUBLIC_URL}/cityMaster`, Component: <PageList_CityMaster /> },
   /*
   { path: `${process.env.PUBLIC_URL}/itemMaster`, Component: <PageList_ItemMaster /> },
   { path: `${process.env.PUBLIC_URL}/addEditItemGroup`, Component: <AddEdit_ItemGroup /> },

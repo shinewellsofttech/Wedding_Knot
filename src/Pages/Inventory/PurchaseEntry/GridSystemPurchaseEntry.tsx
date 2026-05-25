@@ -45,6 +45,7 @@ interface GridRow {
   Qty: string;
   Rate: string;
   Variant?: string;
+  Photos?: string[];
   ItemData: any[] | null;
   AvailableQty?: number;
 }
@@ -67,6 +68,7 @@ interface GridSystemPurchaseEntryProps {
   itemColorApplyMap?: Record<string | number, boolean>;
   onQuickAddItem?: ((rowIndex: number) => void) | null;
   onQuickAddItemGroup?: ((rowIndex: number) => void) | null;
+  onBarcodeFetch?: (index: number, barcode: string) => void;
 }
 
 const GridSystemPurchaseEntry: React.FC<GridSystemPurchaseEntryProps> = ({
@@ -87,6 +89,7 @@ const GridSystemPurchaseEntry: React.FC<GridSystemPurchaseEntryProps> = ({
   itemColorApplyMap = {},
   onQuickAddItem = null,
   onQuickAddItemGroup = null,
+  onBarcodeFetch,
 }) => {
   const inputRefs = useRef<Record<string, HTMLInputElement | HTMLSelectElement | HTMLButtonElement | null>>({});
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -146,12 +149,13 @@ const GridSystemPurchaseEntry: React.FC<GridSystemPurchaseEntryProps> = ({
         let nextFieldName = '';
 
         if (fieldName === 'ItemCode') {
+          if (onBarcodeFetch) {
+            onBarcodeFetch(rowIndex, row.ItemCode);
+          }
           nextFieldName = 'F_ItemGroupMaster';
         } else if (fieldName === 'F_ItemGroupMaster') {
           nextFieldName = 'F_ItemMaster';
         } else if (fieldName === 'F_ItemMaster') {
-          nextFieldName = 'Variant';
-        } else if (fieldName === 'Variant') {
           nextFieldName = 'Qty';
         } else if (fieldName === 'Qty') {
           nextFieldName = 'Rate';
@@ -194,6 +198,7 @@ const GridSystemPurchaseEntry: React.FC<GridSystemPurchaseEntryProps> = ({
               document.querySelector('.po-action-btn[type="submit"]') ||
               document.querySelector('button.po-action-btn');
           }
+          
 
           if (saveButton) {
             requestAnimationFrame(() => {
@@ -299,6 +304,11 @@ const GridSystemPurchaseEntry: React.FC<GridSystemPurchaseEntryProps> = ({
                           const itemCode = e.target.value;
                           onUpdateRow(index, 'ItemCode', itemCode);
                         }}
+                        onBlur={(e) => {
+                          if (onBarcodeFetch && e.target.value) {
+                            onBarcodeFetch(index, e.target.value);
+                          }
+                        }}
                         onKeyDown={(e) => handleKeyDown(e, index, 'ItemCode')}
                         data-row={index}
                         data-field="ItemCode"
@@ -350,18 +360,17 @@ const GridSystemPurchaseEntry: React.FC<GridSystemPurchaseEntryProps> = ({
                     </td>
 
                     <td className="py-0">
-                      <input
-                        ref={(ref) => setInputRef(ref, index, 'Variant')}
-                        type="text"
-                        className="form-control"
-                        value={row.Variant || ""}
-                        onChange={(e) => onUpdateRow(index, 'Variant', e.target.value)}
-                        onKeyDown={(e) => handleKeyDown(e, index, 'Variant')}
-                        data-row={index}
-                        data-field="Variant"
-                        disabled={disabled}
-                        placeholder="Varient"
-                      />
+                      {row.Photos && row.Photos.length > 0 ? (
+                        <div className="d-flex gap-1 flex-wrap align-items-center h-100 py-1">
+                          {row.Photos.map((photo, pIdx) => (
+                            <a key={pIdx} href={photo} target="_blank" rel="noreferrer">
+                              <img src={photo} alt="Variant" style={{ width: 30, height: 30, objectFit: 'cover', borderRadius: 4, border: '1px solid #ccc' }} />
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted small d-block mt-2">No Images</span>
+                      )}
                     </td>
 
                     <td className="py-0" style={{ textAlign: 'right' }}>

@@ -7,7 +7,7 @@ import { Card, CardBody, Col, Container, Input, Label, Row, Table, Badge } from 
 import { Btn } from "../../AbstractElements";
 import Breadcrumbs from "../../CommonElements/Breadcrumbs/Breadcrumbs";
 import CardHeaderCommon from "../../CommonElements/CardHeaderCommon/CardHeaderCommon";
-import { Fn_DeleteData, Fn_FillListData } from "../../store/Functions";
+import { Fn_DeleteData, Fn_FillListData, Fn_GetReport } from "../../store/Functions";
 import { API_WEB_URLS } from "../../constants/constAPI";
 
 const LIST_API_URL = `${API_WEB_URLS.MASTER}/0/token/ItemMasterData/Id/0`;
@@ -40,6 +40,9 @@ const PageList_ItemMaster = () => {
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
   const [printQtys, setPrintQtys] = useState<Record<string, number>>({});
 
+  const [filterCategory, setFilterCategory] = useState<string>("");
+  const [filterGstGroup, setFilterGstGroup] = useState<string>("");
+
   /**
    * Transforms standard video URLs into embeddable iframe URLs.
    */
@@ -64,20 +67,71 @@ const PageList_ItemMaster = () => {
   };
 
   /**
-   * Fetch item list from API.
+   * Fetch item list from API based on filters.
    */
   const loadData = useCallback(() => {
     setState((prev) => ({ ...prev, isProgress: true }));
-    Fn_FillListData(dispatch, (prev: any) => (typeof prev === "function" ? prev : prev), "items", LIST_API_URL)
-      .then((data: any) => {
-        const list = Array.isArray(data) ? data : data?.dataList ?? data?.data?.dataList ?? [];
-        setState((prev) => ({ ...prev, ItemMasterList: list, isProgress: false }));
+    const formData = new FormData();
+    if (filterCategory) formData.append("F_CategoryMaster", filterCategory);
+    if (filterGstGroup) formData.append("F_GSTGroupMaster", filterGstGroup);
+
+    Fn_GetReport(
+      dispatch,
+      () => {},
+      "custom",
+      "GetItemDetailByReference/0/token",
+      { arguList: { id: 0, formData } },
+      true
+    )
+      .then((dataList: any) => {
+        if (!dataList || !Array.isArray(dataList)) {
+          setState((prev) => ({ ...prev, ItemMasterList: [], isProgress: false }));
+          return;
+        }
+
+        const grouped: Record<string, any> = {};
+        dataList.forEach((v: any) => {
+          const itemMasterId = v.F_ItemMaster;
+          if (!grouped[itemMasterId]) {
+            grouped[itemMasterId] = {
+              Id: itemMasterId,
+              ItemName: v.ItemName,
+              HSNCode: v.HSNCode,
+              HasSize: v.HasSize,
+              F_CategoryMaster: v.F_CategoryMaster,
+              F_GSTGroupMaster: v.F_GSTGroupMaster,
+              F_UnitMaster: v.F_UnitMaster,
+              F_AlterUnitMaster: v.F_AlterUnitMaster,
+              UnitConversion: v.UnitConversion,
+              DesignDetails: []
+            };
+          }
+          grouped[itemMasterId].DesignDetails.push({
+            Id: v.Id,
+            SizeName: v.SizeName,
+            SalePrice: v.SalePrice,
+            Barcode: v.Barcode,
+            OpeningStock: v.OpeningStock,
+            DesignPhoto: v.DesignPhoto,
+            DesignPhoto2: v.DesignPhoto2,
+            DesignPhoto3: v.DesignPhoto3,
+            DesignPhoto4: v.DesignPhoto4,
+            DesignPhoto5: v.DesignPhoto5,
+            VideoLink: v.VideoLink,
+            Length: v.Length,
+            Width: v.Width,
+            Height: v.Height,
+            Weight: v.Weight
+          });
+        });
+
+        setState((prev) => ({ ...prev, ItemMasterList: Object.values(grouped), isProgress: false }));
       })
       .catch((error) => {
         console.error("Failed to load items:", error);
         setState((prev) => ({ ...prev, ItemMasterList: [], isProgress: false }));
       });
-  }, [dispatch]);
+  }, [dispatch, filterCategory, filterGstGroup]);
 
   useEffect(() => {
     loadData();
@@ -99,7 +153,11 @@ const PageList_ItemMaster = () => {
     Fn_FillListData(dispatch, () => {}, "alterUnits", "Masters/0/token/AlterUnitMaster/Id/0")
       .then((data: any) => setAlterUnits(Array.isArray(data) ? data : data?.dataList ?? data?.data?.dataList ?? []))
       .catch(console.error);
-  }, [loadData, dispatch]);
+  }, [dispatch]); // Removed loadData from dependency to prevent infinite loop
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   /**
    * Navigate to add form.
@@ -318,16 +376,52 @@ const PageList_ItemMaster = () => {
                 <CardHeaderCommon title="Item Master List" tagClass="card-title mb-0" />
                 <CardBody>
                   <Row className="mb-3">
-                    <Col md="6" className="d-flex align-items-center">
+                    <Col md="2" className="d-flex align-items-center">
                       <Label className="me-2 mb-0">Search:</Label>
                       <Input
                         type="search"
-                        placeholder="Search by Item Name, HSN Code..."
+                        placeholder="Search Item..."
                         value={state.filterText}
                         onChange={handleSearchChange}
                       />
                     </Col>
-                    <Col md="6" className="text-end">
+                    <Col md="3" className="d-flex align-items-center">
+                      <Label className="me-2 mb-0">Category:</Label>
+                      <Input
+                        type="select"
+                        value={filterCategory}
+                        onChange={(e) => setFilterCategory(e.target.value)}
+                      >
+                        <option value="">All Categories</option>
+                        {categories.map((c: any) => (
+                          <option key={c.Id} value={c.Id}>
+                            {c.Name || c.GroupName || c.Id}
+                          </option>
+                        ))}
+                      </Input>
+                    </Col>
+                    <Col md="3" className="d-flex align-items-center">
+                      <Label className="me-2 mb-0">GST:</Label>
+                      <Input
+                        type="select"
+                        value={filterGstGroup}
+                        onChange={(e) => setFilterGstGroup(e.target.value)}
+                      >
+                        <option value="">All GST Groups</option>
+                        {gstGroups.map((g: any) => (
+                          <option key={g.Id} value={g.Id}>
+                            {g.GSTGroupName || g.Id}
+                          </option>
+                        ))}
+                      </Input>
+                    </Col>
+                    <Col md="2" className="d-flex align-items-center">
+                      <Btn color="success" onClick={loadData} className="w-100">
+                        <i className="fa fa-search me-2" />
+                        Get Data
+                      </Btn>
+                    </Col>
+                    <Col md="2" className="text-end">
                       <Btn color="primary" onClick={handleAdd}>
                         <i className="fa fa-plus me-2" />
                         Add New Item
@@ -347,7 +441,10 @@ const PageList_ItemMaster = () => {
                         <thead className="table-light">
                           <tr>
                             <th>Variant / Info</th>
-                            <th>Size</th>
+                            <th>Length</th>
+                            <th>Width</th>
+                            <th>Height</th>
+                            <th>Weight</th>
                             <th>Price</th>
                             <th>Barcode</th>
                             <th>Stock</th>
@@ -380,7 +477,7 @@ const PageList_ItemMaster = () => {
                                 <React.Fragment key={item?.Id ?? index}>
                                   {/* Item Master Header Row */}
                                   <tr className="table-primary">
-                                    <td colSpan={7}>
+                                    <td colSpan={10}>
                                       <strong>#{index + 1} - {item?.ItemName || "-"}</strong>
                                       <span className="mx-2">|</span>
                                       <strong>HSN:</strong> {item?.HSNCode || "-"}
@@ -430,7 +527,7 @@ const PageList_ItemMaster = () => {
                                   {/* Item Design Master Variant Rows */}
                                   {parsedDesign.length === 0 ? (
                                     <tr>
-                                      <td colSpan={8} className="text-center text-muted py-2">
+                                      <td colSpan={11} className="text-center text-muted py-2">
                                         No variants available for this item.
                                       </td>
                                     </tr>
@@ -447,7 +544,10 @@ const PageList_ItemMaster = () => {
                                       return (
                                         <tr key={d.Id || dIdx}>
                                           <td className="ps-4">Variant {dIdx + 1}</td>
-                                          <td>{d.SizeName || "-"}</td>
+                                          <td>{d.Length || "-"}</td>
+                                          <td>{d.Width || "-"}</td>
+                                          <td>{d.Height || "-"}</td>
+                                          <td>{d.Weight || "-"}</td>
                                           <td>₹{d.SalePrice || "0"}</td>
                                           <td>
                                             {d.Barcode && d.Barcode.trim() !== "" ? (

@@ -15,13 +15,11 @@ import { getCurrentUserId, handleEnterToNextField } from "../../utils/formUtils"
 interface FormValues {
   Name: string;
   F_StateMaster: string;
-  F_CountryMaster: string;
 }
 
 const initialValues: FormValues = {
   Name: "",
   F_StateMaster: "",
-  F_CountryMaster: "",
 };
 
 interface CityMasterState {
@@ -34,14 +32,12 @@ interface CityMasterState {
 }
 
 interface DropdownState {
-  countries: Array<{ Id?: number; Name?: string }>;
   states: Array<{ Id?: number; Name?: string }>;
   isProgress?: boolean;
 }
 
 const API_URL_SAVE = `${API_WEB_URLS.CityMaster}/0/token`;
 const API_URL_EDIT = API_WEB_URLS.MASTER + `/0/token/${API_WEB_URLS.CityMaster}/Id`;
-const COUNTRY_LIST_URL = `${API_WEB_URLS.MASTER}/0/token/${API_WEB_URLS.CountryMaster}/Id/0`;
 const STATE_LIST_URL = `${API_WEB_URLS.MASTER}/0/token/${API_WEB_URLS.StateMaster}/Id/0`;
 
 /**
@@ -59,7 +55,6 @@ const AddEdit_CityMaster = () => {
   });
 
   const [dropdowns, setDropdowns] = useState<DropdownState>({
-    countries: [],
     states: [],
     isProgress: false,
   });
@@ -74,18 +69,14 @@ const AddEdit_CityMaster = () => {
       Yup.object({
         Name: Yup.string().trim().required("Name is required"),
         F_StateMaster: Yup.string().trim().required("State selection is required"),
-        F_CountryMaster: Yup.string().trim().required("Country selection is required"),
       }),
     []
   );
 
   /**
-   * Load country and state dropdowns on mount.
+   * Load state dropdown on mount.
    */
   useEffect(() => {
-    Fn_FillListData(dispatch, setDropdowns, "countries", COUNTRY_LIST_URL).catch((error) => {
-      console.error("Failed to fetch countries:", error);
-    });
     Fn_FillListData(dispatch, setDropdowns, "states", STATE_LIST_URL).catch((error) => {
       console.error("Failed to fetch states:", error);
     });
@@ -119,7 +110,6 @@ const AddEdit_CityMaster = () => {
     ...initialValues,
     Name: toStringOrEmpty(cityMaster.formData.Name || cityMaster.formData.CityName),
     F_StateMaster: toStringOrEmpty(cityMaster.formData.F_StateMaster),
-    F_CountryMaster: toStringOrEmpty(cityMaster.formData.F_CountryMaster),
   };
 
   /**
@@ -131,7 +121,6 @@ const AddEdit_CityMaster = () => {
       formData.append("Id", String(cityMaster.id ?? 0));
       formData.append("Name", values.Name || "");
       formData.append("F_StateMaster", values.F_StateMaster || "");
-      formData.append("F_CountryMaster", values.F_CountryMaster || "");
       formData.append("UserId", getCurrentUserId());
       formData.append("F_CompanyMaster", (() => { try { const a = JSON.parse(localStorage.getItem("authUser")||"{}"); return String(a?.F_CompanyMaster ?? a?.CompanyId ?? a?.F_Company ?? "0"); } catch(e){return "0";} })());
 
@@ -191,29 +180,7 @@ const AddEdit_CityMaster = () => {
                               <ErrorMessage name="Name" component="div" className="text-danger small" />
                             </FormGroup>
                           </Col>
-                          <Col md="6">
-                            <FormGroup>
-                              <Label>
-                                Country <span className="text-danger">*</span>
-                              </Label>
-                              <Input
-                                type="select"
-                                name="F_CountryMaster"
-                                value={values.F_CountryMaster}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                                invalid={touched.F_CountryMaster && !!errors.F_CountryMaster}
-                              >
-                                <option value="">Select country</option>
-                                {dropdowns.countries.map((country) => (
-                                  <option key={country?.Id} value={country?.Id ?? ""}>
-                                    {country?.Name || `Country ${country?.Id ?? ""}`}
-                                  </option>
-                                ))}
-                              </Input>
-                              <ErrorMessage name="F_CountryMaster" component="div" className="text-danger small" />
-                            </FormGroup>
-                          </Col>
+
                           <Col md="6">
                             <FormGroup>
                               <Label>
