@@ -18,11 +18,17 @@ interface FormValues {
   F_FinancialYearMaster: string;
   F_WarehouseMasterDefault: string;
   F_ColorMasterDefault: string;
-  AllowNegativeStock: boolean;
   F_CompanyMaster: string;
+  MobileNo: string;
+  PANNo: string;
+  EmailId: string;
   F_LedgerMaster_InterestPaid: string;
   F_LedgerMaster_InterestReceived: string;
   IsBatchAllowed: boolean;
+  F_StateMaster: string;
+  F_CityMaster: string;
+  FirmAddress: string;
+  GSTNo: string;
 }
 
 const initialValues: FormValues = {
@@ -30,11 +36,17 @@ const initialValues: FormValues = {
   F_FinancialYearMaster: "",
   F_WarehouseMasterDefault: "",
   F_ColorMasterDefault: "",
-  AllowNegativeStock: false,
   F_CompanyMaster: "",
+  MobileNo: "",
+  PANNo: "",
+  EmailId: "",
   F_LedgerMaster_InterestPaid: "",
   F_LedgerMaster_InterestReceived: "",
   IsBatchAllowed: false,
+  F_StateMaster: "",
+  F_CityMaster: "",
+  FirmAddress: "",
+  GSTNo: "",
 };
 
 interface DropdownState {
@@ -43,6 +55,8 @@ interface DropdownState {
   colorList: any[];
   companyList: any[];
   ledgerList: any[];
+  stateList: any[];
+  cityList: any[];
 }
 
 interface GlobalOptionsState {
@@ -53,11 +67,8 @@ interface GlobalOptionsState {
 const validationSchema = Yup.object().shape({
   FirmName: Yup.string().required("Firm Name is required"),
   F_FinancialYearMaster: Yup.string().required("Financial Year is required"),
-  F_WarehouseMasterDefault: Yup.string().required("Default Warehouse is required"),
-  F_ColorMasterDefault: Yup.string().required("Default Color is required"),
-  F_CompanyMaster: Yup.string().required("Company is required"),
-  F_LedgerMaster_InterestPaid: Yup.string().required("Interest Paid Ledger is required"),
-  F_LedgerMaster_InterestReceived: Yup.string().required("Interest Received Ledger is required"),
+  F_StateMaster: Yup.string().required("State is required"),
+  F_CityMaster: Yup.string().required("City is required"),
 });
 
 const API_URL_FETCH = `${API_WEB_URLS.MASTER}/0/token/GlobalOptions/Id/0`;
@@ -76,6 +87,8 @@ const GlobalOptions: React.FC = () => {
     colorList: [],
     companyList: [],
     ledgerList: [],
+    stateList: [],
+    cityList: [],
   });
 
   // Helper function to convert values to string or empty
@@ -86,11 +99,17 @@ const GlobalOptions: React.FC = () => {
     F_FinancialYearMaster: toStringOrEmpty(globalOptionsState.formData.F_FinancialYearMaster),
     F_WarehouseMasterDefault: toStringOrEmpty(globalOptionsState.formData.F_WarehouseMasterDefault),
     F_ColorMasterDefault: toStringOrEmpty(globalOptionsState.formData.F_ColorMasterDefault),
-    AllowNegativeStock: Boolean(globalOptionsState.formData.AllowNegativeStock),
     F_CompanyMaster: toStringOrEmpty(globalOptionsState.formData.F_CompanyMaster),
+    MobileNo: toStringOrEmpty(globalOptionsState.formData.MobileNo),
+    PANNo: toStringOrEmpty(globalOptionsState.formData.PANNo),
+    EmailId: toStringOrEmpty(globalOptionsState.formData.EmailId),
     F_LedgerMaster_InterestPaid: toStringOrEmpty(globalOptionsState.formData.F_LedgerMaster_InterestPaid),
     F_LedgerMaster_InterestReceived: toStringOrEmpty(globalOptionsState.formData.F_LedgerMaster_InterestReceived),
     IsBatchAllowed: Boolean(globalOptionsState.formData.IsBatchAllowed),
+    F_StateMaster: toStringOrEmpty(globalOptionsState.formData.F_StateMaster),
+    F_CityMaster: toStringOrEmpty(globalOptionsState.formData.F_CityMaster),
+    FirmAddress: toStringOrEmpty(globalOptionsState.formData.FirmAddress),
+    GSTNo: toStringOrEmpty(globalOptionsState.formData.GSTNo),
   };
 
   // Load dropdown data on component mount
@@ -106,6 +125,24 @@ const GlobalOptions: React.FC = () => {
     ).catch((error) => {
       console.error("Failed to fetch financial years:", error);
     });
+
+    Fn_FillListData(
+      dispatch,
+      setDropdowns,
+      "stateList",
+      `${API_WEB_URLS.MASTER}/0/token/StateMaster/Id/0`,
+      () => {},
+      () => {}
+    ).catch((error) => console.error("Failed to fetch states:", error));
+
+    Fn_FillListData(
+      dispatch,
+      setDropdowns,
+      "cityList",
+      `${API_WEB_URLS.MASTER}/0/token/CityMaster/Id/0`,
+      () => {},
+      () => {}
+    ).catch((error) => console.error("Failed to fetch cities:", error));
 
     // Load Warehouses (Godowns)
     Fn_FillListData(
@@ -180,11 +217,17 @@ const GlobalOptions: React.FC = () => {
               F_FinancialYearMaster: String(globalOptionsRecord.F_FinancialYearMaster || ""),
               F_WarehouseMasterDefault: String(globalOptionsRecord.F_WarehouseMasterDefault || ""),
               F_ColorMasterDefault: String(globalOptionsRecord.F_ColorMasterDefault || ""),
-              AllowNegativeStock: Boolean(globalOptionsRecord.AllowNegativeStock),
               F_CompanyMaster: String(globalOptionsRecord.F_CompanyMaster || ""),
+              MobileNo: globalOptionsRecord.MobileNo || "",
+              PANNo: globalOptionsRecord.PANNo || globalOptionsRecord.PanNo || "",
+              EmailId: globalOptionsRecord.EmailId || globalOptionsRecord.Email || "",
               F_LedgerMaster_InterestPaid: String(globalOptionsRecord.F_LedgerMaster_InterestPaid || ""),
               F_LedgerMaster_InterestReceived: String(globalOptionsRecord.F_LedgerMaster_InterestReceived || ""),
               IsBatchAllowed: Boolean(globalOptionsRecord.IsBatchAllowed),
+              F_StateMaster: String(globalOptionsRecord.F_StateMaster || ""),
+              F_CityMaster: String(globalOptionsRecord.F_CityMaster || ""),
+              FirmAddress: globalOptionsRecord.FirmAddress || "",
+              GSTNo: globalOptionsRecord.GSTNo || "",
             },
             isProgress: false,
           }));
@@ -203,17 +246,16 @@ const GlobalOptions: React.FC = () => {
 
       // Prepare form data
       const formData = new FormData();
-      formData.append("Id", "0");
       formData.append("FirmName", values.FirmName || "");
       formData.append("F_FinancialYearMaster", values.F_FinancialYearMaster || "");
-      formData.append("F_WarehouseMasterDefault", values.F_WarehouseMasterDefault || "");
-      formData.append("F_ColorMasterDefault", values.F_ColorMasterDefault || "");
-      formData.append("AllowNegativeStock", values.AllowNegativeStock.toString());
+      formData.append("F_StateMaster", values.F_StateMaster || "");
+      formData.append("F_CityMaster", values.F_CityMaster || "");
+      formData.append("FirmAddress", values.FirmAddress || "");
+      formData.append("GSTNo", values.GSTNo || "");
+      formData.append("PANNo", values.PANNo || "");
+      formData.append("MobileNo", values.MobileNo || "");
+      formData.append("EmailId", values.EmailId || "");
       formData.append("UserId", userId);
-      formData.append("F_LedgerMaster_InterestPaid", values.F_LedgerMaster_InterestPaid || "");
-      formData.append("F_LedgerMaster_InterestReceived", values.F_LedgerMaster_InterestReceived || "");
-      formData.append("IsBatchAllowed", values.IsBatchAllowed.toString());
-      formData.append("F_CompanyMaster", (() => { try { const a = JSON.parse(localStorage.getItem("authUser")||"{}"); return String(a?.F_CompanyMaster ?? a?.CompanyId ?? a?.F_Company ?? "0"); } catch(e){return "0";} })());
 
       const requestData = {
         arguList: { id: 0, formData },
@@ -306,168 +348,122 @@ const GlobalOptions: React.FC = () => {
                               <ErrorMessage name="F_FinancialYearMaster" component="div" className="text-danger small" />
                             </FormGroup>
                           </Col>
+
                           <Col md="6">
                             <FormGroup>
                               <Label>
-                                Default Warehouse <span className="text-danger">*</span>
+                                State <span className="text-danger">*</span>
                               </Label>
                               <Input
-                                name="F_WarehouseMasterDefault"
+                                name="F_StateMaster"
                                 type="select"
-                                value={values.F_WarehouseMasterDefault}
+                                value={values.F_StateMaster}
                                 onChange={handleChange}
                                 onBlur={handleBlur}
-                                invalid={touched.F_WarehouseMasterDefault && !!errors.F_WarehouseMasterDefault}
+                                invalid={touched.F_StateMaster && !!errors.F_StateMaster}
                               >
-                                <option value="">Select Default Warehouse</option>
-                                {dropdowns.warehouseList.map((item: any) => {
-                                  const itemId = String(item.Id ?? item.ID ?? item.id ?? "");
-                                  return (
-                                    <option key={itemId} value={itemId}>
-                                      {item.Name || item.GodownName}
-                                    </option>
-                                  );
-                                })}
+                                <option value="">Select State</option>
+                                {dropdowns.stateList.map((item: any) => (
+                                  <option key={item.Id} value={item.Id}>
+                                    {item.StateName || item.Name}
+                                  </option>
+                                ))}
                               </Input>
-                              <ErrorMessage name="F_WarehouseMasterDefault" component="div" className="text-danger small" />
+                              <ErrorMessage name="F_StateMaster" component="div" className="text-danger small" />
                             </FormGroup>
                           </Col>
+
                           <Col md="6">
                             <FormGroup>
                               <Label>
-                                Default Color <span className="text-danger">*</span>
+                                City <span className="text-danger">*</span>
                               </Label>
                               <Input
-                                name="F_ColorMasterDefault"
+                                name="F_CityMaster"
                                 type="select"
-                                value={values.F_ColorMasterDefault}
+                                value={values.F_CityMaster}
                                 onChange={handleChange}
                                 onBlur={handleBlur}
-                                invalid={touched.F_ColorMasterDefault && !!errors.F_ColorMasterDefault}
+                                invalid={touched.F_CityMaster && !!errors.F_CityMaster}
                               >
-                                <option value="">Select Default Color</option>
-                                {dropdowns.colorList.map((item: any) => {
-                                  const itemId = String(item.Id ?? item.ID ?? item.id ?? "");
-                                  return (
-                                    <option key={itemId} value={itemId}>
-                                      {item.Name || item.ColorName}
-                                    </option>
-                                  );
-                                })}
+                                <option value="">Select City</option>
+                                {dropdowns.cityList.map((item: any) => (
+                                  <option key={item.Id} value={item.Id}>
+                                    {item.CityName || item.Name}
+                                  </option>
+                                ))}
                               </Input>
-                              <ErrorMessage name="F_ColorMasterDefault" component="div" className="text-danger small" />
+                              <ErrorMessage name="F_CityMaster" component="div" className="text-danger small" />
                             </FormGroup>
                           </Col>
+
                           <Col md="6">
                             <FormGroup>
-                              <Label>
-                                Company <span className="text-danger">*</span>
-                              </Label>
+                              <Label>Firm Address</Label>
                               <Input
-                                name="F_CompanyMaster"
-                                type="select"
-                                value={values.F_CompanyMaster}
+                                name="FirmAddress"
+                                type="text"
+                                placeholder="Enter firm address"
+                                value={values.FirmAddress}
                                 onChange={handleChange}
                                 onBlur={handleBlur}
-                                invalid={touched.F_CompanyMaster && !!errors.F_CompanyMaster}
-                              >
-                                <option value="">Select Company</option>
-                                {dropdowns.companyList.map((item: any) => {
-                                  const itemId = String(item.Id ?? item.ID ?? item.id ?? "");
-                                  return (
-                                    <option key={itemId} value={itemId}>
-                                      {item.CompanyName || item.Name}
-                                    </option>
-                                  );
-                                })}
-                              </Input>
-                              <ErrorMessage name="F_CompanyMaster" component="div" className="text-danger small" />
+                              />
                             </FormGroup>
                           </Col>
+
                           <Col md="6">
                             <FormGroup>
-                              <Label>
-                                Interest Paid Ledger <span className="text-danger">*</span>
-                              </Label>
+                              <Label>GST No</Label>
                               <Input
-                                name="F_LedgerMaster_InterestPaid"
-                                type="select"
-                                value={values.F_LedgerMaster_InterestPaid}
+                                name="GSTNo"
+                                type="text"
+                                placeholder="Enter GST No"
+                                value={values.GSTNo}
                                 onChange={handleChange}
                                 onBlur={handleBlur}
-                                invalid={touched.F_LedgerMaster_InterestPaid && !!errors.F_LedgerMaster_InterestPaid}
-                              >
-                                <option value="">Select Interest Paid Ledger</option>
-                                {dropdowns.ledgerList.map((item: any) => {
-                                  const itemId = String(item.Id ?? item.ID ?? item.id ?? "");
-                                  return (
-                                    <option key={itemId} value={itemId}>
-                                      {item.Name || item.LedgerName}
-                                    </option>
-                                  );
-                                })}
-                              </Input>
-                              <ErrorMessage name="F_LedgerMaster_InterestPaid" component="div" className="text-danger small" />
+                              />
                             </FormGroup>
                           </Col>
+
                           <Col md="6">
                             <FormGroup>
-                              <Label>
-                                Interest Received Ledger <span className="text-danger">*</span>
-                              </Label>
+                              <Label>Mobile No</Label>
                               <Input
-                                name="F_LedgerMaster_InterestReceived"
-                                type="select"
-                                value={values.F_LedgerMaster_InterestReceived}
+                                name="MobileNo"
+                                type="text"
+                                placeholder="Enter mobile no"
+                                value={values.MobileNo}
                                 onChange={handleChange}
                                 onBlur={handleBlur}
-                                invalid={touched.F_LedgerMaster_InterestReceived && !!errors.F_LedgerMaster_InterestReceived}
-                              >
-                                <option value="">Select Interest Received Ledger</option>
-                                {dropdowns.ledgerList.map((item: any) => {
-                                  const itemId = String(item.Id ?? item.ID ?? item.id ?? "");
-                                  return (
-                                    <option key={itemId} value={itemId}>
-                                      {item.Name || item.LedgerName}
-                                    </option>
-                                  );
-                                })}
-                              </Input>
-                              <ErrorMessage name="F_LedgerMaster_InterestReceived" component="div" className="text-danger small" />
+                              />
                             </FormGroup>
                           </Col>
+
                           <Col md="6">
                             <FormGroup>
-                              <div className="form-check form-switch">
-                                <Input
-                                  name="AllowNegativeStock"
-                                  type="checkbox"
-                                  role="switch"
-                                  className="form-check-input"
-                                  checked={values.AllowNegativeStock}
-                                  onChange={handleChange}
-                                />
-                                <Label check className="form-check-label ms-2">
-                                  Allow Negative Stock
-                                </Label>
-                              </div>
+                              <Label>PAN No</Label>
+                              <Input
+                                name="PANNo"
+                                type="text"
+                                placeholder="Enter PAN no"
+                                value={values.PANNo}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                              />
                             </FormGroup>
                           </Col>
+
                           <Col md="6">
                             <FormGroup>
-                              <div className="form-check form-switch">
-                                <Input
-                                  name="IsBatchAllowed"
-                                  type="checkbox"
-                                  role="switch"
-                                  className="form-check-input"
-                                  checked={values.IsBatchAllowed}
-                                  onChange={handleChange}
-                                />
-                                <Label check className="form-check-label ms-2">
-                                  Is Batch Allowed
-                                </Label>
-                              </div>
+                              <Label>Email</Label>
+                              <Input
+                                name="EmailId"
+                                type="email"
+                                placeholder="Enter email address"
+                                value={values.EmailId}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                              />
                             </FormGroup>
                           </Col>
                         </Row>

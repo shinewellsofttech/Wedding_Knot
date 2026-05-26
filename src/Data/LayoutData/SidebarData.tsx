@@ -84,7 +84,14 @@ export const MenuList: MenuItem[] = [
         bookmark: true 
       },
     ]
-  }
+  },
+   {
+    title: "Tools",
+    Items: [
+      // { id: 1, title: "User Rights", path: `${process.env.PUBLIC_URL}/userRights`, icon: "Shield", type: "link", bookmark: true },
+      { id: 2, title: "Global Options", path: `${process.env.PUBLIC_URL}/globalOptions`, icon: "Settings", type: "link", bookmark: true },
+    ],
+  },
   /*
   {
     title: "Dashboard",

@@ -284,6 +284,7 @@ const GridSystemPurchaseEntry: React.FC<GridSystemPurchaseEntryProps> = ({
                   <th>Varient</th>
                   <th>Quantity</th>
                   <th>Rate</th>
+                  <th>Amount</th>
                   <th>Action</th>
                 </tr> 
               </thead>
@@ -326,7 +327,7 @@ const GridSystemPurchaseEntry: React.FC<GridSystemPurchaseEntryProps> = ({
                         onKeyDown={(e) => handleKeyDown(e, index, 'F_ItemGroupMaster')}
                         data-row={index}
                         data-field="F_ItemGroupMaster"
-                        disabled={disabled}
+                        disabled={true}
                       >
                         <option value="">Select Item Group</option>
                         {itemGroupMaster &&
@@ -347,7 +348,7 @@ const GridSystemPurchaseEntry: React.FC<GridSystemPurchaseEntryProps> = ({
                         onKeyDown={(e) => handleKeyDown(e, index, 'F_ItemMaster')}
                         data-row={index}
                         data-field="F_ItemMaster"
-                        disabled={disabled}
+                        disabled={true}
                       >
                         <option value="">Select Item</option>
                         {row.ItemData &&
@@ -405,6 +406,18 @@ const GridSystemPurchaseEntry: React.FC<GridSystemPurchaseEntryProps> = ({
                         placeholder="Rate"
                         min="0"
                         step="0.01"
+                      />
+                    </td>
+
+                    <td className="py-0" style={{ textAlign: 'right' }}>
+                      <input
+                        type="text"
+                        className="form-control"
+                        style={{ textAlign: 'right', width: '100%', minWidth: '80px', backgroundColor: '#e9ecef' }}
+                        value={((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)).toFixed(2)}
+                        disabled
+                        readOnly
+                        placeholder="Amount"
                       />
                     </td>
 

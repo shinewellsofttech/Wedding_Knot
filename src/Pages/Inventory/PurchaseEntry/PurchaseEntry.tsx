@@ -29,6 +29,7 @@ interface GridRow {
   AvailableQty?: number;
   F_PurchaseOrderH?: string | number;
   F_PurchaseOrderL?: string | number;
+  F_GSTGroupMaster?: string;
 }
 
 interface StateData {
@@ -57,6 +58,7 @@ interface StateData {
   itemColorApplyMap: Record<string, boolean>;
   isEditMode: boolean;
   GlobalOptions: any[];
+  GSTGroupMaster: any[];
 }
 
 function PurchaseEntry() {
@@ -98,6 +100,7 @@ function PurchaseEntry() {
     itemColorApplyMap: {},
     isEditMode: false,
     GlobalOptions: [],
+    GSTGroupMaster: [],
   });
 
   const [gridRows, setGridRows] = useState<GridRow[]>([
@@ -138,6 +141,8 @@ function PurchaseEntry() {
     Address: "",
   });
 
+  const [taxOverrides, setTaxOverrides] = useState<{ CGST?: string, SGST?: string, IGST?: string }>({});
+
   const saveButtonRef = useRef<HTMLButtonElement>(null);
 
   // Fetch master data on component mount
@@ -155,6 +160,9 @@ function PurchaseEntry() {
         else if (peData?.dataList && Array.isArray(peData.dataList)) peDataArray = peData.dataList;
         else if (peData?.data?.response && Array.isArray(peData.data.response)) peDataArray = peData.data.response;
 
+        const API_URL_GSTGROUP = API_WEB_URLS.MASTER + "/0/token/GSTGroupMaster/Id/0";
+        const gstData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_GSTGROUP);
+
         const extractArray = (data: any) => Array.isArray(data) ? data : (data?.data?.dataList || data?.dataList || data?.data?.response || data?.response || []);
 
         setState((prev) => ({
@@ -162,6 +170,7 @@ function PurchaseEntry() {
           ItemGroupMaster: extractArray(itemGroups),
           VendorMaster: extractArray(vendors),
           CreatedPurchaseEntries: peDataArray,
+          GSTGroupMaster: extractArray(gstData),
         }));
 
         const params = new URLSearchParams(location.search);
@@ -170,7 +179,7 @@ function PurchaseEntry() {
           await loadPurchaseEntryRecord(parseInt(recordId));
         } else {
           try {
-            const API_ENTRY_NO = API_WEB_URLS.MASTER + "/0/token/GetVoucherNoByVoucherTypeId/Id/10";
+            const API_ENTRY_NO = API_WEB_URLS.MASTER + "/0/token/GetVoucherNoByVoucherTypeId/Id/5";
             const entryNoData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_ENTRY_NO);
             let newEntryNo = "";
             let dataArray = extractArray(entryNoData);
@@ -280,25 +289,34 @@ function PurchaseEntry() {
     }));
 
     if (lines.length > 0) {
-      const mappedRows: GridRow[] = lines.map((l: any) => ({
-        ItemCode: l.Barcode || "",
-        F_ItemGroupMaster: String(l.F_CategoryMaster || ""),
-        F_ItemMaster: String(l.F_ItemMaster || ""),
-        F_ItemDesignMaster: String(l.F_ItemDesignMaster || ""),
-        F_ColorMaster: state.DefaultColor?.Id || "",
-        F_WarehouseMaster: state.DefaultWarehouse?.Id || "",
-        F_BatchMaster: "",
-        ItemName: l.ItemName || "",
-        DesignPhoto: l.DesignPhoto || "",
-        Variant: l.Variant || l.Varient || "",
-        Photos: l.DesignPhoto ? [l.DesignPhoto] : [],
-        Qty: String(l.Qty || ""),
-        Rate: l.Rate ? String(l.Rate) : "",
-        ItemData: [{ Id: l.F_ItemMaster, ItemName: l.ItemName || "Scanned Item" }],
-        AvailableQty: 0,
-        F_PurchaseOrderH: 0,
-        F_PurchaseOrderL: 0,
-      }));
+      const mappedRows: GridRow[] = lines.map((l: any) => {
+        let cleanPhoto = l.DesignPhoto || "";
+        if (cleanPhoto.includes("https://") && cleanPhoto.lastIndexOf("https://") > 0) {
+           cleanPhoto = cleanPhoto.substring(cleanPhoto.lastIndexOf("https://"));
+        } else if (cleanPhoto.includes("http://") && cleanPhoto.lastIndexOf("http://") > 0) {
+           cleanPhoto = cleanPhoto.substring(cleanPhoto.lastIndexOf("http://"));
+        }
+
+        return {
+          ItemCode: l.Barcode || "",
+          F_ItemGroupMaster: String(l.F_CategoryMaster || ""),
+          F_ItemMaster: String(l.F_ItemMaster || ""),
+          F_ItemDesignMaster: String(l.F_ItemDesignMaster || ""),
+          F_ColorMaster: state.DefaultColor?.Id || "",
+          F_WarehouseMaster: state.DefaultWarehouse?.Id || "",
+          F_BatchMaster: "",
+          ItemName: l.ItemName || "",
+          DesignPhoto: cleanPhoto,
+          Variant: l.Variant || l.Varient || "",
+          Photos: cleanPhoto ? [cleanPhoto] : [],
+          Qty: String(l.Qty || ""),
+          Rate: l.Rate ? String(l.Rate) : "",
+          ItemData: [{ Id: l.F_ItemMaster, ItemName: l.ItemName || "Scanned Item" }],
+          AvailableQty: 0,
+          F_PurchaseOrderH: 0,
+          F_PurchaseOrderL: 0,
+        };
+      });
       setGridRows(mappedRows);
     } else {
       setGridRows([{ ItemCode: "", F_ItemGroupMaster: "", F_ItemMaster: "", F_WarehouseMaster: state.DefaultWarehouse?.Id || "", F_BatchMaster: "", Variant: "", Qty: "", Rate: "", Photos: [], ItemData: null }]);
@@ -501,10 +519,10 @@ function PurchaseEntry() {
           F_ItemDesignMaster: String(designId),
           ItemName: item.ItemName || "Scanned Item",
           DesignPhoto: item.DesignPhoto || "",
-          Rate: String(item.SalePrice || 0),
           Variant: item.SizeName || "",
           Photos: photos,
-          ItemData: [{ Id: itemId, ItemName: item.ItemName || "Scanned Item" }]
+          F_GSTGroupMaster: item.F_GSTGroupMaster || "",
+          ItemData: [{ Id: itemId, ItemName: item.ItemName || "Scanned Item", F_GSTGroupMaster: item.F_GSTGroupMaster }]
         };
         
         setGridRows(updatedRows);
@@ -648,23 +666,68 @@ function PurchaseEntry() {
     if (gridRows.length === 0) { alert("Please add at least one item"); return; }
     for (let i = 0; i < gridRows.length; i++) {
       const row = gridRows[i];
-      if (!row.F_ItemMaster || !row.Qty || parseFloat(row.Qty) <= 0 || !row.Rate || parseFloat(row.Rate) < 0 || !row.F_WarehouseMaster) {
-        alert(`Row ${i + 1}: Please fill all required fields correctly`);
+      if (!row.F_ItemMaster || !row.Qty || parseFloat(row.Qty) <= 0 || !row.Rate || parseFloat(row.Rate) < 0) {
+        alert(`Row ${i + 1}: Please fill all required fields correctly (Item, Quantity, Rate)`);
         return;
       }
     }
     try {
       const obj = JSON.parse(localStorage.getItem("user") || "{}");
-      const jsonDataArray = gridRows.map((row) => ({
-        F_ItemDesignMaster: Number(row.F_ItemDesignMaster) || 0,
-        F_CategoryMaster: Number(row.F_ItemGroupMaster) || 0,
-        F_ItemMaster: Number(row.F_ItemMaster) || 0,
-        Barcode: row.ItemCode || "",
-        ItemName: row.ItemName || row.ItemData?.[0]?.ItemName || "",
-        DesignPhoto: row.DesignPhoto || row.Photos?.[0] || "",
-        Qty: Number(row.Qty) || 0,
-        Rate: Number(row.Rate) || 0,
-      }));
+      
+      let totalCGST = 0;
+      let totalSGST = 0;
+      let totalIGST = 0;
+      const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
+      const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+
+      const jsonDataArray = gridRows.map((row) => {
+        const qty = Number(row.Qty) || 0;
+        const rate = Number(row.Rate) || 0;
+        const amount = qty * rate;
+
+        let itemCGST = 0;
+        let itemSGST = 0;
+        let itemIGST = 0;
+
+        const itemObj = row.ItemData?.find((i: any) => String(i.Id) === String(row.F_ItemMaster)) ||
+                        state.ItemMaster?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
+        const gstGroupId = itemObj?.F_GSTGroupMaster || itemObj?.GSTGroupMasterId || itemObj?.GSTGroupId || row.F_GSTGroupMaster;
+        const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
+
+        if (gstGroup) {
+          if (isInState) {
+            itemCGST = amount * (parseFloat(gstGroup.CGSTPercent) / 100);
+            itemSGST = amount * (parseFloat(gstGroup.SGSTPercent) / 100);
+          } else {
+            itemIGST = amount * (parseFloat(gstGroup.IGSTPercent) / 100);
+          }
+        }
+        
+        totalCGST += itemCGST;
+        totalSGST += itemSGST;
+        totalIGST += itemIGST;
+
+        return {
+          F_ItemDesignMaster: Number(row.F_ItemDesignMaster) || 0,
+          F_CategoryMaster: Number(row.F_ItemGroupMaster) || 0,
+          F_ItemMaster: Number(row.F_ItemMaster) || 0,
+          Barcode: row.ItemCode || "",
+          ItemName: row.ItemName || row.ItemData?.[0]?.ItemName || "",
+          DesignPhoto: row.DesignPhoto || row.Photos?.[0] || "",
+          Qty: qty,
+          Rate: rate,
+          Amount: amount,
+          CGST: Number(itemCGST.toFixed(2)),
+          SGST: Number(itemSGST.toFixed(2)),
+          IGST: Number(itemIGST.toFixed(2))
+        };
+      });
+
+      const finalCGST = taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST;
+      const finalSGST = taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST;
+      const finalIGST = taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST;
+      const finalTotalTax = finalCGST + finalSGST + finalIGST;
+
       const headerFormData = new FormData();
       headerFormData.append("EntryDate", state.formData.PODate);
       headerFormData.append("EntryNo", state.formData.PONo || "");
@@ -672,6 +735,10 @@ function PurchaseEntry() {
       headerFormData.append("F_StatusMaster", "0");
       headerFormData.append("Remarks", state.formData.Remarks || "");
       headerFormData.append("UserId", obj?.uid || "0");
+      headerFormData.append("TotalCGST", finalCGST.toFixed(2));
+      headerFormData.append("TotalSGST", finalSGST.toFixed(2));
+      headerFormData.append("TotalIGST", finalIGST.toFixed(2));
+      headerFormData.append("TotalTax", finalTotalTax.toFixed(2));
       headerFormData.append("JsonData", JSON.stringify(jsonDataArray));
       headerFormData.append("F_CompanyMaster", "0");
       await Fn_AddEditData(dispatch, setState, { arguList: { id: state.id, formData: headerFormData } }, API_URL_SAVE, true, "memberid", navigate, "#");
@@ -801,6 +868,111 @@ function PurchaseEntry() {
                     />
                   </Col>
                 </Row>
+                
+                {/* Tax Summary Section */}
+                <Row className="mt-4">
+                  <Col md={{ size: 4, offset: 8 }}>
+                    {(() => {
+                      let totalCGST = 0;
+                      let totalSGST = 0;
+                      let totalIGST = 0;
+
+                      const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
+                      const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+
+                      gridRows.forEach((row) => {
+                        const qty = parseFloat(row.Qty) || 0;
+                        const rate = parseFloat(row.Rate) || 0;
+                        const amount = qty * rate;
+
+                        const itemObj = row.ItemData?.find((i: any) => String(i.Id) === String(row.F_ItemMaster)) ||
+                                        state.ItemMaster?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
+                                        
+                        const gstGroupId = itemObj?.F_GSTGroupMaster || itemObj?.GSTGroupMasterId || itemObj?.GSTGroupId || row.F_GSTGroupMaster;
+                        const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
+                        
+                        if (gstGroup) {
+                          if (isInState) {
+                            totalCGST += amount * (parseFloat(gstGroup.CGSTPercent) / 100);
+                            totalSGST += amount * (parseFloat(gstGroup.SGSTPercent) / 100);
+                          } else {
+                            totalIGST += amount * (parseFloat(gstGroup.IGSTPercent) / 100);
+                          }
+                        }
+                      });
+
+                      const finalCGST = taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST;
+                      const finalSGST = taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST;
+                      const finalIGST = taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST;
+
+                      const totalTax = finalCGST + finalSGST + finalIGST;
+                      const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
+                      const grandTotal = subTotal + totalTax;
+
+                      return (
+                        <div className="table-responsive">
+                          <table className="table table-bordered table-sm mb-0 align-middle">
+                            <tbody>
+                              <tr>
+                                <th className="text-end w-50">Sub Total:</th>
+                                <td className="text-end fw-bold">{subTotal.toFixed(2)}</td>
+                              </tr>
+                              {isInState ? (
+                                <>
+                                  <tr>
+                                    <th className="text-end">Total CGST:</th>
+                                    <td className="text-end">
+                                      <Input 
+                                        type="number" 
+                                        bsSize="sm" 
+                                        className="text-end m-0 p-1" 
+                                        value={taxOverrides.CGST !== undefined ? taxOverrides.CGST : totalCGST.toFixed(2)} 
+                                        onChange={(e) => setTaxOverrides(prev => ({ ...prev, CGST: e.target.value }))} 
+                                      />
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <th className="text-end">Total SGST:</th>
+                                    <td className="text-end">
+                                      <Input 
+                                        type="number" 
+                                        bsSize="sm" 
+                                        className="text-end m-0 p-1" 
+                                        value={taxOverrides.SGST !== undefined ? taxOverrides.SGST : totalSGST.toFixed(2)} 
+                                        onChange={(e) => setTaxOverrides(prev => ({ ...prev, SGST: e.target.value }))} 
+                                      />
+                                    </td>
+                                  </tr>
+                                </>
+                              ) : (
+                                <tr>
+                                  <th className="text-end">Total IGST:</th>
+                                  <td className="text-end">
+                                    <Input 
+                                      type="number" 
+                                      bsSize="sm" 
+                                      className="text-end m-0 p-1" 
+                                      value={taxOverrides.IGST !== undefined ? taxOverrides.IGST : totalIGST.toFixed(2)} 
+                                      onChange={(e) => setTaxOverrides(prev => ({ ...prev, IGST: e.target.value }))} 
+                                    />
+                                  </td>
+                                </tr>
+                              )}
+                              <tr>
+                                <th className="text-end text-danger">Total Tax:</th>
+                                <td className="text-end text-danger fw-bold">{totalTax.toFixed(2)}</td>
+                              </tr>
+                              <tr>
+                                <th className="text-end text-success fs-5">Grand Total:</th>
+                                <td className="text-end text-success fw-bold fs-5">{grandTotal.toFixed(2)}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()}
+                  </Col>
+                </Row>
               </CardBody>
               <CardFooter className="d-flex flex-row flex-nowrap gap-2 justify-content-end p-2 p-sm-3">
                 <button ref={saveButtonRef} type="button" className="btn btn-primary m-0" onClick={handleSave}><i className="bx bx-save me-2"></i>Save</button>
@@ -902,12 +1074,81 @@ function PurchaseEntry() {
             })}
           </tbody>
           <tfoot>
-            <tr className="total-row">
-              <td colSpan={5} className="text-right">Total:</td>
-              <td className="text-right">{gridRows.reduce((sum, row) => sum + (parseFloat(row.Qty) || 0), 0)}</td>
-              <td></td>
-              <td className="text-right">{gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0).toFixed(2)}</td>
-            </tr>
+            {(() => {
+              let totalCGST = 0;
+              let totalSGST = 0;
+              let totalIGST = 0;
+              const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
+              const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+
+              gridRows.forEach((row) => {
+                const qty = parseFloat(row.Qty) || 0;
+                const rate = parseFloat(row.Rate) || 0;
+                const amount = qty * rate;
+                const itemObj = row.ItemData?.find((i: any) => String(i.Id) === String(row.F_ItemMaster)) ||
+                                state.ItemMaster?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
+                const gstGroupId = itemObj?.F_GSTGroupMaster || itemObj?.GSTGroupMasterId || itemObj?.GSTGroupId || row.F_GSTGroupMaster;
+                const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
+                
+                if (gstGroup) {
+                  if (isInState) {
+                    totalCGST += amount * (parseFloat(gstGroup.CGSTPercent) / 100);
+                    totalSGST += amount * (parseFloat(gstGroup.SGSTPercent) / 100);
+                  } else {
+                    totalIGST += amount * (parseFloat(gstGroup.IGSTPercent) / 100);
+                  }
+                }
+              });
+
+              const finalCGST = taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST;
+              const finalSGST = taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST;
+              const finalIGST = taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST;
+
+              const totalTax = finalCGST + finalSGST + finalIGST;
+              const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
+              const grandTotal = subTotal + totalTax;
+
+              return (
+                <>
+                  <tr className="total-row">
+                    <td colSpan={5} className="text-right">Total Qty:</td>
+                    <td className="text-right">{gridRows.reduce((sum, row) => sum + (parseFloat(row.Qty) || 0), 0)}</td>
+                    <td className="text-right">Sub Total:</td>
+                    <td className="text-right">{subTotal.toFixed(2)}</td>
+                  </tr>
+                  {isInState ? (
+                    <>
+                      <tr className="total-row">
+                        <td colSpan={6}></td>
+                        <td className="text-right">Total CGST:</td>
+                        <td className="text-right">{finalCGST.toFixed(2)}</td>
+                      </tr>
+                      <tr className="total-row">
+                        <td colSpan={6}></td>
+                        <td className="text-right">Total SGST:</td>
+                        <td className="text-right">{finalSGST.toFixed(2)}</td>
+                      </tr>
+                    </>
+                  ) : (
+                    <tr className="total-row">
+                      <td colSpan={6}></td>
+                      <td className="text-right">Total IGST:</td>
+                      <td className="text-right">{finalIGST.toFixed(2)}</td>
+                    </tr>
+                  )}
+                  <tr className="total-row">
+                    <td colSpan={6}></td>
+                    <td className="text-right">Total Tax:</td>
+                    <td className="text-right">{totalTax.toFixed(2)}</td>
+                  </tr>
+                  <tr className="total-row" style={{fontSize: '1.2em', fontWeight: 'bold'}}>
+                    <td colSpan={6}></td>
+                    <td className="text-right">Grand Total:</td>
+                    <td className="text-right">{grandTotal.toFixed(2)}</td>
+                  </tr>
+                </>
+              );
+            })()}
           </tfoot>
         </table>
       </div>

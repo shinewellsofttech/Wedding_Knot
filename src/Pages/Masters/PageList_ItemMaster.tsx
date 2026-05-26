@@ -3,7 +3,7 @@ import Barcode from 'react-barcode';
 import { toast } from "react-toastify";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { Card, CardBody, Col, Container, Input, Label, Row, Table, Badge } from "reactstrap";
+import { Card, CardBody, Col, Container, Input, Label, Row, Table, Badge, Pagination, PaginationItem, PaginationLink } from "reactstrap";
 import { Btn } from "../../AbstractElements";
 import Breadcrumbs from "../../CommonElements/Breadcrumbs/Breadcrumbs";
 import CardHeaderCommon from "../../CommonElements/CardHeaderCommon/CardHeaderCommon";
@@ -39,9 +39,23 @@ const PageList_ItemMaster = () => {
   const [alterUnits, setAlterUnits] = useState<any[]>([]);
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
   const [printQtys, setPrintQtys] = useState<Record<string, number>>({});
+  const [printCodes, setPrintCodes] = useState<Record<string, string>>({});
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [globalOptions, setGlobalOptions] = useState<any[]>([]);
 
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [filterGstGroup, setFilterGstGroup] = useState<string>("");
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(20);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [state.filterText, filterCategory, filterGstGroup]);
+
+  const toggleRow = (id: string) => {
+    setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   /**
    * Transforms standard video URLs into embeddable iframe URLs.
@@ -153,6 +167,10 @@ const PageList_ItemMaster = () => {
     Fn_FillListData(dispatch, () => {}, "alterUnits", "Masters/0/token/AlterUnitMaster/Id/0")
       .then((data: any) => setAlterUnits(Array.isArray(data) ? data : data?.dataList ?? data?.data?.dataList ?? []))
       .catch(console.error);
+
+    Fn_FillListData(dispatch, () => {}, "globalOptions", "Masters/0/token/GlobalOptions/Id/0")
+      .then((data: any) => setGlobalOptions(Array.isArray(data) ? data : data?.dataList ?? data?.data?.dataList ?? []))
+      .catch(console.error);
   }, [dispatch]); // Removed loadData from dependency to prevent infinite loop
 
   useEffect(() => {
@@ -220,86 +238,90 @@ const PageList_ItemMaster = () => {
         <head>
           <title>Print Barcodes</title>
           <style>
-            body { font-family: sans-serif; text-align: center; margin: 0; padding: 0; }
+            body { font-family: sans-serif; text-align: center; margin: 0; padding: 0; background: #fff; }
             .no-print { padding: 15px; background: #f8f9fa; border-bottom: 1px solid #ddd; margin-bottom: 20px; }
-            .controls { display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap; }
-            .control-group { display: flex; align-items: center; gap: 5px; }
             
             #printArea {
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              justify-items: center;
-              gap: 15px 5px;
+              display: flex;
+              flex-wrap: wrap;
+              gap: 10px;
               padding: 10px;
+              justify-content: center;
             }
             
             .barcode-card { 
+              width: 50mm;
+              height: 25mm;
               border: 1px dashed #999; 
-              padding: 5px; 
-              border-radius: 4px; 
-              page-break-inside: avoid;
+              padding: 1mm; 
+              box-sizing: border-box;
               display: flex;
               flex-direction: column;
               align-items: center;
               justify-content: center;
-              box-sizing: border-box;
               overflow: hidden;
               background: #fff;
+              page-break-inside: avoid;
             }
-            .barcode-wrapper { margin: 0 auto; }
-            .barcode-wrapper svg { width: 100% !important; height: auto !important; }
             
-            .item-name { font-weight: bold; font-size: 14px; margin-bottom: 5px; text-align: center; }
-            .item-price { font-size: 16px; font-weight: bold; margin-top: 5px; text-align: center; }
+            .barcode-wrapper { 
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              width: 100%;
+              flex: 1;
+              overflow: hidden;
+            }
+            .barcode-wrapper svg { width: 100% !important; height: 100% !important; max-height: 14mm !important; }
+            
+            .item-name { font-weight: bold; font-size: 8px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+            .item-price { font-size: 9px; font-weight: bold; margin-top: 1px; text-align: center; }
+            .header-row { display: flex; align-items: center; justify-content: center; gap: 3px; margin-bottom: 1px; width: 100%; }
+            .header-row img { height: 8px; width: auto; }
             
             @media print {
-              @page { margin: 5mm; }
-              body { margin: 0; }
+              @page { size: 50mm 25mm; margin: 0; }
+              body { margin: 0; padding: 0; }
               .no-print { display: none !important; }
-              /* Force the exact dimensions to be respected during printing */
+              #printArea { display: block; padding: 0; gap: 0; }
               .barcode-card { 
+                width: 50mm !important;
+                height: 25mm !important;
+                border: none !important;
+                padding: 1mm !important;
+                margin: 0 !important;
+                page-break-after: always;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
-                border: 1px dashed #ccc; /* Keeps cut guidelines visible in print */
               }
             }
           </style>
         </head>
         <body>
           <div class="no-print">
-            <div class="controls">
-              <div class="control-group">
-                <label><strong>Box Width:</strong></label>
-                <input type="range" id="boxWidth" min="100" max="600" value="300" oninput="updateStyles()" />
-                <span id="lblBW">300px</span>
-              </div>
-              <div class="control-group">
-                <label><strong>Box Height:</strong></label>
-                <input type="range" id="boxHeight" min="80" max="400" value="150" oninput="updateStyles()" />
-                <span id="lblBH">150px</span>
-              </div>
-              <div class="control-group">
-                <label><strong>Barcode Size:</strong></label>
-                <input type="range" id="bcSize" min="50" max="400" value="150" oninput="updateStyles()" />
-                <span id="lblBC">150px</span>
-              </div>
-              <button onclick="window.print()" style="padding: 8px 20px; background: #0d6efd; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Print Now</button>
-            </div>
+            <button onclick="window.print()" style="padding: 8px 20px; background: #0d6efd; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Print Now</button>
+            <p style="margin-top: 10px; font-size: 14px; color: #666;">Make sure printer is set to <strong>50mm x 25mm</strong>, margins to <strong>None</strong>, and disable Headers/Footers.</p>
           </div>
           <div id="printArea">
     `;
 
+    const firmName = globalOptions[0]?.FirmName || "FIRM NAME";
+
     variantsToPrint.forEach((d: any, dIdx: number) => {
       const qty = printQtys[d.Id || dIdx] || 0;
+      const pCode = printCodes[d.Id || dIdx] || "";
       const el = document.querySelector(`.im-barcode-svg-${d.Id || dIdx}`);
       if (el) {
         for (let i = 0; i < qty; i++) {
-          html += `<div class="barcode-card" style="width: 300px; height: 150px;">
-            <div class="item-name">${item.ItemName} - ${dIdx + 1} ${d.SizeName ? '(' + d.SizeName + ')' : ''}</div>
-            <div class="barcode-wrapper" style="width: 150px;">
+          html += `<div class="barcode-card">
+            <div class="header-row">
+              <img src="/assets/images/Wedding-logo.png" />
+              <span class="item-name">${firmName}</span>
+            </div>
+            <div class="barcode-wrapper">
               ${el.innerHTML}
             </div>
-            <div class="item-price">₹${d.SalePrice || "0"}</div>
+            <div class="item-price">${pCode}</div>
           </div>`;
         }
       }
@@ -375,68 +397,75 @@ const PageList_ItemMaster = () => {
               <Card>
                 <CardHeaderCommon title="Item Master List" tagClass="card-title mb-0" />
                 <CardBody>
-                  <Row className="mb-3">
-                    <Col md="2" className="d-flex align-items-center">
-                      <Label className="me-2 mb-0">Search:</Label>
-                      <Input
-                        type="search"
-                        placeholder="Search Item..."
-                        value={state.filterText}
-                        onChange={handleSearchChange}
-                      />
-                    </Col>
-                    <Col md="3" className="d-flex align-items-center">
-                      <Label className="me-2 mb-0">Category:</Label>
-                      <Input
-                        type="select"
-                        value={filterCategory}
-                        onChange={(e) => setFilterCategory(e.target.value)}
-                      >
-                        <option value="">All Categories</option>
-                        {categories.map((c: any) => (
-                          <option key={c.Id} value={c.Id}>
-                            {c.Name || c.GroupName || c.Id}
-                          </option>
-                        ))}
-                      </Input>
-                    </Col>
-                    <Col md="3" className="d-flex align-items-center">
-                      <Label className="me-2 mb-0">GST:</Label>
-                      <Input
-                        type="select"
-                        value={filterGstGroup}
-                        onChange={(e) => setFilterGstGroup(e.target.value)}
-                      >
-                        <option value="">All GST Groups</option>
-                        {gstGroups.map((g: any) => (
-                          <option key={g.Id} value={g.Id}>
-                            {g.GSTGroupName || g.Id}
-                          </option>
-                        ))}
-                      </Input>
-                    </Col>
-                    <Col md="2" className="d-flex align-items-center">
-                      <Btn color="success" onClick={loadData} className="w-100">
-                        <i className="fa fa-search me-2" />
-                        Get Data
-                      </Btn>
-                    </Col>
-                    <Col md="2" className="text-end">
-                      <Btn color="primary" onClick={handleAdd}>
-                        <i className="fa fa-plus me-2" />
-                        Add New Item
-                      </Btn>
-                    </Col>
-                  </Row>
+                  <div className="p-3 mb-4 bg-light rounded border">
+                    <Row className="g-3 align-items-end">
+                      <Col md="3">
+                        <Label className="mb-1 text-muted fw-bold" style={{ fontSize: "0.85rem" }}>Search Items</Label>
+                        <Input
+                          type="search"
+                          placeholder="Search Item..."
+                          value={state.filterText}
+                          onChange={handleSearchChange}
+                        />
+                      </Col>
+                      <Col md="3">
+                        <Label className="mb-1 text-muted fw-bold" style={{ fontSize: "0.85rem" }}>Category</Label>
+                        <Input
+                          type="select"
+                          value={filterCategory}
+                          onChange={(e) => setFilterCategory(e.target.value)}
+                        >
+                          <option value="">All Categories</option>
+                          {categories.map((c: any) => (
+                            <option key={c.Id} value={c.Id}>
+                              {c.Name || c.GroupName || c.Id}
+                            </option>
+                          ))}
+                        </Input>
+                      </Col>
+                      <Col md="2">
+                        <Label className="mb-1 text-muted fw-bold" style={{ fontSize: "0.85rem" }}>GST Group</Label>
+                        <Input
+                          type="select"
+                          value={filterGstGroup}
+                          onChange={(e) => setFilterGstGroup(e.target.value)}
+                        >
+                          <option value="">All GST Groups</option>
+                          {gstGroups.map((g: any) => (
+                            <option key={g.Id} value={g.Id}>
+                              {g.GSTGroupName || g.Id}
+                            </option>
+                          ))}
+                        </Input>
+                      </Col>
+                      <Col md="2">
+                        <Btn color="success" onClick={loadData} className="w-100">
+                          <i className="fa fa-refresh me-2" />
+                          Refresh
+                        </Btn>
+                      </Col>
+                      <Col md="2">
+                        <Btn color="primary" onClick={handleAdd} className="w-100">
+                          <i className="fa fa-plus me-2" />
+                          Add Item
+                        </Btn>
+                      </Col>
+                    </Row>
+                  </div>
 
-                  {state.isProgress ? (
-                    <div className="text-center py-5">
-                      <div className="spinner-border" role="status">
-                        <span className="visually-hidden">Loading...</span>
+                  {(() => {
+                    const totalPages = Math.ceil(filteredList.length / itemsPerPage);
+                    const currentItems = filteredList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+                    
+                    return state.isProgress ? (
+                      <div className="text-center py-5">
+                        <div className="spinner-border" role="status">
+                          <span className="visually-hidden">Loading...</span>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="table-responsive">
+                    ) : (
+                      <>
+                        <div className="table-responsive">
                       <Table bordered hover>
                         <thead className="table-light">
                           <tr>
@@ -461,7 +490,8 @@ const PageList_ItemMaster = () => {
                               </td>
                             </tr>
                           ) : (
-                            filteredList.map((item: any, index: number) => {
+                            currentItems.map((item: any, index: number) => {
+                              const absoluteIndex = (currentPage - 1) * itemsPerPage + index;
                               let parsedDesign: any[] = [];
                               try {
                                 if (typeof item.DesignDetails === "string") {
@@ -478,7 +508,18 @@ const PageList_ItemMaster = () => {
                                   {/* Item Master Header Row */}
                                   <tr className="table-primary">
                                     <td colSpan={10}>
-                                      <strong>#{index + 1} - {item?.ItemName || "-"}</strong>
+                                      <Btn 
+                                        color="primary" 
+                                        outline 
+                                        size="sm" 
+                                        className="me-2 px-2 py-0 rounded-circle" 
+                                        style={{ width: '28px', height: '28px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                        onClick={() => toggleRow(String(item?.Id ?? index))}
+                                        title={expandedRows[String(item?.Id ?? index)] ? "Collapse" : "Expand"}
+                                      >
+                                        <i className={`fa ${expandedRows[String(item?.Id ?? index)] ? "fa-chevron-down" : "fa-chevron-right"}`} />
+                                      </Btn>
+                                      <strong>#{absoluteIndex + 1} - {item?.ItemName || "-"}</strong>
                                       <span className="mx-2">|</span>
                                       <strong>HSN:</strong> {item?.HSNCode || "-"}
                                       <span className="mx-2">|</span>
@@ -525,14 +566,15 @@ const PageList_ItemMaster = () => {
                                   </tr>
                                   
                                   {/* Item Design Master Variant Rows */}
-                                  {parsedDesign.length === 0 ? (
-                                    <tr>
-                                      <td colSpan={11} className="text-center text-muted py-2">
-                                        No variants available for this item.
-                                      </td>
-                                    </tr>
-                                  ) : (
-                                    parsedDesign.map((d: any, dIdx: number) => {
+                                  {expandedRows[String(item?.Id ?? index)] && (
+                                    parsedDesign.length === 0 ? (
+                                      <tr>
+                                        <td colSpan={11} className="text-center text-muted py-2">
+                                          No variants available for this item.
+                                        </td>
+                                      </tr>
+                                    ) : (
+                                      parsedDesign.map((d: any, dIdx: number) => {
                                       const images = [
                                         d.DesignPhoto,
                                         d.DesignPhoto2,
@@ -565,6 +607,17 @@ const PageList_ItemMaster = () => {
                                                     value={printQtys[d.Id || dIdx] || ""} 
                                                     onChange={(e) => setPrintQtys(prev => ({ ...prev, [d.Id || dIdx]: parseInt(e.target.value) || 0 }))}
                                                     style={{ width: '60px' }}
+                                                  />
+                                                </div>
+                                                <div className="mt-2 d-flex align-items-center justify-content-center">
+                                                  <Label className="me-2 mb-0" style={{fontSize: '12px'}}>Print Code:</Label>
+                                                  <Input 
+                                                    type="text" 
+                                                    bsSize="sm"
+                                                    value={printCodes[d.Id || dIdx] || ""} 
+                                                    onChange={(e) => setPrintCodes(prev => ({ ...prev, [d.Id || dIdx]: e.target.value }))}
+                                                    style={{ width: '100px' }}
+                                                    placeholder="Code"
                                                   />
                                                 </div>
                                               </div>
@@ -621,7 +674,7 @@ const PageList_ItemMaster = () => {
                                         </tr>
                                       );
                                     })
-                                  )}
+                                  ))}
                                 </React.Fragment>
                               );
                             })
@@ -629,7 +682,63 @@ const PageList_ItemMaster = () => {
                         </tbody>
                       </Table>
                     </div>
-                  )}
+                    
+                    {totalPages > 0 && (
+                      <div className="d-flex justify-content-between align-items-center mt-3 p-2 bg-light rounded border">
+                        <div className="d-flex align-items-center flex-wrap gap-2">
+                          <div className="text-muted small">
+                            Showing {filteredList.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredList.length)} of {filteredList.length} items
+                          </div>
+                          <div className="d-flex align-items-center ms-0 ms-md-3">
+                            <Label className="mb-0 me-2 small text-muted text-nowrap">Rows:</Label>
+                            <Input
+                              type="number"
+                              bsSize="sm"
+                              min="1"
+                              max="20"
+                              value={itemsPerPage || ""}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value);
+                                if (!isNaN(val)) {
+                                  setItemsPerPage(Math.min(20, Math.max(1, val)));
+                                  setCurrentPage(1);
+                                } else {
+                                  setItemsPerPage(20);
+                                  setCurrentPage(1);
+                                }
+                              }}
+                              style={{ width: "70px" }}
+                            />
+                          </div>
+                        </div>
+                        <Pagination className="mb-0">
+                          <PaginationItem disabled={currentPage === 1}>
+                            <PaginationLink previous onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} />
+                          </PaginationItem>
+                          {[...Array(totalPages)].map((_, i) => {
+                            if (i + 1 === 1 || i + 1 === totalPages || (i + 1 >= currentPage - 2 && i + 1 <= currentPage + 2)) {
+                              return (
+                                <PaginationItem active={i + 1 === currentPage} key={i}>
+                                  <PaginationLink onClick={() => setCurrentPage(i + 1)}>
+                                    {i + 1}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              );
+                            }
+                            if (i + 1 === currentPage - 3 || i + 1 === currentPage + 3) {
+                              return <PaginationItem disabled key={i}><PaginationLink>...</PaginationLink></PaginationItem>;
+                            }
+                            return null;
+                          })}
+                          <PaginationItem disabled={currentPage === totalPages}>
+                            <PaginationLink next onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} />
+                          </PaginationItem>
+                        </Pagination>
+                      </div>
+                    )}
+                      </>
+                    );
+                  })()}
                 </CardBody>
               </Card>
             </Col>

@@ -106,6 +106,8 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/stateMaster`, Component: <PageList_StateMaster /> },
     { path: `${process.env.PUBLIC_URL}/addEditCityMaster`, Component: <AddEdit_CityMaster /> },
   { path: `${process.env.PUBLIC_URL}/cityMaster`, Component: <PageList_CityMaster /> },
+
+    { path: `${process.env.PUBLIC_URL}/globalOptions`, Component: <GlobalOptions /> }
   /*
   { path: `${process.env.PUBLIC_URL}/itemMaster`, Component: <PageList_ItemMaster /> },
   { path: `${process.env.PUBLIC_URL}/addEditItemGroup`, Component: <AddEdit_ItemGroup /> },
