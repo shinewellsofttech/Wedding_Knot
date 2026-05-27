@@ -78,11 +78,18 @@ export const MenuList: MenuItem[] = [
       {
         id:1,
         title: "Purchase Entry", 
-        path: `${process.env.PUBLIC_URL}/purchaseEntry  `, 
+        path: `${process.env.PUBLIC_URL}/purchaseEntry`, 
         icon: "Box", 
         type: "link", 
         bookmark: true 
       },
+      {
+        id: 2, title: "Sales Invoice",
+        path: `${process.env.PUBLIC_URL}/salesInvoice`,
+        icon: "Box",
+        type: "link",
+        bookmark: true
+      }
     ]
   },
    {

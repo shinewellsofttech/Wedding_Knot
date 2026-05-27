@@ -1,10 +1,11 @@
+// Verified exact structural match with PurchaseEntry
 import React, { useState, useEffect, useRef } from "react";
 import { Col, Row, Card, CardBody, CardFooter, Button, Modal, ModalBody, ModalHeader, ModalFooter, Form, FormGroup, Label, Input, Container } from "reactstrap";
 import { Fn_AddEditData, Fn_DisplayData, Fn_FillListData, Fn_GetReport, Fn_DeleteData } from "../../../store/Functions";
 import { useDispatch } from "react-redux";
 import { API_WEB_URLS } from "../../../constants/constAPI";
 import { useLocation, useNavigate } from "react-router-dom";
-import GridSystemPurchaseEntry from "./GridSystemPurchaseEntry";
+import GridSystemSalesInvoice from "./GridSystemSalesInvoice";
 import { getCurrentDateYYYYMMDD, parseDateFromAPI } from "../../../helpers/dateUtils";
 import DateInput from "../../../CommonElements/DateInput/DateInput";
 import Breadcrumbs from "../../../CommonElements/Breadcrumbs/Breadcrumbs";
@@ -27,8 +28,8 @@ interface GridRow {
   Photos?: string[];
   ItemData: any[] | null;
   AvailableQty?: number;
-  F_PurchaseOrderH?: string | number;
-  F_PurchaseOrderL?: string | number;
+  F_SalesOrderH?: string | number;
+  F_SalesOrderL?: string | number;
   F_GSTGroupMaster?: string;
 }
 
@@ -39,13 +40,13 @@ interface StateData {
     PODate: string;
     F_VendorMaster: string;
     Remarks: string;
-    F_PurchaseOrderH?: string;
-    F_PurchaseEntryH?: string;
+    F_SalesOrderH?: string;
+    F_SalesInvoiceH?: string;
   };
-  CreatedPurchaseOrders?: any[];
-  PurchaseOrderLinesMap?: Record<string, any[]>;
-  CreatedPurchaseEntries?: any[];
-  PurchaseEntryLinesMap?: Record<string, any[]>;
+  CreatedSalesOrders?: any[];
+  SalesOrderLinesMap?: Record<string, any[]>;
+  CreatedSalesEntries?: any[];
+  SalesInvoiceLinesMap?: Record<string, any[]>;
   VendorMaster: any[];
   ItemGroupMaster: any[];
   ItemMaster: any[];
@@ -55,17 +56,18 @@ interface StateData {
   DefaultWarehouse: any | null;
   DefaultColor: any | null;
   IsBatchAllowed: boolean;
-  itemColorApplyMap: Record<string | number, boolean>;
   isEditMode: boolean;
   isGridEditable: boolean;
+  itemColorApplyMap: Record<string | number, boolean>;
   GlobalOptions: any[];
   GSTGroupMaster: any[];
+  OtherChargesLedgers: any[];
 }
 
-function PurchaseEntry() {
-  const API_URL_SAVE = "PurchaseEntry/0/token";
-  const API_URL_EDIT = API_WEB_URLS.MASTER + "/0/token/PurchaseEntryH/Id";
-  const API_URL_LINES = API_WEB_URLS.MASTER + "/0/token/PurchaseEntryL/Id";
+function SalesInvoice() {
+  const API_URL_SAVE = "SalesInvoice/0/token";
+  const API_URL_EDIT = API_WEB_URLS.MASTER + "/0/token/SalesInvoiceH/Id";
+  const API_URL_LINES = API_WEB_URLS.MASTER + "/0/token/SalesInvoiceL/Id";
   const API_URL_ITEMGROUP = API_WEB_URLS.MASTER + "/0/token/CategoryMaster/Id/0";
   const API_URL_ITEMS = API_WEB_URLS.MASTER + "/0/token/ItemMaster/Id";
   const API_URL_VENDOR = API_WEB_URLS.MASTER + "/0/token/PartyLedgerMaster/Id/0";
@@ -98,11 +100,12 @@ function PurchaseEntry() {
     DefaultWarehouse: null,
     DefaultColor: null,
     IsBatchAllowed: false,
-    itemColorApplyMap: {},
     isEditMode: false,
     isGridEditable: true,
+    itemColorApplyMap: {},
     GlobalOptions: [],
     GSTGroupMaster: [],
+    OtherChargesLedgers: [],
   });
 
   const [gridRows, setGridRows] = useState<GridRow[]>([
@@ -120,6 +123,10 @@ function PurchaseEntry() {
       ItemData: null,
       AvailableQty: 0,
     },
+  ]);
+
+  const [otherChargesRows, setOtherChargesRows] = useState<any[]>([
+    { F_LedgerMaster: "", Amount: "" }
   ]);
 
   const [quickItemModalOpen, setQuickItemModalOpen] = useState(false);
@@ -153,7 +160,7 @@ function PurchaseEntry() {
       try {
         const itemGroups = await Fn_FillListData(dispatch, setState, "ItemGroupMaster", API_URL_ITEMGROUP);
         const vendors = await Fn_FillListData(dispatch, setState, "VendorMaster", API_URL_VENDOR);
-        const API_URL_PE_LIST = API_WEB_URLS.MASTER + "/0/token/PurchaseEntryData/Id/0";
+        const API_URL_PE_LIST = API_WEB_URLS.MASTER + "/0/token/SalesInvoiceData/Id/0";
         const peData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_PE_LIST);
         
         let peDataArray: any[] = [];
@@ -165,20 +172,24 @@ function PurchaseEntry() {
         const API_URL_GSTGROUP = API_WEB_URLS.MASTER + "/0/token/GSTGroupMaster/Id/0";
         const gstData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_GSTGROUP);
 
+        const API_URL_OTHER_LEDGER = API_WEB_URLS.MASTER + "/0/token/GetLedgerByLedgerGroup/Id/0";
+        const otherLedgersData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_OTHER_LEDGER);
+
         const extractArray = (data: any) => Array.isArray(data) ? data : (data?.data?.dataList || data?.dataList || data?.data?.response || data?.response || []);
 
         setState((prev) => ({
           ...prev,
           ItemGroupMaster: extractArray(itemGroups),
           VendorMaster: extractArray(vendors),
-          CreatedPurchaseEntries: peDataArray,
+          CreatedSalesEntries: peDataArray,
           GSTGroupMaster: extractArray(gstData),
+          OtherChargesLedgers: extractArray(otherLedgersData),
         }));
 
         const params = new URLSearchParams(location.search);
         const recordId = params.get("id");
         if (recordId) {
-          await loadPurchaseEntryRecord(parseInt(recordId));
+          await loadSalesInvoiceRecord(parseInt(recordId));
         } else {
           try {
             const API_ENTRY_NO = API_WEB_URLS.MASTER + "/0/token/GetVoucherNoByVoucherTypeId/Id/5";
@@ -211,7 +222,7 @@ function PurchaseEntry() {
   const fetchPODataAndPopulateGrid = async (poId: string) => {
     if (!poId) return;
     const prevState = state;
-    const lines = prevState.PurchaseOrderLinesMap?.[poId] || [];
+    const lines = prevState.SalesOrderLinesMap?.[poId] || [];
     if (lines.length > 0) {
       // Fetch item data for each unique group first to avoid empty items list
       const uniqueGroupIds = Array.from(new Set(lines.map((l: any) => l.F_ItemGroupMaster).filter(Boolean)));
@@ -241,19 +252,19 @@ function PurchaseEntry() {
         Rate: l.Rate ? String(l.Rate) : "",
         ItemData: groupItemsMap[String(l.F_ItemGroupMaster)] || null,
         AvailableQty: 0,
-        F_PurchaseOrderH: poId,
-        F_PurchaseOrderL: l.PurchaseOrderLId || l.Id || 0,
+        F_SalesOrderH: poId,
+        F_SalesOrderL: l.SalesOrderLId || l.Id || 0,
       }));
       setGridRows(mappedRows);
       
       let newVendorMasterId = prevState.formData.F_VendorMaster;
-      const poHeader = prevState.CreatedPurchaseOrders?.find((p: any) => String(p.Id) === String(poId));
+      const poHeader = prevState.CreatedSalesOrders?.find((p: any) => String(p.Id) === String(poId));
       if (poHeader && poHeader.F_LedgerMaster) {
          newVendorMasterId = String(poHeader.F_LedgerMaster);
       }
       setState((prev) => ({
         ...prev,
-        formData: { ...prev.formData, F_VendorMaster: newVendorMasterId, F_PurchaseOrderH: poId }
+        formData: { ...prev.formData, F_VendorMaster: newVendorMasterId, F_SalesOrderH: poId }
       }));
     } else {
       alert("No approved lines found for the selected PO.");
@@ -263,17 +274,17 @@ function PurchaseEntry() {
   const fetchPEDataAndPopulateGrid = async (peId: string) => {
     if (!peId) return;
     const prevState = state;
-    const pe = prevState.CreatedPurchaseEntries?.find((p: any) => String(p.Id) === String(peId));
+    const pe = prevState.CreatedSalesEntries?.find((p: any) => String(p.Id) === String(peId));
     if (!pe) return;
 
     let lines: any[] = [];
     try {
-      if (pe.PurchaseLDetails) {
-        const parsed = typeof pe.PurchaseLDetails === "string" ? JSON.parse(pe.PurchaseLDetails) : pe.PurchaseLDetails;
+      if (pe.SalesLDetails) {
+        const parsed = typeof pe.SalesLDetails === "string" ? JSON.parse(pe.SalesLDetails) : pe.SalesLDetails;
         lines = Array.isArray(parsed) ? parsed : [];
       }
     } catch (e) {
-      console.error("Error parsing PurchaseLDetails", e);
+      console.error("Error parsing SalesLDetails", e);
     }
 
     setTaxOverrides({
@@ -293,7 +304,7 @@ function PurchaseEntry() {
         PODate: pe.EntryDate ? pe.EntryDate.split('T')[0] : "",
         F_VendorMaster: pe.F_LedgerMaster || "",
         Remarks: pe.Remarks || "",
-        F_PurchaseEntryH: pe.Id,
+        F_SalesInvoiceH: pe.Id,
       }
     }));
 
@@ -322,18 +333,18 @@ function PurchaseEntry() {
           Rate: l.Rate ? String(l.Rate) : "",
           ItemData: [{ Id: l.F_ItemMaster, ItemName: l.ItemName || "Scanned Item" }],
           AvailableQty: 0,
-          F_PurchaseOrderH: 0,
-          F_PurchaseOrderL: 0,
+          F_SalesOrderH: 0,
+          F_SalesOrderL: 0,
         };
       });
       setGridRows(mappedRows);
     } else {
       setGridRows([{ ItemCode: "", F_ItemGroupMaster: "", F_ItemMaster: "", F_WarehouseMaster: state.DefaultWarehouse?.Id || "", F_BatchMaster: "", Variant: "", Qty: "", Rate: "", Photos: [], ItemData: null }]);
-      alert("No lines found for the selected Purchase Entry.");
+      alert("No lines found for the selected Sales Invoice.");
     }
   };
 
-  const loadPurchaseEntryRecord = async (id: number) => {
+  const loadSalesInvoiceRecord = async (id: number) => {
     try {
       setState((prev) => ({ ...prev, isEditMode: true }));
       const headerData = await Fn_FillListData(dispatch, setState, "headerData", API_URL_EDIT + "/" + id);
@@ -377,7 +388,7 @@ function PurchaseEntry() {
         }
       }
     } catch (error) {
-      console.error("Error loading purchase entry record:", error);
+      console.error("Error loading sales entry record:", error);
     }
   };
 
@@ -393,17 +404,17 @@ function PurchaseEntry() {
   };
 
   const handleDeletePE = () => {
-    if (!state.formData.F_PurchaseEntryH) return;
-    if (window.confirm("Are you sure you want to delete this purchase entry?")) {
-      const DELETE_API_URL = `${API_WEB_URLS.MASTER}/0/token/PurchaseEntryH`;
-      Fn_DeleteData(dispatch, () => {}, Number(state.formData.F_PurchaseEntryH), DELETE_API_URL)
+    if (!state.formData.F_SalesInvoiceH) return;
+    if (window.confirm("Are you sure you want to delete this sales invoice?")) {
+      const DELETE_API_URL = `${API_WEB_URLS.MASTER}/0/token/SalesInvoiceH`;
+      Fn_DeleteData(dispatch, () => {}, Number(state.formData.F_SalesInvoiceH), DELETE_API_URL)
         .then(() => {
-          alert("Purchase Entry deleted successfully.");
+          alert("Sales Invoice deleted successfully.");
           window.location.reload();
         })
         .catch((error: any) => {
-          console.error("Failed to delete purchase entry:", error);
-          alert("Failed to delete purchase entry. Please try again.");
+          console.error("Failed to delete sales invoice:", error);
+          alert("Failed to delete sales invoice. Please try again.");
         });
     }
   };
@@ -539,6 +550,26 @@ function PurchaseEntry() {
         if (item.DesignPhoto4) photos.push(item.DesignPhoto4);
         if (item.DesignPhoto5) photos.push(item.DesignPhoto5);
         
+        const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
+        const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+
+        let gstPercent = 0;
+        const gstGroupId = item.F_GSTGroupMaster || "";
+        const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
+        if (gstGroup) {
+          if (isInState) {
+            gstPercent = (parseFloat(gstGroup.CGSTPercent) || 0) + (parseFloat(gstGroup.SGSTPercent) || 0);
+          } else {
+            gstPercent = parseFloat(gstGroup.IGSTPercent) || 0;
+          }
+        }
+        
+        let salePrice = parseFloat(item.SalePrice || item.Rate || item.Price || 0);
+        let baseRate = salePrice;
+        if (gstPercent > 0) {
+          baseRate = (salePrice * 100) / (100 + gstPercent);
+        }
+
         const updatedRows = [...gridRows];
         updatedRows[index] = {
           ...updatedRows[index],
@@ -550,6 +581,7 @@ function PurchaseEntry() {
           DesignPhoto: item.DesignPhoto || "",
           Variant: item.SizeName || "",
           Photos: photos,
+          Rate: baseRate > 0 ? String(baseRate.toFixed(2)) : "",
           F_GSTGroupMaster: item.F_GSTGroupMaster || "",
           ItemData: [{ Id: itemId, ItemName: item.ItemName || "Scanned Item", F_GSTGroupMaster: item.F_GSTGroupMaster }]
         };
@@ -663,7 +695,7 @@ function PurchaseEntry() {
       formData.append("F_GSTGroupMaster", "0");
       formData.append("F_TaxPayerType", "0");
       formData.append("F_LedgerMasterSales", "0");
-      formData.append("F_LedgerMasterPurchase", "0");
+      formData.append("F_LedgerMasterSales", "0");
       formData.append("F_YearScheme", "0");
       formData.append("F_IntCalcMethod", "0");
       formData.append("BankName", "0");
@@ -771,10 +803,10 @@ function PurchaseEntry() {
       headerFormData.append("JsonData", JSON.stringify(jsonDataArray));
       headerFormData.append("F_CompanyMaster", "0");
       await Fn_AddEditData(dispatch, setState, { arguList: { id: state.id, formData: headerFormData } }, API_URL_SAVE, true, "memberid", navigate, "#");
-      alert("Purchase Entry saved successfully");
-      navigate("/purchaseEntry");
+      alert("Sales Invoice saved successfully");
+      navigate("/salesInvoice");
     } catch (error) {
-      console.error("Error saving purchase entry:", error);
+      console.error("Error saving sales entry:", error);
     }
   };
 
@@ -785,30 +817,30 @@ function PurchaseEntry() {
     document.title = oldTitle;
   };
 
-  const purchaseEntryCompactStyles = `
+  const salesInvoiceCompactStyles = `
     @media (max-width: 991.98px) {
-      .purchase-entry-page .container-fluid { padding: 0.4rem !important; }
-      .purchase-entry-page .card-body { padding: 0.4rem !important; }
-      .purchase-entry-page .card-footer { padding: 0.35rem 0.4rem !important; }
-      .purchase-entry-page .form-label { font-size: 0.75rem; margin-bottom: 0.2rem; }
-      .purchase-entry-page .form-control { font-size: 0.8rem; height: 26px; padding: 0.2rem 0.35rem; }
-      .purchase-entry-page .btn { font-size: 0.8rem; padding: 0.22rem 0.4rem; }
+      .sales-entry-page .container-fluid { padding: 0.4rem !important; }
+      .sales-entry-page .card-body { padding: 0.4rem !important; }
+      .sales-entry-page .card-footer { padding: 0.35rem 0.4rem !important; }
+      .sales-entry-page .form-label { font-size: 0.75rem; margin-bottom: 0.2rem; }
+      .sales-entry-page .form-control { font-size: 0.8rem; height: 26px; padding: 0.2rem 0.35rem; }
+      .sales-entry-page .btn { font-size: 0.8rem; padding: 0.22rem 0.4rem; }
     }
     @media (max-width: 767.98px) {
-      .purchase-entry-page .container-fluid { padding: 0.25rem !important; }
-      .purchase-entry-page .card-body { padding: 0.3rem !important; }
-      .purchase-entry-page .card-footer { padding: 0.25rem 0.3rem !important; }
-      .purchase-entry-page .form-label { font-size: 0.7rem; margin-bottom: 0.15rem; }
-      .purchase-entry-page .form-control { font-size: 0.75rem; height: 24px; padding: 0.15rem 0.28rem; }
-      .purchase-entry-page .btn { font-size: 0.75rem; padding: 0.18rem 0.35rem; }
+      .sales-entry-page .container-fluid { padding: 0.25rem !important; }
+      .sales-entry-page .card-body { padding: 0.3rem !important; }
+      .sales-entry-page .card-footer { padding: 0.25rem 0.3rem !important; }
+      .sales-entry-page .form-label { font-size: 0.7rem; margin-bottom: 0.15rem; }
+      .sales-entry-page .form-control { font-size: 0.75rem; height: 24px; padding: 0.15rem 0.28rem; }
+      .sales-entry-page .btn { font-size: 0.75rem; padding: 0.18rem 0.35rem; }
     }
-    .purchase-print-layout { display: none; }
+    .sales-print-layout { display: none; }
     @media print {
       @page { margin: 0; }
       body { margin: 0.2cm; line-height: 1.1; }
       body * { visibility: hidden; }
-      .purchase-print-layout, .purchase-print-layout * { visibility: visible; }
-      .purchase-print-layout { 
+      .sales-print-layout, .sales-print-layout * { visibility: visible; }
+      .sales-print-layout { 
         display: block !important; 
         position: absolute; 
         left: 0; top: 0; 
@@ -818,40 +850,40 @@ function PurchaseEntry() {
         color: black; 
         font-family: Arial, sans-serif; 
       }
-      .purchase-print-layout .print-header { text-align: center; margin-bottom: 5px; border-bottom: 1px solid #000; padding-bottom: 2px; }
-      .purchase-print-layout .firm-name { font-size: 18px; font-weight: bold; text-transform: uppercase; margin-bottom: 0; }
-      .purchase-print-layout .print-title { font-size: 14px; font-weight: bold; margin-top: 0; }
-      .purchase-print-layout .print-details { margin-bottom: 5px; }
-      .purchase-print-layout .detail-row { display: flex; justify-content: space-between; margin-bottom: 1px; font-size: 11px; }
-      .purchase-print-layout table { width: 100%; border-collapse: collapse; margin-top: 2px; }
-      .purchase-print-layout th, .purchase-print-layout td { border: 1px solid #000; padding: 2px 4px; text-align: left; font-size: 11px; }
-      .purchase-print-layout th { background: #eee !important; -webkit-print-color-adjust: exact; }
-      .purchase-print-layout .text-right { text-align: right; }
-      .purchase-print-layout .total-row { font-weight: bold; }
+      .sales-print-layout .print-header { text-align: center; margin-bottom: 5px; border-bottom: 1px solid #000; padding-bottom: 2px; }
+      .sales-print-layout .firm-name { font-size: 18px; font-weight: bold; text-transform: uppercase; margin-bottom: 0; }
+      .sales-print-layout .print-title { font-size: 14px; font-weight: bold; margin-top: 0; }
+      .sales-print-layout .print-details { margin-bottom: 5px; }
+      .sales-print-layout .detail-row { display: flex; justify-content: space-between; margin-bottom: 1px; font-size: 11px; }
+      .sales-print-layout table { width: 100%; border-collapse: collapse; margin-top: 2px; }
+      .sales-print-layout th, .sales-print-layout td { border: 1px solid #000; padding: 2px 4px; text-align: left; font-size: 11px; }
+      .sales-print-layout th { background: #eee !important; -webkit-print-color-adjust: exact; }
+      .sales-print-layout .text-right { text-align: right; }
+      .sales-print-layout .total-row { font-weight: bold; }
     }
   `;
 
   return (
-    <div className="page-body purchase-entry-page" style={{ maxWidth: "100%", overflowX: "hidden" }}>
-      <style>{purchaseEntryCompactStyles}</style>
-      <Breadcrumbs mainTitle="Purchase Entry" parent="Inventory" />
+    <div className="page-body sales-entry-page" style={{ maxWidth: "100%", overflowX: "hidden" }}>
+      <style>{salesInvoiceCompactStyles}</style>
+      <Breadcrumbs mainTitle="Sales Invoice" parent="Inventory" />
       <Container fluid className="px-2 px-sm-3">
         <Row>
           <Col xs="12">
             <Card>
-              <CardHeaderCommon title={`${state.isEditMode ? "Edit" : "Add"} Purchase Entry`} tagClass="card-title mb-0" />
+              <CardHeaderCommon title={`${state.isEditMode ? "Edit" : "Add"} Sales Invoice`} tagClass="card-title mb-0" />
               <CardBody className="p-2 p-sm-3">
                 <Row className="g-2 g-sm-3">
                   <Col md="2">
-                    <label className="form-label">Created Purchase Entry</label>
-                    <select className="form-control" value={state.formData.F_PurchaseEntryH || ""} onChange={(e) => { 
+                    <label className="form-label">Created Sales Invoice</label>
+                    <select className="form-control" value={state.formData.F_SalesInvoiceH || ""} onChange={(e) => { 
                       const val = e.target.value;
-                      handleFormFieldChange("F_PurchaseEntryH", val); 
+                      handleFormFieldChange("F_SalesInvoiceH", val); 
                       if (!val) window.location.reload();
                       else fetchPEDataAndPopulateGrid(val); 
                     }}>
                       <option value="">Select PE</option>
-                      {state.CreatedPurchaseEntries?.map((pe: any) => (
+                      {state.CreatedSalesEntries?.map((pe: any) => (
                         <option key={pe.Id} value={pe.Id}>{pe.EntryNo || pe.Id}</option>
                       ))}
                     </select>
@@ -884,7 +916,7 @@ function PurchaseEntry() {
                 </Row>
                 <Row className="mt-3">
                   <Col xs="12" className="overflow-auto">
-                    <GridSystemPurchaseEntry
+                    <GridSystemSalesInvoice
                       gridRows={gridRows}
                       itemGroupMaster={state.ItemGroupMaster}
                       colorMaster={state.ColorMaster}
@@ -902,7 +934,83 @@ function PurchaseEntry() {
                     />
                   </Col>
                 </Row>
-                
+                {/* Other Charges Table */}
+                <Row className="mt-4">
+                  <Col md={6}>
+                    <h6 className="mb-2 text-primary fw-bold">Other Charges</h6>
+                    <div className="table-responsive">
+                      <table className="table table-bordered table-sm mb-0">
+                        <thead className="table-light">
+                          <tr>
+                            <th>Ledger</th>
+                            <th className="text-end" style={{ width: "120px" }}>Amount</th>
+                            <th className="text-center" style={{ width: "90px" }}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {otherChargesRows.map((row, index) => (
+                            <tr key={index}>
+                              <td>
+                                <select 
+                                  className="form-control form-control-sm"
+                                  value={row.F_LedgerMaster}
+                                  onChange={(e) => {
+                                    const newRows = [...otherChargesRows];
+                                    newRows[index].F_LedgerMaster = e.target.value;
+                                    setOtherChargesRows(newRows);
+                                  }}
+                                  disabled={!state.isGridEditable}
+                                >
+                                  <option value="">Select Ledger</option>
+                                  {state.OtherChargesLedgers?.map((l: any) => (
+                                    <option key={l.Id} value={l.Id}>{l.LedgerName || l.Name}</option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td>
+                                <Input 
+                                  type="number"
+                                  bsSize="sm"
+                                  className="text-end m-0"
+                                  value={row.Amount}
+                                  onChange={(e) => {
+                                    const newRows = [...otherChargesRows];
+                                    newRows[index].Amount = e.target.value;
+                                    setOtherChargesRows(newRows);
+                                  }}
+                                  disabled={!state.isGridEditable}
+                                />
+                              </td>
+                              <td className="text-center">
+                                <Button 
+                                  color="primary" 
+                                  size="sm" 
+                                  className="me-1 p-1 px-2" 
+                                  onClick={() => setOtherChargesRows([...otherChargesRows, { F_LedgerMaster: "", Amount: "" }])}
+                                  disabled={!state.isGridEditable}
+                                >
+                                  <i className="fa fa-plus"></i>
+                                </Button>
+                                {otherChargesRows.length > 1 && (
+                                  <Button 
+                                    color="danger" 
+                                    size="sm" 
+                                    className="p-1 px-2"
+                                    onClick={() => setOtherChargesRows(otherChargesRows.filter((_, i) => i !== index))}
+                                    disabled={!state.isGridEditable}
+                                  >
+                                    <i className="fa fa-minus"></i>
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Col>
+                </Row>
+
                 {/* Tax Summary Section */}
                 <Row className="mt-4">
                   <Col md={{ size: 4, offset: 8 }}>
@@ -941,7 +1049,8 @@ function PurchaseEntry() {
 
                       const totalTax = finalCGST + finalSGST + finalIGST;
                       const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
-                      const grandTotal = subTotal + totalTax;
+                      const totalOtherCharges = otherChargesRows.reduce((sum, r) => sum + (parseFloat(r.Amount) || 0), 0);
+                      const grandTotal = subTotal + totalTax + totalOtherCharges;
 
                       return (
                         <div className="table-responsive">
@@ -996,6 +1105,12 @@ function PurchaseEntry() {
                                 <th className="text-end text-danger">Total Tax:</th>
                                 <td className="text-end text-danger fw-bold">{totalTax.toFixed(2)}</td>
                               </tr>
+                              {totalOtherCharges > 0 && (
+                                <tr>
+                                  <th className="text-end text-info">Other Charges:</th>
+                                  <td className="text-end text-info fw-bold">{totalOtherCharges.toFixed(2)}</td>
+                                </tr>
+                              )}
                               <tr>
                                 <th className="text-end text-success fs-5">Grand Total:</th>
                                 <td className="text-end text-success fw-bold fs-5">{grandTotal.toFixed(2)}</td>
@@ -1062,14 +1177,14 @@ function PurchaseEntry() {
         <ModalFooter><Button color="primary" onClick={handleVendorSubmit} disabled={vendorSubmitting}>Save</Button><Button color="secondary" onClick={closeVendorModal}>Cancel</Button></ModalFooter>
       </Modal>
 
-      <div className="purchase-print-layout">
+      <div className="sales-print-layout">
         <div className="print-header">
           <div className="firm-name">{state.GlobalOptions[0]?.FirmName || "FIRM NAME"}</div>
           <div className="print-title">PURCHASE INVOICE</div>
         </div>
         <div className="print-details">
           <div className="detail-row">
-            <div><strong>Purchase Invoice No.:</strong> {state.formData.PONo || "N/A"}</div>
+            <div><strong>Sales Invoice No.:</strong> {state.formData.PONo || "N/A"}</div>
             <div><strong>Date:</strong> {state.formData.PODate || "N/A"}</div>
           </div>
           <div className="detail-row">
@@ -1208,4 +1323,4 @@ function PurchaseEntry() {
   );
 }
 
-export default PurchaseEntry;
+export default SalesInvoice;

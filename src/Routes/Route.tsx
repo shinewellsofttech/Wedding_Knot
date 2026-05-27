@@ -69,7 +69,7 @@ import PurchaseOrderApproval from "../Pages/Inventory/PurchaseOrderApproval/Purc
 import GlobalOptions from "../Pages/Tools/GlobalOptions";
 import PurchaseEntry from "../Pages/Inventory/PurchaseEntry/PurchaseEntry";
 import SalesOrderForApproval from "../Pages/Inventory/SalesOrderApproval/SalesOrderForApproval";
-import SalesInvoice from "../Pages/Inventory/Challan/Challan";
+import SalesInvoice from "../Pages/Inventory/SalesInvoice/SalesInvoice";
 import PurchaseReturn from "../Pages/Inventory/PurchaseReturn/PurchaseReturn";
 import AddEdit_MaterialMaster from "../Pages/Masters/AddEdit_MaterialMaster";
 import PageList_MaterialMaster from "../Pages/Masters/PageList_MaterialMaster";
@@ -109,6 +109,7 @@ export const routes = [
     { path: `${process.env.PUBLIC_URL}/addEditCityMaster`, Component: <AddEdit_CityMaster /> },
   { path: `${process.env.PUBLIC_URL}/cityMaster`, Component: <PageList_CityMaster /> },
 
+  {path:`${process.env.PUBLIC_URL}/salesInvoice`,Component:<SalesInvoice/>},
     { path: `${process.env.PUBLIC_URL}/globalOptions`, Component: <GlobalOptions /> }
   /*
   { path: `${process.env.PUBLIC_URL}/itemMaster`, Component: <PageList_ItemMaster /> },
