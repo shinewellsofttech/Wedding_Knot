@@ -52,11 +52,11 @@ export default function BarcodePrintWizard() {
   const [loadingInfo, setLoadingInfo] = useState(false);
 
   // Layout (mm)
-  const [labelW, setLabelW] = useState(104.2);
-  const [labelH, setLabelH] = useState(152.4);
+  const [labelW, setLabelW] = useState(100);
+  const [labelH, setLabelH] = useState(25);
   const [marginT, setMarginT] = useState(2);
-  const [marginL, setMarginL] = useState(3.1);
-  const [bcH, setBcH] = useState(5);
+  const [marginL, setMarginL] = useState(2);
+  const [bcH, setBcH] = useState(8);
   const [firmName, setFirmName] = useState("FIRM NAME");
   const [showFirm, setShowFirm] = useState(true);
   const [showItem, setShowItem] = useState(true);
@@ -606,8 +606,8 @@ export default function BarcodePrintWizard() {
               }
             }
             hasSavedSettings.current = false;
-            setBcH(5); setLineSpacing(1); setMarginT(2); setMarginL(3.1); setBcTextSize(1);
-            setLabelW(104.2); setLabelH(152.4); setColumns(2);
+            setBcH(8); setLineSpacing(1); setMarginT(2); setMarginL(2); setBcTextSize(1);
+            setLabelW(100); setLabelH(25); setColumns(2);
             toast.success("Design settings reset to defaults!");
           }}><i className="fa fa-refresh me-1" />Reset to Defaults</button>
         </div>
