@@ -1,0 +1,2 @@
+D:\Kuljeet\Accounting\Wedding_Knot\print-agent\bin\Release\net10.0\win-x64\publish\LocalPrintAgent.pdb
+D:\Kuljeet\Accounting\Wedding_Knot\print-agent\bin\Release\net10.0\win-x64\publish\LocalPrintAgent.exe

@@ -12,6 +12,7 @@ import AddEdit_CityMaster from "../Pages/Masters/AddEdit_CityMaster";
 import PageList_CityMaster from "../Pages/Masters/PageList_CityMaster";
 import AddEdit_ItemMaster from "../Pages/Masters/AddEdit_ItemMaster";
 import PageList_ItemMaster from "../Pages/Masters/PageList_ItemMaster";
+import BarcodePrintWizard from "../Pages/Masters/BarcodePrintWizard";
 import AddEdit_ItemGroup from "../Pages/Masters/AddEdit_ItemGroup";
 import PageList_ItemGroup from "../Pages/Masters/PageList_ItemGroup";
 import AddEdit_ItemCompany from "../Pages/Masters/AddEdit_ItemCompany";
@@ -95,6 +96,7 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/addEditCategoryMaster`, Component: <AddEdit_CategoryMaster /> },
   { path: `${process.env.PUBLIC_URL}/categoryMaster`, Component: <PageList_CategoryMaster /> },
   { path: `${process.env.PUBLIC_URL}/itemMaster`, Component: <PageList_ItemMaster /> },
+  { path: `${process.env.PUBLIC_URL}/barcodePrintWizard`, Component: <BarcodePrintWizard /> },
     { path: `${process.env.PUBLIC_URL}/addEditUserMaster`, Component: <AddEdit_UserMaster /> },
   { path: `${process.env.PUBLIC_URL}/userMaster`, Component: <PageList_UserMaster /> },
     { path: `${process.env.PUBLIC_URL}/taxGroupMaster`, Component: <PageList_GSTGroup /> },

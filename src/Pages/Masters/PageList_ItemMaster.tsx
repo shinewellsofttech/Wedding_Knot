@@ -10,6 +10,8 @@ import CardHeaderCommon from "../../CommonElements/CardHeaderCommon/CardHeaderCo
 import { Fn_DeleteData, Fn_FillListData, Fn_GetReport } from "../../store/Functions";
 import { API_WEB_URLS } from "../../constants/constAPI";
 
+
+
 const LIST_API_URL = `${API_WEB_URLS.MASTER}/0/token/ItemMasterData/Id/0`;
 const DELETE_API_URL = `${API_WEB_URLS.MASTER}/0/token/${API_WEB_URLS.ItemMaster}`;
 const CATEGORY_LIST_URL = `${API_WEB_URLS.MASTER}/0/token/CategoryMaster/Id/0`;
@@ -38,13 +40,14 @@ const PageList_ItemMaster = () => {
   const [units, setUnits] = useState<any[]>([]);
   const [alterUnits, setAlterUnits] = useState<any[]>([]);
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
-  const [printQtys, setPrintQtys] = useState<Record<string, number>>({});
-  const [printCodes, setPrintCodes] = useState<Record<string, string>>({});
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [globalOptions, setGlobalOptions] = useState<any[]>([]);
 
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [filterGstGroup, setFilterGstGroup] = useState<string>("");
+
+  // Barcode Printing - opens wizard in new tab
+  const [selectedItemForPrint, setSelectedItemForPrint] = useState<any>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(20);
@@ -205,156 +208,12 @@ const PageList_ItemMaster = () => {
   };
 
   /**
-   * Print barcodes for item variants
+   * Print barcodes for item variants (opens the advanced printer setup dashboard)
    */
   const handlePrintBarcodes = (item: any) => {
-    let parsedDesign: any[] = [];
-    try {
-      if (typeof item.DesignDetails === "string") {
-        parsedDesign = JSON.parse(item.DesignDetails || "[]");
-      } else if (Array.isArray(item.DesignDetails)) {
-        parsedDesign = item.DesignDetails;
-      }
-    } catch (e) {}
-
-    const variantsToPrint = parsedDesign.filter((d: any, dIdx: number) => {
-      const qty = printQtys[d.Id || dIdx] || 0;
-      return qty > 0 && d.Barcode;
-    });
-
-    if (variantsToPrint.length === 0) {
-      toast.warning("Please enter print quantity greater than 0 for at least one variant with a barcode.");
-      return;
-    }
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast.error("Please allow popups to print barcodes.");
-      return;
-    }
-
-    let html = `
-      <html>
-        <head>
-          <title>Print Barcodes</title>
-          <style>
-            body { font-family: sans-serif; text-align: center; margin: 0; padding: 0; background: #fff; }
-            .no-print { padding: 15px; background: #f8f9fa; border-bottom: 1px solid #ddd; margin-bottom: 20px; }
-            
-            #printArea {
-              display: flex;
-              flex-wrap: wrap;
-              gap: 10px;
-              padding: 10px;
-              justify-content: center;
-            }
-            
-            .barcode-card { 
-              width: 50mm;
-              height: 25mm;
-              border: 1px dashed #999; 
-              padding: 1mm; 
-              box-sizing: border-box;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              overflow: hidden;
-              background: #fff;
-              page-break-inside: avoid;
-            }
-            
-            .barcode-wrapper { 
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              width: 100%;
-              flex: 1;
-              overflow: hidden;
-            }
-            .barcode-wrapper svg { width: 100% !important; height: 100% !important; max-height: 14mm !important; }
-            
-            .item-name { font-weight: bold; font-size: 8px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-            .item-price { font-size: 9px; font-weight: bold; margin-top: 1px; text-align: center; }
-            .header-row { display: flex; align-items: center; justify-content: center; gap: 3px; margin-bottom: 1px; width: 100%; }
-            .header-row img { height: 8px; width: auto; }
-            
-            @media print {
-              @page { size: 50mm 25mm; margin: 0; }
-              body { margin: 0; padding: 0; }
-              .no-print { display: none !important; }
-              #printArea { display: block; padding: 0; gap: 0; }
-              .barcode-card { 
-                width: 50mm !important;
-                height: 25mm !important;
-                border: none !important;
-                padding: 1mm !important;
-                margin: 0 !important;
-                page-break-after: always;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="no-print">
-            <button onclick="window.print()" style="padding: 8px 20px; background: #0d6efd; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Print Now</button>
-            <p style="margin-top: 10px; font-size: 14px; color: #666;">Make sure printer is set to <strong>50mm x 25mm</strong>, margins to <strong>None</strong>, and disable Headers/Footers.</p>
-          </div>
-          <div id="printArea">
-    `;
-
-    const firmName = globalOptions[0]?.FirmName || "FIRM NAME";
-
-    variantsToPrint.forEach((d: any, dIdx: number) => {
-      const qty = printQtys[d.Id || dIdx] || 0;
-      const pCode = printCodes[d.Id || dIdx] || "";
-      const el = document.querySelector(`.im-barcode-svg-${d.Id || dIdx}`);
-      if (el) {
-        for (let i = 0; i < qty; i++) {
-          html += `<div class="barcode-card">
-            <div class="header-row">
-              <img src="/assets/images/Wedding-logo.png" />
-              <span class="item-name">${firmName}</span>
-            </div>
-            <div class="barcode-wrapper">
-              ${el.innerHTML}
-            </div>
-            <div class="item-price">${pCode}</div>
-          </div>`;
-        }
-      }
-    });
-
-    html += `
-          </div>
-          <script>
-            function updateStyles() {
-              const bw = document.getElementById('boxWidth').value;
-              const bh = document.getElementById('boxHeight').value;
-              const bc = document.getElementById('bcSize').value;
-              
-              document.getElementById('lblBW').innerText = bw + 'px';
-              document.getElementById('lblBH').innerText = bh + 'px';
-              document.getElementById('lblBC').innerText = bc + 'px';
-
-              document.querySelectorAll('.barcode-card').forEach(el => {
-                el.style.width = bw + 'px';
-                el.style.height = bh + 'px';
-              });
-
-              document.querySelectorAll('.barcode-wrapper').forEach(el => {
-                el.style.width = bc + 'px';
-              });
-            }
-          </script>
-        </body>
-      </html>
-    `;
-
-    printWindow.document.write(html);
-    printWindow.document.close();
+    sessionStorage.setItem("barcodePrintItem", JSON.stringify(item));
+    sessionStorage.setItem("barcodePrintFirmName", globalOptions[0]?.FirmName || "FIRM NAME");
+    window.open(`${process.env.PUBLIC_URL}/barcodePrintWizard`, "_blank");
   };
 
   /**
@@ -598,28 +457,6 @@ const PageList_ItemMaster = () => {
                                                 <div className={`im-barcode-svg-${d.Id || dIdx}`}>
                                                   <Barcode value={d.Barcode} width={2} height={60} displayValue={true} fontSize={16} margin={0} background="transparent" />
                                                 </div>
-                                                <div className="mt-2 d-flex align-items-center justify-content-center">
-                                                  <Label className="me-2 mb-0" style={{fontSize: '12px'}}>Print Qty:</Label>
-                                                  <Input 
-                                                    type="number" 
-                                                    min="0" 
-                                                    bsSize="sm"
-                                                    value={printQtys[d.Id || dIdx] || ""} 
-                                                    onChange={(e) => setPrintQtys(prev => ({ ...prev, [d.Id || dIdx]: parseInt(e.target.value) || 0 }))}
-                                                    style={{ width: '60px' }}
-                                                  />
-                                                </div>
-                                                <div className="mt-2 d-flex align-items-center justify-content-center">
-                                                  <Label className="me-2 mb-0" style={{fontSize: '12px'}}>Print Code:</Label>
-                                                  <Input 
-                                                    type="text" 
-                                                    bsSize="sm"
-                                                    value={printCodes[d.Id || dIdx] || ""} 
-                                                    onChange={(e) => setPrintCodes(prev => ({ ...prev, [d.Id || dIdx]: e.target.value }))}
-                                                    style={{ width: '100px' }}
-                                                    placeholder="Code"
-                                                  />
-                                                </div>
                                               </div>
                                             ) : (
                                               "-"
@@ -745,6 +582,7 @@ const PageList_ItemMaster = () => {
           </Row>
         </Container>
       </div>
+
     </>
   );
 };
