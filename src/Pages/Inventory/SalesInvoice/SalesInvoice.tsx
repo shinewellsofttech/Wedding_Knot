@@ -31,6 +31,9 @@ interface GridRow {
   F_SalesOrderH?: string | number;
   F_SalesOrderL?: string | number;
   F_GSTGroupMaster?: string;
+  OriginalSalePrice?: number;
+  SchemeDetails?: any[];
+  GSTPercent?: number;
 }
 
 interface StateData {
@@ -65,9 +68,9 @@ interface StateData {
 }
 
 function SalesInvoice() {
-  const API_URL_SAVE = "SalesInvoice/0/token";
-  const API_URL_EDIT = API_WEB_URLS.MASTER + "/0/token/SalesInvoiceH/Id";
-  const API_URL_LINES = API_WEB_URLS.MASTER + "/0/token/SalesInvoiceL/Id";
+  const API_URL_SAVE = "SalesEntry/0/token";
+  const API_URL_EDIT = API_WEB_URLS.MASTER + "/0/token/SalesEntryH/Id";
+  const API_URL_LINES = API_WEB_URLS.MASTER + "/0/token/SalesEntryL/Id";
   const API_URL_ITEMGROUP = API_WEB_URLS.MASTER + "/0/token/CategoryMaster/Id/0";
   const API_URL_ITEMS = API_WEB_URLS.MASTER + "/0/token/ItemMaster/Id";
   const API_URL_VENDOR = API_WEB_URLS.MASTER + "/0/token/PartyLedgerMaster/Id/0";
@@ -160,7 +163,7 @@ function SalesInvoice() {
       try {
         const itemGroups = await Fn_FillListData(dispatch, setState, "ItemGroupMaster", API_URL_ITEMGROUP);
         const vendors = await Fn_FillListData(dispatch, setState, "VendorMaster", API_URL_VENDOR);
-        const API_URL_PE_LIST = API_WEB_URLS.MASTER + "/0/token/SalesInvoiceData/Id/0";
+        const API_URL_PE_LIST = API_WEB_URLS.MASTER + "/0/token/Salesentrydata/Id/0";
         const peData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_PE_LIST);
         
         let peDataArray: any[] = [];
@@ -175,6 +178,9 @@ function SalesInvoice() {
         const API_URL_OTHER_LEDGER = API_WEB_URLS.MASTER + "/0/token/GetLedgerByLedgerGroup/Id/0";
         const otherLedgersData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_OTHER_LEDGER);
 
+        const API_URL_GLOBALOPTIONS = API_WEB_URLS.MASTER + "/0/token/GlobalOptions/Id/0";
+        const globalOptionsData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_GLOBALOPTIONS);
+
         const extractArray = (data: any) => Array.isArray(data) ? data : (data?.data?.dataList || data?.dataList || data?.data?.response || data?.response || []);
 
         setState((prev) => ({
@@ -184,6 +190,7 @@ function SalesInvoice() {
           CreatedSalesEntries: peDataArray,
           GSTGroupMaster: extractArray(gstData),
           OtherChargesLedgers: extractArray(otherLedgersData),
+          GlobalOptions: extractArray(globalOptionsData),
         }));
 
         const params = new URLSearchParams(location.search);
@@ -192,7 +199,7 @@ function SalesInvoice() {
           await loadSalesInvoiceRecord(parseInt(recordId));
         } else {
           try {
-            const API_ENTRY_NO = API_WEB_URLS.MASTER + "/0/token/GetVoucherNoByVoucherTypeId/Id/5";
+            const API_ENTRY_NO = API_WEB_URLS.MASTER + "/0/token/GetVoucherNoByVoucherTypeId/Id/4";
             const entryNoData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_ENTRY_NO);
             let newEntryNo = "";
             let dataArray = extractArray(entryNoData);
@@ -285,6 +292,25 @@ function SalesInvoice() {
       }
     } catch (e) {
       console.error("Error parsing SalesLDetails", e);
+    }
+
+    let otherChargesLines: any[] = [];
+    try {
+      if (pe.SalesLOtherChargesDetails) {
+        const parsed = typeof pe.SalesLOtherChargesDetails === "string" ? JSON.parse(pe.SalesLOtherChargesDetails) : pe.SalesLOtherChargesDetails;
+        otherChargesLines = Array.isArray(parsed) ? parsed : [];
+      }
+    } catch (e) {
+      console.error("Error parsing SalesLOtherChargesDetails", e);
+    }
+
+    if (otherChargesLines.length > 0) {
+      setOtherChargesRows(otherChargesLines.map((l: any) => ({
+        F_LedgerMaster: String(l.F_LedgerMaster || ""),
+        Amount: String(l.Amount || "")
+      })));
+    } else {
+      setOtherChargesRows([{ F_LedgerMaster: "", Amount: "" }]);
     }
 
     setTaxOverrides({
@@ -502,11 +528,40 @@ function SalesInvoice() {
       if (selectedItem) {
         updatedRows[index].ItemCode = selectedItem.ItemCode || selectedItem.Code || "";
       }
+    } else if (field === "Qty") {
+      const row = updatedRows[index];
+      const qty = parseFloat(value) || 0;
+      let newSalePrice = row.OriginalSalePrice || parseFloat(row.Rate) || 0;
+      
+      if (row.SchemeDetails && Array.isArray(row.SchemeDetails) && row.SchemeDetails.length > 0 && qty > 0) {
+        let schemeRate: number | null = null;
+        for (const scheme of row.SchemeDetails) {
+          const from = parseFloat(scheme.FromRange) || 0;
+          const to = parseFloat(scheme.ToRange) || Infinity;
+          if (qty >= from && qty <= to) {
+            schemeRate = parseFloat(scheme.Rate) || 0;
+            break;
+          }
+        }
+        if (schemeRate !== null) {
+          newSalePrice = schemeRate;
+        }
+      }
+
+      const gstPercent = row.GSTPercent || 0;
+      let baseRate = newSalePrice;
+      if (gstPercent > 0) {
+        baseRate = (newSalePrice * 100) / (100 + gstPercent);
+      }
+      
+      if (row.OriginalSalePrice !== undefined) {
+        updatedRows[index].Rate = String(baseRate > 0 ? baseRate.toFixed(2) : "");
+      }
     }
 
     if (field === "F_ItemMaster" || field === "F_ColorMaster" || field === "F_WarehouseMaster") {
       const row = updatedRows[index];
-      if (row.F_ItemMaster) {
+      if (row.F_ItemMaster && !row.OriginalSalePrice) { // Don't override barcode scanned items
         const fetchedRate = await fetchRate(
           row.F_ItemGroupMaster || "0",
           row.F_ItemMaster || "0",
@@ -539,16 +594,29 @@ function SalesInvoice() {
 
       if (list && list.length > 0) {
         const item = list[0];
+        
+        let designItem = null;
+        try {
+          if (typeof item.DesignDetails === "string") {
+            const parsedDesign = JSON.parse(item.DesignDetails);
+            designItem = parsedDesign.find((d: any) => String(d.Barcode) === String(barcode));
+          } else if (Array.isArray(item.DesignDetails)) {
+            designItem = item.DesignDetails.find((d: any) => String(d.Barcode) === String(barcode));
+          }
+        } catch(e) {}
+        
+        if (!designItem) designItem = item;
+
         const groupId = item.F_CategoryMaster || item.F_ItemGroupMaster || "";
         const itemId = item.F_ItemMaster || item.Id || "";
-        const designId = item.Id || "";
+        const designId = designItem.Id || item.Id || "";
         
         const photos = [];
-        if (item.DesignPhoto) photos.push(item.DesignPhoto);
-        if (item.DesignPhoto2) photos.push(item.DesignPhoto2);
-        if (item.DesignPhoto3) photos.push(item.DesignPhoto3);
-        if (item.DesignPhoto4) photos.push(item.DesignPhoto4);
-        if (item.DesignPhoto5) photos.push(item.DesignPhoto5);
+        if (designItem.DesignPhoto) photos.push(designItem.DesignPhoto);
+        if (designItem.DesignPhoto2) photos.push(designItem.DesignPhoto2);
+        if (designItem.DesignPhoto3) photos.push(designItem.DesignPhoto3);
+        if (designItem.DesignPhoto4) photos.push(designItem.DesignPhoto4);
+        if (designItem.DesignPhoto5) photos.push(designItem.DesignPhoto5);
         
         const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
         const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
@@ -564,26 +632,54 @@ function SalesInvoice() {
           }
         }
         
-        let salePrice = parseFloat(item.SalePrice || item.Rate || item.Price || 0);
-        let baseRate = salePrice;
-        if (gstPercent > 0) {
-          baseRate = (salePrice * 100) / (100 + gstPercent);
-        }
+        let salePrice = parseFloat(designItem.SalePrice || designItem.Rate || designItem.Price || item.SalePrice || item.Rate || item.Price || 0);
+        
+        let parsedSchemes = [];
+        try {
+          if (typeof designItem.SchemeDetails === "string") {
+            parsedSchemes = JSON.parse(designItem.SchemeDetails || "[]");
+          } else if (Array.isArray(designItem.SchemeDetails)) {
+            parsedSchemes = designItem.SchemeDetails;
+          }
+        } catch(e) {}
 
         const updatedRows = [...gridRows];
+        const qty = parseFloat(updatedRows[index].Qty) || (updatedRows[index].Qty === "" ? 0 : 0);
+        
+        // Auto-apply scheme rate if quantity already exists in the row
+        let finalSalePrice = salePrice;
+        if (parsedSchemes.length > 0 && qty > 0) {
+          for (const scheme of parsedSchemes) {
+            const from = parseFloat(scheme.FromRange) || 0;
+            const to = parseFloat(scheme.ToRange) || Infinity;
+            if (qty >= from && qty <= to) {
+              finalSalePrice = parseFloat(scheme.Rate) || salePrice;
+              break;
+            }
+          }
+        }
+
+        let baseRate = finalSalePrice;
+        if (gstPercent > 0) {
+          baseRate = (finalSalePrice * 100) / (100 + gstPercent);
+        }
+
         updatedRows[index] = {
           ...updatedRows[index],
-          ItemCode: item.Barcode || barcode,
+          ItemCode: designItem.Barcode || item.Barcode || barcode,
           F_ItemGroupMaster: String(groupId),
           F_ItemMaster: String(itemId),
           F_ItemDesignMaster: String(designId),
           ItemName: item.ItemName || "Scanned Item",
-          DesignPhoto: item.DesignPhoto || "",
-          Variant: item.SizeName || "",
+          DesignPhoto: designItem.DesignPhoto || item.DesignPhoto || "",
+          Variant: designItem.SizeName || item.SizeName || "",
           Photos: photos,
           Rate: baseRate > 0 ? String(baseRate.toFixed(2)) : "",
           F_GSTGroupMaster: item.F_GSTGroupMaster || "",
-          ItemData: [{ Id: itemId, ItemName: item.ItemName || "Scanned Item", F_GSTGroupMaster: item.F_GSTGroupMaster }]
+          ItemData: [{ Id: itemId, ItemName: item.ItemName || "Scanned Item", F_GSTGroupMaster: item.F_GSTGroupMaster }],
+          OriginalSalePrice: salePrice,
+          SchemeDetails: parsedSchemes,
+          GSTPercent: gstPercent
         };
         
         setGridRows(updatedRows);
@@ -789,19 +885,26 @@ function SalesInvoice() {
       const finalIGST = taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST;
       const finalTotalTax = finalCGST + finalSGST + finalIGST;
 
+      const otherChargesArray = otherChargesRows
+        .filter((row) => row.F_LedgerMaster && row.Amount)
+        .map((row) => ({
+          F_LedgerMaster: Number(row.F_LedgerMaster),
+          Amount: Number(row.Amount),
+        }));
+
       const headerFormData = new FormData();
       headerFormData.append("EntryDate", state.formData.PODate);
       headerFormData.append("EntryNo", state.formData.PONo || "");
       headerFormData.append("F_LedgerMaster", state.formData.F_VendorMaster);
-      headerFormData.append("F_StatusMaster", "0");
       headerFormData.append("Remarks", state.formData.Remarks || "");
-      headerFormData.append("UserId", obj?.uid || "0");
       headerFormData.append("TotalCGST", finalCGST.toFixed(2));
       headerFormData.append("TotalSGST", finalSGST.toFixed(2));
       headerFormData.append("TotalIGST", finalIGST.toFixed(2));
       headerFormData.append("TotalTax", finalTotalTax.toFixed(2));
-      headerFormData.append("JsonData", JSON.stringify(jsonDataArray));
+      headerFormData.append("UserId", obj?.uid || "0");
       headerFormData.append("F_CompanyMaster", "0");
+      headerFormData.append("JsonData", JSON.stringify(jsonDataArray));
+      headerFormData.append("OtherChargesJson", JSON.stringify(otherChargesArray));
       await Fn_AddEditData(dispatch, setState, { arguList: { id: state.id, formData: headerFormData } }, API_URL_SAVE, true, "memberid", navigate, "#");
       alert("Sales Invoice saved successfully");
       navigate("/salesInvoice");
@@ -1177,147 +1280,171 @@ function SalesInvoice() {
         <ModalFooter><Button color="primary" onClick={handleVendorSubmit} disabled={vendorSubmitting}>Save</Button><Button color="secondary" onClick={closeVendorModal}>Cancel</Button></ModalFooter>
       </Modal>
 
+      {/* ── SALES INVOICE PRINT LAYOUT ── */}
       <div className="sales-print-layout">
-        <div className="print-header">
-          <div className="firm-name">{state.GlobalOptions[0]?.FirmName || "FIRM NAME"}</div>
-          <div className="print-title">PURCHASE INVOICE</div>
-        </div>
-        <div className="print-details">
-          <div className="detail-row">
-            <div><strong>Sales Invoice No.:</strong> {state.formData.PONo || "N/A"}</div>
-            <div><strong>Date:</strong> {state.formData.PODate || "N/A"}</div>
+        <div style={{ border: "1px solid #000", minHeight: "1000px", display: "flex", flexDirection: "column" }}>
+          
+          <div style={{ textAlign: "center", borderBottom: "1px solid #000", padding: "10px" }}>
+            <h2 style={{ margin: "0", fontSize: "22px", fontWeight: "bold", textTransform: "uppercase" }}>{state.GlobalOptions[0]?.FirmName || "FIRM NAME"}</h2>
+            <h4 style={{ margin: "5px 0 0 0", fontSize: "16px", textDecoration: "underline" }}>SALES INVOICE</h4>
           </div>
-          <div className="detail-row">
-            <div>
-              <strong>Vendor:</strong>{" "}
+
+          <div style={{ display: "flex", borderBottom: "1px solid #000" }}>
+            <div style={{ flex: 1, padding: "10px", borderRight: "1px solid #000" }}>
+              <strong>Bill To:</strong><br />
               {(() => {
                 const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
-                return vendor ? (vendor.CompanyName || vendor.Name || vendor.LedgerName) : "N/A";
+                return vendor ? (
+                  <>
+                    <div style={{ fontWeight: "bold", fontSize: "14px", marginTop: "4px" }}>{vendor.CompanyName || vendor.Name || vendor.LedgerName}</div>
+                    {vendor.Address && <div style={{ fontSize: "12px", marginTop: "2px" }}>{vendor.Address}</div>}
+                    {vendor.Phone && <div style={{ fontSize: "12px", marginTop: "2px" }}>Ph: {vendor.Phone}</div>}
+                  </>
+                ) : "N/A";
               })()}
             </div>
+            <div style={{ flex: 1, padding: "10px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
+                <span><strong>Invoice No.:</strong> {state.formData.PONo || "N/A"}</span>
+                <span><strong>Date:</strong> {state.formData.PODate || "N/A"}</span>
+              </div>
+              {state.formData.Remarks && <div style={{ marginTop: "10px", fontSize: "12px" }}><strong>Remarks:</strong> {state.formData.Remarks}</div>}
+            </div>
           </div>
-          {state.formData.Remarks && <div className="detail-row"><div><strong>Remarks:</strong> {state.formData.Remarks}</div></div>}
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Barcode</th>
-              <th>Category</th>
-              <th>Item Name</th>
-              <th>Varient</th>
-              <th className="text-right">Qty</th>
-              <th className="text-right">Rate</th>
-              <th className="text-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {gridRows.map((row, index) => {
-              const qty = parseFloat(row.Qty) || 0;
-              const rate = parseFloat(row.Rate) || 0;
-              
-              const groupObj = state.ItemGroupMaster?.find((g: any) => String(g.Id) === String(row.F_ItemGroupMaster));
-              const groupName = groupObj ? (groupObj.Name || groupObj.GroupName) : "N/A";
-              
-              const itemObj = row.ItemData?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
-              const stateItemObj = state.ItemMaster?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
-              const itemName = itemObj?.ItemName || itemObj?.Name || stateItemObj?.ItemName || stateItemObj?.Name || row.ItemCode || "N/A";
-              
-              const colorName = state.ColorMaster?.find((c: any) => String(c.Id) === String(row.F_ColorMaster))?.Name || "N/A";
-              const warehouseName = state.WarehouseMaster?.find((w: any) => String(w.Id) === String(row.F_WarehouseMaster))?.Name || "N/A";
-              
-              return (
-                <tr key={index}>
-                  <td>{index + 1}</td>
-                  <td>{row.ItemCode || "N/A"}</td>
-                  <td>{groupName}</td>
-                  <td>{itemName}</td>
-                  <td>{row.Variant || "N/A"}</td>
-                  <td className="text-right">{qty}</td>
-                  <td className="text-right">{rate.toFixed(2)}</td>
-                  <td className="text-right">{(qty * rate).toFixed(2)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            {(() => {
-              let totalCGST = 0;
-              let totalSGST = 0;
-              let totalIGST = 0;
-              const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
-              const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
 
-              gridRows.forEach((row) => {
+          <table style={{ width: "100%", borderCollapse: "collapse", flex: 1 }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid #000" }}>
+                <th style={{ padding: "6px", borderRight: "1px solid #000", textAlign: "center", width: "40px" }}>#</th>
+                <th style={{ padding: "6px", borderRight: "1px solid #000", textAlign: "left" }}>Description of Goods</th>
+                <th style={{ padding: "6px", borderRight: "1px solid #000", textAlign: "center", width: "80px" }}>Qty</th>
+                <th style={{ padding: "6px", borderRight: "1px solid #000", textAlign: "right", width: "100px" }}>Rate</th>
+                <th style={{ padding: "6px", textAlign: "right", width: "120px" }}>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {gridRows.map((row, index) => {
                 const qty = parseFloat(row.Qty) || 0;
                 const rate = parseFloat(row.Rate) || 0;
-                const amount = qty * rate;
                 const itemObj = row.ItemData?.find((i: any) => String(i.Id) === String(row.F_ItemMaster)) ||
                                 state.ItemMaster?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
-                const gstGroupId = itemObj?.F_GSTGroupMaster || itemObj?.GSTGroupMasterId || itemObj?.GSTGroupId || row.F_GSTGroupMaster;
-                const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
-                
-                if (gstGroup) {
-                  if (isInState) {
-                    totalCGST += amount * (parseFloat(gstGroup.CGSTPercent) / 100);
-                    totalSGST += amount * (parseFloat(gstGroup.SGSTPercent) / 100);
-                  } else {
-                    totalIGST += amount * (parseFloat(gstGroup.IGSTPercent) / 100);
+                const itemName = itemObj?.ItemName || itemObj?.Name || row.ItemCode || "N/A";
+
+                return (
+                  <tr key={index}>
+                    <td style={{ padding: "4px 6px", borderRight: "1px solid #000", textAlign: "center", verticalAlign: "top" }}>{index + 1}</td>
+                    <td style={{ padding: "4px 6px", borderRight: "1px solid #000", verticalAlign: "top" }}>
+                      <strong>{itemName}</strong>
+                      {(row.Variant || row.ItemCode) && (
+                        <div style={{ fontSize: "11px", color: "#333", marginTop: "2px" }}>
+                          {row.Variant && <span>Variant: {row.Variant}</span>}
+                          {row.Variant && row.ItemCode && <span> | </span>}
+                          {row.ItemCode && <span>Code: {row.ItemCode}</span>}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ padding: "4px 6px", borderRight: "1px solid #000", textAlign: "center", verticalAlign: "top" }}>{qty}</td>
+                    <td style={{ padding: "4px 6px", borderRight: "1px solid #000", textAlign: "right", verticalAlign: "top" }}>{rate.toFixed(2)}</td>
+                    <td style={{ padding: "4px 6px", textAlign: "right", verticalAlign: "top" }}>{(qty * rate).toFixed(2)}</td>
+                  </tr>
+                );
+              })}
+              {/* Filler row to push footer to bottom */}
+              <tr>
+                <td style={{ borderRight: "1px solid #000", height: "100%" }}></td>
+                <td style={{ borderRight: "1px solid #000" }}></td>
+                <td style={{ borderRight: "1px solid #000" }}></td>
+                <td style={{ borderRight: "1px solid #000" }}></td>
+                <td></td>
+              </tr>
+            </tbody>
+            <tfoot style={{ borderTop: "1px solid #000" }}>
+              {(() => {
+                let totalCGST = 0;
+                let totalSGST = 0;
+                let totalIGST = 0;
+                const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
+                const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+
+                gridRows.forEach((row) => {
+                  const qty = parseFloat(row.Qty) || 0;
+                  const rate = parseFloat(row.Rate) || 0;
+                  const amount = qty * rate;
+                  const itemObj = row.ItemData?.find((i: any) => String(i.Id) === String(row.F_ItemMaster)) ||
+                                  state.ItemMaster?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
+                  const gstGroupId = itemObj?.F_GSTGroupMaster || itemObj?.GSTGroupMasterId || itemObj?.GSTGroupId || row.F_GSTGroupMaster;
+                  const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
+                  
+                  if (gstGroup) {
+                    if (isInState) {
+                      totalCGST += amount * (parseFloat(gstGroup.CGSTPercent) / 100);
+                      totalSGST += amount * (parseFloat(gstGroup.SGSTPercent) / 100);
+                    } else {
+                      totalIGST += amount * (parseFloat(gstGroup.IGSTPercent) / 100);
+                    }
                   }
-                }
-              });
+                });
 
-              const finalCGST = taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST;
-              const finalSGST = taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST;
-              const finalIGST = taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST;
+                const finalCGST = taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST;
+                const finalSGST = taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST;
+                const finalIGST = taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST;
 
-              const totalTax = finalCGST + finalSGST + finalIGST;
-              const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
-              const grandTotal = subTotal + totalTax;
+                const totalTax = finalCGST + finalSGST + finalIGST;
+                const totalQty = gridRows.reduce((sum, row) => sum + (parseFloat(row.Qty) || 0), 0);
+                const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
+                const totalOtherCharges = otherChargesRows.reduce((sum, r) => sum + (parseFloat(r.Amount) || 0), 0);
+                const grandTotal = subTotal + totalTax + totalOtherCharges;
 
-              return (
-                <>
-                  <tr className="total-row">
-                    <td colSpan={5} className="text-right">Total Qty:</td>
-                    <td className="text-right">{gridRows.reduce((sum, row) => sum + (parseFloat(row.Qty) || 0), 0)}</td>
-                    <td className="text-right">Sub Total:</td>
-                    <td className="text-right">{subTotal.toFixed(2)}</td>
-                  </tr>
-                  {isInState ? (
-                    <>
-                      <tr className="total-row">
-                        <td colSpan={6}></td>
-                        <td className="text-right">Total CGST:</td>
-                        <td className="text-right">{finalCGST.toFixed(2)}</td>
-                      </tr>
-                      <tr className="total-row">
-                        <td colSpan={6}></td>
-                        <td className="text-right">Total SGST:</td>
-                        <td className="text-right">{finalSGST.toFixed(2)}</td>
-                      </tr>
-                    </>
-                  ) : (
-                    <tr className="total-row">
-                      <td colSpan={6}></td>
-                      <td className="text-right">Total IGST:</td>
-                      <td className="text-right">{finalIGST.toFixed(2)}</td>
+                return (
+                  <>
+                    <tr style={{ borderBottom: "1px solid #eee" }}>
+                      <td colSpan={2} style={{ padding: "6px", borderRight: "1px solid #000", textAlign: "right", fontWeight: "bold" }}>Total:</td>
+                      <td style={{ padding: "6px", borderRight: "1px solid #000", textAlign: "center", fontWeight: "bold" }}>{totalQty}</td>
+                      <td style={{ padding: "6px", borderRight: "1px solid #000", textAlign: "right", fontWeight: "bold" }}>Sub Total:</td>
+                      <td style={{ padding: "6px", textAlign: "right", fontWeight: "bold" }}>{subTotal.toFixed(2)}</td>
                     </tr>
-                  )}
-                  <tr className="total-row">
-                    <td colSpan={6}></td>
-                    <td className="text-right">Total Tax:</td>
-                    <td className="text-right">{totalTax.toFixed(2)}</td>
-                  </tr>
-                  <tr className="total-row" style={{fontSize: '1.2em', fontWeight: 'bold'}}>
-                    <td colSpan={6}></td>
-                    <td className="text-right">Grand Total:</td>
-                    <td className="text-right">{grandTotal.toFixed(2)}</td>
-                  </tr>
-                </>
-              );
-            })()}
-          </tfoot>
-        </table>
+                    {isInState ? (
+                      <>
+                        <tr style={{ borderBottom: "1px solid #eee" }}>
+                          <td colSpan={3} style={{ borderRight: "1px solid #000" }}></td>
+                          <td style={{ padding: "4px 6px", borderRight: "1px solid #000", textAlign: "right" }}>CGST:</td>
+                          <td style={{ padding: "4px 6px", textAlign: "right" }}>{finalCGST.toFixed(2)}</td>
+                        </tr>
+                        <tr style={{ borderBottom: "1px solid #eee" }}>
+                          <td colSpan={3} style={{ borderRight: "1px solid #000" }}></td>
+                          <td style={{ padding: "4px 6px", borderRight: "1px solid #000", textAlign: "right" }}>SGST:</td>
+                          <td style={{ padding: "4px 6px", textAlign: "right" }}>{finalSGST.toFixed(2)}</td>
+                        </tr>
+                      </>
+                    ) : (
+                      <tr style={{ borderBottom: "1px solid #eee" }}>
+                        <td colSpan={3} style={{ borderRight: "1px solid #000" }}></td>
+                        <td style={{ padding: "4px 6px", borderRight: "1px solid #000", textAlign: "right" }}>IGST:</td>
+                        <td style={{ padding: "4px 6px", textAlign: "right" }}>{finalIGST.toFixed(2)}</td>
+                      </tr>
+                    )}
+                    {totalOtherCharges > 0 && (
+                      <tr style={{ borderBottom: "1px solid #eee" }}>
+                        <td colSpan={3} style={{ borderRight: "1px solid #000" }}></td>
+                        <td style={{ padding: "4px 6px", borderRight: "1px solid #000", textAlign: "right" }}>Other Charges:</td>
+                        <td style={{ padding: "4px 6px", textAlign: "right" }}>{totalOtherCharges.toFixed(2)}</td>
+                      </tr>
+                    )}
+                    <tr style={{ borderTop: "1px solid #000", fontSize: "14px" }}>
+                      <td colSpan={3} style={{ borderRight: "1px solid #000" }}></td>
+                      <td style={{ padding: "8px 6px", borderRight: "1px solid #000", textAlign: "right", fontWeight: "bold" }}>Grand Total:</td>
+                      <td style={{ padding: "8px 6px", textAlign: "right", fontWeight: "bold" }}>{grandTotal.toFixed(2)}</td>
+                    </tr>
+                  </>
+                );
+              })()}
+            </tfoot>
+          </table>
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "30px 10px 10px 10px", marginTop: "20px" }}>
+            <div style={{ borderTop: "1px solid #000", width: "200px", textAlign: "center", paddingTop: "5px" }}>Customer's Signature</div>
+            <div style={{ borderTop: "1px solid #000", width: "200px", textAlign: "center", paddingTop: "5px" }}>Authorised Signatory</div>
+          </div>
+        </div>
       </div>
     </div>
   );

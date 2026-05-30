@@ -38,7 +38,7 @@ export default function BarcodePrintWizard() {
   const [item, setItem] = useState<Item | null>(null);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [prices, setPrices] = useState<Record<string, string>>({});
+  const [codes, setCodes] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<Record<string, boolean>>({});
 
   // Step 2 - printer
@@ -60,7 +60,7 @@ export default function BarcodePrintWizard() {
   const [firmName, setFirmName] = useState("FIRM NAME");
   const [showFirm, setShowFirm] = useState(true);
   const [showItem, setShowItem] = useState(true);
-  const [showBcText, setShowBcText] = useState(true);
+  const [showCode, setShowCode] = useState(true);
   const [printing, setPrinting] = useState(false);
   const [columns, setColumns] = useState(2);   // labels per row
   const [colGap, setColGap] = useState(2);     // gap between columns in mm
@@ -159,15 +159,15 @@ export default function BarcodePrintWizard() {
     const v = parseVariants(parsed);
     setVariants(v);
     const initQ: Record<string, number> = {};
-    const initP: Record<string, string> = {};
+    const initC: Record<string, string> = {};
     const initS: Record<string, boolean> = {};
     v.forEach((d, i) => {
       const k = String(d.Id || i);
       initQ[k] = 1;
-      initP[k] = String(d.SalePrice || "0");
+      initC[k] = "";
       initS[k] = !!d.Barcode;
     });
-    setQuantities(initQ); setPrices(initP); setSelected(initS);
+    setQuantities(initQ); setCodes(initC); setSelected(initS);
     checkAgent();
   }, []);
 
@@ -257,13 +257,13 @@ export default function BarcodePrintWizard() {
   const printQueue = variants.flatMap((d, i) => {
     const k = String(d.Id || i);
     if (!selected[k] || !d.Barcode || quantities[k] <= 0) return [];
-    return Array(quantities[k]).fill({ barcode: d.Barcode, name: d.SizeName || item?.ItemName || "", price: prices[k] || "0" });
+    return Array(quantities[k]).fill({ barcode: d.Barcode, name: d.SizeName || item?.ItemName || "", code: codes[k] || "" });
   });
 
   // Layout height helper computations
   const dots = dpi === 300 ? 11.8 : 8;
-  const elementsCount = (showFirm ? 1 : 0) + (showItem ? 1 : 0) + 1 + (showBcText ? 1 : 0);
-  const textH = (showFirm ? 28 : 0) + (showItem ? 22 : 0) + (showBcText ? ({ 1: 12, 2: 20, 3: 22, 4: 32, 5: 48 }[bcTextSize] || 22) : 0);
+  const elementsCount = (showFirm ? 1 : 0) + (showItem ? 1 : 0) + 2 + (showCode ? 1 : 0); // +2 for Barcode graphic + Barcode text
+  const textH = (showFirm ? 28 : 0) + (showItem ? 22 : 0) + 20 + (showCode ? ({ 1: 12, 2: 20, 3: 22, 4: 32, 5: 48 }[bcTextSize] || 22) : 0); // +20 for Barcode text
   const totalHdots = (marginT * dots) + textH + (bcH * dots) + (Math.max(0, elementsCount - 1) * (lineSpacing * dots));
   
   // A layout is overflowing the physical label if it exceeds labelH * dots
@@ -279,8 +279,8 @@ export default function BarcodePrintWizard() {
 
     const calculateHeight = (bH: number, ls: number, mT: number) => {
       const dotsVal = dpi === 300 ? 11.8 : 8;
-      const ec = (showFirm ? 1 : 0) + (showItem ? 1 : 0) + 1 + (showBcText ? 1 : 0);
-      const tH = (showFirm ? 28 : 0) + (showItem ? 22 : 0) + (showBcText ? ({ 1: 12, 2: 20, 3: 22, 4: 32, 5: 48 }[bcTextSize] || 22) : 0);
+      const ec = (showFirm ? 1 : 0) + (showItem ? 1 : 0) + 2 + (showCode ? 1 : 0);
+      const tH = (showFirm ? 28 : 0) + (showItem ? 22 : 0) + 20 + (showCode ? ({ 1: 12, 2: 20, 3: 22, 4: 32, 5: 48 }[bcTextSize] || 22) : 0);
       return (mT * dotsVal) + tH + (bH * dotsVal) + (Math.max(0, ec - 1) * (ls * dotsVal));
     };
 
@@ -342,15 +342,21 @@ export default function BarcodePrintWizard() {
         const barcodeY = y;
         y += bh + yGap;
 
+        // Print Barcode Text explicitly below the graphic
+        const bcNumY = y;
+        y += 20 + yGap; // Font size 2 height
+
         let bcTextY = 0;
-        if (showBcText) {
+        if (showCode && label.code) {
           bcTextY = y;
           y += (22 * bcTextSize) + yGap;
         }
 
         // Print Text FIRST
-        if (showBcText) {
-          cmd += `TEXT ${xCenter}, ${bcTextY}, "${bcTextSize}", 0, 1, 1, 2, "${label.barcode}"\n`;
+        cmd += `TEXT ${xCenter}, ${bcNumY}, "2", 0, 1, 1, 2, "${label.barcode}"\n`;
+
+        if (showCode && label.code) {
+          cmd += `TEXT ${xCenter}, ${bcTextY}, "${bcTextSize}", 0, 1, 1, 2, "${label.code}"\n`;
         }
 
         // Calculate centered X position for standard 1D barcode on the label column
@@ -409,7 +415,7 @@ export default function BarcodePrintWizard() {
               <th style={{ width: 40 }}><input type="checkbox" onChange={e => { const s: any = {}; variants.forEach((d, i) => { if (d.Barcode) s[String(d.Id || i)] = e.target.checked; }); setSelected(s); }} /></th>
               <th>Variant / Size</th>
               <th style={{ width: 120 }}>Barcode</th>
-              <th style={{ width: 100 }}>Price (₹)</th>
+              <th style={{ width: 180 }}>Code</th>
               <th style={{ width: 110 }}>Quantity</th>
             </tr>
           </thead>
@@ -424,8 +430,8 @@ export default function BarcodePrintWizard() {
                   <td style={{ color: "#212529" }}><strong>{d.SizeName || `Variant ${i + 1}`}</strong></td>
                   <td style={{ color: "#212529" }}><small className="font-monospace">{d.Barcode || <span className="text-danger">No Barcode</span>}</small></td>
                   <td style={{ color: "#212529" }}>
-                    <input type="number" className="form-control form-control-sm" style={{ color: "#212529", backgroundColor: "#fff" }} value={prices[k] || ""} min="0"
-                      onChange={e => setPrices(p => ({ ...p, [k]: e.target.value }))} />
+                    <input type="text" className="form-control form-control-sm" style={{ color: "#212529", backgroundColor: "#fff" }} value={codes[k] || ""}
+                      onChange={e => setCodes(p => ({ ...p, [k]: e.target.value }))} />
                   </td>
                   <td style={{ color: "#212529" }}>
                     <div className="d-flex align-items-center gap-1">
@@ -542,7 +548,7 @@ export default function BarcodePrintWizard() {
         <div className="d-flex gap-3 flex-wrap mb-2">
           <label className="form-check-label"><input type="checkbox" className="form-check-input me-1" checked={showFirm} onChange={e => setShowFirm(e.target.checked)} />Firm Name</label>
           <label className="form-check-label"><input type="checkbox" className="form-check-input me-1" checked={showItem} onChange={e => setShowItem(e.target.checked)} />Item Name</label>
-          <label className="form-check-label"><input type="checkbox" className="form-check-input me-1" checked={showBcText} onChange={e => setShowBcText(e.target.checked)} />Barcode Number</label>
+          <label className="form-check-label"><input type="checkbox" className="form-check-input me-1" checked={showCode} onChange={e => setShowCode(e.target.checked)} />Print Code</label>
         </div>
         <div className="d-flex gap-3 align-items-center flex-wrap">
           <div className="d-flex align-items-center gap-2">
@@ -589,7 +595,7 @@ export default function BarcodePrintWizard() {
     const mTPx = marginT * PX_PER_MM;
     const mLPx = marginL * PX_PER_MM;
     const bcHpx = bcH * PX_PER_MM;
-    const dummyLabel = { barcode: "890123456789", name: "Sample Item Name", price: "999" };
+    const dummyLabel = { barcode: "890123456789", name: "Sample Item Name", code: "CODE123" };
     
     return (
       <div>
@@ -657,7 +663,7 @@ export default function BarcodePrintWizard() {
               <label className="small d-flex justify-content-between mb-0"><span>Barcode Height: <strong>{bcH} mm</strong></span></label>
               <input type="range" className="form-range mb-2" min="5" max="100" step="1" value={bcH} onChange={e => setBcH(Number(e.target.value))} />
 
-              <label className="small d-flex justify-content-between mb-0"><span>Barcode Text Size: <strong>{bcTextSize}</strong></span></label>
+              <label className="small d-flex justify-content-between mb-0"><span>Code Text Size: <strong>{bcTextSize}</strong></span></label>
               <input type="range" className="form-range" min="1" max="5" step="1" value={bcTextSize} onChange={e => setBcTextSize(Number(e.target.value))} />
             </div>
           </div>
@@ -670,7 +676,8 @@ export default function BarcodePrintWizard() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: bcHpx }}>
                 <Barcode value={dummyLabel.barcode} height={Math.max(bcHpx, 10)} width={Math.max((singleWpx - mLPx * 2) / 70, 0.8)} displayValue={false} margin={0} background="transparent" />
               </div>
-              {showBcText && <div style={{ fontWeight: 700, fontSize: Math.max(singleWpx * 0.03 * bcTextSize, 8), textAlign: "center", lineHeight: 1, width: "100%", letterSpacing: 2 }}>{dummyLabel.barcode}</div>}
+              <div style={{ fontWeight: 600, fontSize: Math.max(singleWpx * 0.045, 9), textAlign: "center", lineHeight: 1, width: "100%", letterSpacing: 1 }}>{dummyLabel.barcode}</div>
+              {showCode && dummyLabel.code && <div style={{ fontWeight: 700, fontSize: Math.max(singleWpx * 0.03 * bcTextSize, 8), textAlign: "center", lineHeight: 1, width: "100%", letterSpacing: 2 }}>{dummyLabel.code}</div>}
             </div>
           </div>
         </div>
@@ -729,7 +736,8 @@ export default function BarcodePrintWizard() {
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: bcHpx }}>
                       <Barcode value={label.barcode} height={Math.max(bcHpx, 10)} width={Math.max((singleWpx - mLPx * 2) / 70, 0.8)} displayValue={false} margin={0} background="transparent" />
                     </div>
-                    {showBcText && <div style={{ fontWeight: 700, fontSize: Math.max(singleWpx * 0.03 * bcTextSize, 8), textAlign: "center", lineHeight: 1, width: "100%", letterSpacing: 2 }}>{label.barcode}</div>}
+                    <div style={{ fontWeight: 600, fontSize: Math.max(singleWpx * 0.045, 9), textAlign: "center", lineHeight: 1, width: "100%", letterSpacing: 1 }}>{label.barcode}</div>
+                    {showCode && label.code && <div style={{ fontWeight: 700, fontSize: Math.max(singleWpx * 0.03 * bcTextSize, 8), textAlign: "center", lineHeight: 1, width: "100%", letterSpacing: 2 }}>{label.code}</div>}
                   </div>
                 ))}
               </div>
@@ -812,16 +820,16 @@ export default function BarcodePrintWizard() {
               {activeTab === "print" && (
                 <div className="row">
                   <div className="col-lg-7 mb-4 mb-lg-0">
-                    <Step1 />
+                    {Step1()}
                   </div>
                   <div className="col-lg-5 border-start ps-lg-4">
-                    <Step4 />
+                    {Step4()}
                   </div>
                 </div>
               )}
               {activeTab === "hardware" && (
                 <div>
-                  <Step2 />
+                  {Step2()}
                   <div className="d-flex justify-content-end mt-4 pt-3 border-top">
                     <button className="btn btn-primary px-4 fw-bold" onClick={() => setActiveTab("print")}>
                       Go to Print Dashboard <i className="fa fa-arrow-right ms-2" />
@@ -831,7 +839,7 @@ export default function BarcodePrintWizard() {
               )}
               {activeTab === "designer" && (
                 <div>
-                  <Step3 />
+                  {Step3()}
                   <div className="d-flex justify-content-end mt-4 pt-3 border-top">
                     <button className="btn btn-primary px-4 fw-bold" onClick={() => setActiveTab("print")}>
                       Go to Print Dashboard <i className="fa fa-arrow-right ms-2" />

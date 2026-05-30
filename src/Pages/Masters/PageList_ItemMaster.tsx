@@ -88,67 +88,22 @@ const PageList_ItemMaster = () => {
    */
   const loadData = useCallback(() => {
     setState((prev) => ({ ...prev, isProgress: true }));
-    const formData = new FormData();
-    if (filterCategory) formData.append("F_CategoryMaster", filterCategory);
-    if (filterGstGroup) formData.append("F_GSTGroupMaster", filterGstGroup);
 
-    Fn_GetReport(
-      dispatch,
-      () => {},
-      "custom",
-      "GetItemDetailByReference/0/token",
-      { arguList: { id: 0, formData } },
-      true
-    )
-      .then((dataList: any) => {
-        if (!dataList || !Array.isArray(dataList)) {
-          setState((prev) => ({ ...prev, ItemMasterList: [], isProgress: false }));
-          return;
-        }
-
-        const grouped: Record<string, any> = {};
-        dataList.forEach((v: any) => {
-          const itemMasterId = v.F_ItemMaster;
-          if (!grouped[itemMasterId]) {
-            grouped[itemMasterId] = {
-              Id: itemMasterId,
-              ItemName: v.ItemName,
-              HSNCode: v.HSNCode,
-              HasSize: v.HasSize,
-              F_CategoryMaster: v.F_CategoryMaster,
-              F_GSTGroupMaster: v.F_GSTGroupMaster,
-              F_UnitMaster: v.F_UnitMaster,
-              F_AlterUnitMaster: v.F_AlterUnitMaster,
-              UnitConversion: v.UnitConversion,
-              DesignDetails: []
-            };
-          }
-          grouped[itemMasterId].DesignDetails.push({
-            Id: v.Id,
-            SizeName: v.SizeName,
-            SalePrice: v.SalePrice,
-            Barcode: v.Barcode,
-            OpeningStock: v.OpeningStock,
-            DesignPhoto: v.DesignPhoto,
-            DesignPhoto2: v.DesignPhoto2,
-            DesignPhoto3: v.DesignPhoto3,
-            DesignPhoto4: v.DesignPhoto4,
-            DesignPhoto5: v.DesignPhoto5,
-            VideoLink: v.VideoLink,
-            Length: v.Length,
-            Width: v.Width,
-            Height: v.Height,
-            Weight: v.Weight
-          });
-        });
-
-        setState((prev) => ({ ...prev, ItemMasterList: Object.values(grouped), isProgress: false }));
+    Fn_FillListData(dispatch, () => {}, "custom", LIST_API_URL)
+      .then((data: any) => {
+        let rawList: any[] = [];
+        if (Array.isArray(data)) rawList = data;
+        else if (data?.data?.response && Array.isArray(data.data.response)) rawList = data.data.response;
+        else if (data?.dataList && Array.isArray(data.dataList)) rawList = data.dataList;
+        else if (data?.data?.dataList && Array.isArray(data.data.dataList)) rawList = data.data.dataList;
+        
+        setState((prev) => ({ ...prev, ItemMasterList: rawList, isProgress: false }));
       })
       .catch((error) => {
         console.error("Failed to load items:", error);
         setState((prev) => ({ ...prev, ItemMasterList: [], isProgress: false }));
       });
-  }, [dispatch, filterCategory, filterGstGroup]);
+  }, [dispatch]);
 
   useEffect(() => {
     loadData();
@@ -232,19 +187,29 @@ const PageList_ItemMaster = () => {
    */
   const filteredList = useMemo(() => {
     const rawList = Array.isArray(state.ItemMasterList) ? state.ItemMasterList : [];
-    const searchText = state.filterText.trim().toLowerCase();
-    if (!searchText) {
-      return rawList;
+    let result = rawList;
+
+    if (filterCategory) {
+      result = result.filter(item => String(item?.F_CategoryMaster) === String(filterCategory));
+    }
+    
+    if (filterGstGroup) {
+      result = result.filter(item => String(item?.F_GSTGroupMaster) === String(filterGstGroup));
     }
 
-    return rawList.filter((item) => {
-      const fields = [
-        item?.ItemName,
-        item?.HSNCode,
-      ];
-      return fields.some((field) => String(field ?? "").toLowerCase().includes(searchText));
-    });
-  }, [state.ItemMasterList, state.filterText]);
+    const searchText = state.filterText.trim().toLowerCase();
+    if (searchText) {
+      result = result.filter((item) => {
+        const fields = [
+          item?.ItemName,
+          item?.HSNCode,
+        ];
+        return fields.some((field) => String(field ?? "").toLowerCase().includes(searchText));
+      });
+    }
+
+    return result;
+  }, [state.ItemMasterList, state.filterText, filterCategory, filterGstGroup]);
 
   return (
     <>

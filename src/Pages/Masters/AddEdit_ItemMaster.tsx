@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
-import { Container } from "reactstrap";
+import { Container, Modal, ModalHeader, ModalBody, ModalFooter, Button, Table } from "reactstrap";
 import { toast } from "react-toastify";
 import Breadcrumbs from "../../CommonElements/Breadcrumbs/Breadcrumbs";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -27,6 +27,7 @@ interface ItemRow {
   price: string;
   barcode: string;
   stock: string;
+  schemes?: any[];
 }
 
 interface ItemSection {
@@ -37,7 +38,7 @@ interface ItemSection {
   hsnCode: string;
   gstGroup: string;
   unit: string;
-  alterUnit: string;
+  material: string;
   unitConversion: string;
   rows: ItemRow[];
 }
@@ -47,7 +48,7 @@ const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const makeRow = (): ItemRow => ({
   id: uid(), photos: [null, null, null, null, null],
-  videoFile: null, videoName: "", length: "", width: "", height: "", weight: "", price: "", barcode: "", stock: "0",
+  videoFile: null, videoName: "", length: "", width: "", height: "", weight: "", price: "", barcode: "", stock: "0", schemes: [],
 });
 
 const makeSection = (): ItemSection => ({
@@ -58,7 +59,7 @@ const makeSection = (): ItemSection => ({
   hsnCode: "",
   gstGroup: "",
   unit: "",
-  alterUnit: "",
+  material: "",
   unitConversion: "",
   rows: [makeRow()]
 });
@@ -76,15 +77,20 @@ const AddEdit_ItemMaster = () => {
 
   /* Categories from API */
   const [categories, setCategories] = useState<any[]>([]);
-  const [state, setState] = useState<{ gstGroups: any[], units: any[], alterUnits: any[], isProgress: boolean }>({
+  const [state, setState] = useState<{ gstGroups: any[], units: any[], materials: any[], isProgress: boolean }>({
     gstGroups: [],
     units: [],
-    alterUnits: [],
+    materials: [],
     isProgress: true,
   });
 
   /* Sections / rows */
   const [sections, setSections] = useState<ItemSection[]>([]);
+
+  /* Scheme Modal States */
+  const [schemeModalOpen, setSchemeModalOpen] = useState(false);
+  const [activeDesignId, setActiveDesignId] = useState("");
+  const [schemeRows, setSchemeRows] = useState([{ FromRange: "", ToRange: "", Rate: "" }]);
 
   /* Ref for focus tracking */
   const tableRef = useRef<HTMLDivElement>(null);
@@ -127,10 +133,10 @@ const AddEdit_ItemMaster = () => {
     Fn_FillListData(
       dispatch,
       setState,
-      "alterUnits",
-      "Masters/0/token/AlterUnitMaster/Id/0"
+      "materials",
+      "Masters/0/token/MaterialMaster/Id/0"
     ).catch((error) => {
-      console.error("Failed to load Alter Units:", error);
+      console.error("Failed to load Materials:", error);
     });
   }, [dispatch]);
 
@@ -214,6 +220,15 @@ const AddEdit_ItemMaster = () => {
 
              if (parsedDesignDetails.length === 0) parsedDesignDetails = [{}];
 
+             let parsedSchemeDetails: any[] = [];
+             try {
+                if (typeof item.SchemeDetails === "string") {
+                  parsedSchemeDetails = JSON.parse(item.SchemeDetails || "[]");
+                } else if (Array.isArray(item.SchemeDetails)) {
+                  parsedSchemeDetails = item.SchemeDetails;
+                }
+             } catch (e) { console.error("Parse Error Scheme:", e); }
+
              return {
                 id: String(item.Id || uid()),
                 itemName: item.ItemName || "",
@@ -222,9 +237,18 @@ const AddEdit_ItemMaster = () => {
                 hsnCode: item.HSNCode || "",
                 gstGroup: item.F_GSTGroupMaster ? String(item.F_GSTGroupMaster) : "",
                 unit: item.F_UnitMaster ? String(item.F_UnitMaster) : "",
-                alterUnit: item.F_AlterUnitMaster ? String(item.F_AlterUnitMaster) : "",
+                material: item.F_MaterialMaster ? String(item.F_MaterialMaster) : "",
                 unitConversion: item.UnitConversion ? String(item.UnitConversion) : "",
-                rows: parsedDesignDetails.map((d: any) => ({
+                rows: parsedDesignDetails.map((d: any) => {
+                    const rowSchemes = parsedSchemeDetails
+                      .filter((s: any) => String(s.F_ItemDesignMaster) === String(d.Id))
+                      .map((s: any) => ({
+                         FromRange: String(s.FromRange ?? ""),
+                         ToRange: String(s.ToRange ?? ""),
+                         Rate: String(s.Rate ?? "")
+                      }));
+                      
+                    return {
                     id: String(d.Id || uid()),
                     photos: [
                         d.DesignPhoto ? { file: null, preview: d.DesignPhoto } : null,
@@ -241,8 +265,10 @@ const AddEdit_ItemMaster = () => {
                     weight: d.Weight || "",
                     price: d.SalePrice ? String(d.SalePrice) : "",
                     barcode: d.Barcode || "",
-                    stock: d.OpeningStock ? String(d.OpeningStock) : "0"
-                }))
+                    stock: d.OpeningStock ? String(d.OpeningStock) : "0",
+                    schemes: rowSchemes
+                };
+              })
              };
           });
           setSections(prefilledSections);
@@ -482,6 +508,76 @@ const AddEdit_ItemMaster = () => {
     }
   }, []);
 
+  /* ── Scheme Modal Handlers ── */
+  const openSchemeModal = (designId: string, initialSchemes?: any[]) => {
+    setActiveDesignId(designId);
+    if (initialSchemes && initialSchemes.length > 0) {
+      setSchemeRows(initialSchemes);
+    } else {
+      setSchemeRows([{ FromRange: "", ToRange: "", Rate: "" }]);
+    }
+    setSchemeModalOpen(true);
+  };
+
+  const closeSchemeModal = () => {
+    setSchemeModalOpen(false);
+    setActiveDesignId("");
+  };
+
+  const addSchemeRow = () => {
+    let nextFromRange = "";
+    if (schemeRows.length > 0) {
+      const lastToRange = schemeRows[schemeRows.length - 1].ToRange;
+      if (lastToRange && !isNaN(Number(lastToRange))) {
+        nextFromRange = String(Number(lastToRange) + 1);
+      }
+    }
+    setSchemeRows([...schemeRows, { FromRange: nextFromRange, ToRange: "", Rate: "" }]);
+  };
+
+  const removeSchemeRow = (index: number) => {
+    if (schemeRows.length > 1) {
+      setSchemeRows(schemeRows.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateSchemeRow = (index: number, field: keyof typeof schemeRows[0], value: string) => {
+    const updated = [...schemeRows];
+    updated[index] = { ...updated[index], [field]: value };
+    setSchemeRows(updated);
+  };
+
+  const saveScheme = async () => {
+    try {
+      const validRows = schemeRows.filter(r => r.FromRange && r.ToRange && r.Rate);
+      if (validRows.length === 0) {
+        toast.error("Please enter valid scheme data.");
+        return;
+      }
+      
+      const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");
+      const userId = authUser?.uid ?? authUser?.Id ?? "0";
+      
+      const formData = new FormData();
+      formData.append("F_ItemDesignMaster", activeDesignId);
+      formData.append("UserId", userId);
+      formData.append("SchemeJson", JSON.stringify(validRows));
+      
+      await Fn_AddEditData(dispatch, () => {}, { arguList: { id: 0, formData } }, "ItemSchemeMaster/0/token", true, "", () => {}, "");
+      
+      setSections(prev => {
+        return prev.map(s => ({
+          ...s,
+          rows: s.rows.map(r => r.id === activeDesignId ? { ...r, schemes: validRows } : r)
+        }));
+      });
+
+      toast.success("Scheme saved successfully");
+      closeSchemeModal();
+    } catch (error) {
+      console.error("Error saving scheme:", error);
+    }
+  };
 
 
   /* ── Global row counter ── */
@@ -559,19 +655,7 @@ const AddEdit_ItemMaster = () => {
                                   }}
                                 />
                               </div>
-                              <div className="im-section-info-field">
-                                <label>HasSize <span className="req">*</span></label>
-                                <select
-                                  value={section.hasSize}
-                                  onChange={e => {
-                                    updateSectionField(secIdx, 'hasSize', e.target.value);
-                                    handleFieldUpdate(section.id, "ItemMaster", "HasSize", e.target.value === "Yes" ? "true" : "false", undefined, true);
-                                  }}
-                                >
-                                  <option value="Yes">Yes</option>
-                                  <option value="No">No</option>
-                                </select>
-                              </div>
+
                               <div className="im-section-info-field">
                                 <label>Category <span className="req">*</span></label>
                                 <select
@@ -640,25 +724,25 @@ const AddEdit_ItemMaster = () => {
                                 </select>
                               </div>
                               <div className="im-section-info-field">
-                                <label>Alter Unit</label>
+                                <label>Material Master</label>
                                 <select
                                   className="im-category-select"
-                                  value={section.alterUnit}
+                                  value={section.material}
                                   onChange={e => {
-                                    updateSectionField(secIdx, 'alterUnit', e.target.value);
-                                    handleFieldUpdate(section.id, "ItemMaster", "F_AlterUnitMaster", e.target.value, undefined, true);
+                                    updateSectionField(secIdx, 'material', e.target.value);
+                                    handleFieldUpdate(section.id, "ItemMaster", "F_MaterialMaster", e.target.value, undefined, true);
                                   }}
                                 >
-                                  <option value="">Select Alter Unit</option>
-                                  {(state.alterUnits || []).map((a: any, i: number) => (
-                                    <option key={i} value={a.Id}>
-                                      {a.AlterUnitName}
+                                  <option value="">Select Material</option>
+                                  {(state.materials || []).map((m: any, i: number) => (
+                                    <option key={i} value={m.Id}>
+                                      {m.MaterialName || m.Name || m.GroupName || m.materialName || `Material ${m.Id}`}
                                     </option>
                                   ))}
                                 </select>
                               </div>
                               <div className="im-section-info-field">
-                                <label>Unit Conversion</label>
+                                <label>Unit Value</label>
                                 <input
                                   type="text"
                                   className="im-cell-input"
@@ -809,6 +893,11 @@ const AddEdit_ItemMaster = () => {
                                     }
                                   }}
                                 />
+                                <div style={{ marginTop: '5px', textAlign: 'center' }}>
+                                  <button type="button" className="im-btn" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', backgroundColor: '#3b82f6', color: 'white' }} onClick={() => openSchemeModal(row.id, row.schemes)}>
+                                    Add Scheme
+                                  </button>
+                                </div>
                               </td>
 
                               {/* Barcode */}
@@ -891,6 +980,48 @@ const AddEdit_ItemMaster = () => {
 
         </div>
       </Container>
+      
+      <Modal isOpen={schemeModalOpen} toggle={closeSchemeModal} size="lg">
+        <ModalHeader toggle={closeSchemeModal}>Add Scheme</ModalHeader>
+        <ModalBody>
+          <Table bordered size="sm">
+            <thead>
+              <tr>
+                <th>From Range</th>
+                <th>To Range</th>
+                <th>Rate</th>
+                <th style={{ width: '100px' }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {schemeRows.map((row, index) => (
+                <tr key={index}>
+                  <td>
+                    <input type="number" className="form-control form-control-sm" value={row.FromRange} onChange={(e) => updateSchemeRow(index, "FromRange", e.target.value)} />
+                  </td>
+                  <td>
+                    <input type="number" className="form-control form-control-sm" value={row.ToRange} onChange={(e) => updateSchemeRow(index, "ToRange", e.target.value)} />
+                  </td>
+                  <td>
+                    <input type="number" className="form-control form-control-sm" value={row.Rate} onChange={(e) => updateSchemeRow(index, "Rate", e.target.value)} />
+                  </td>
+                  <td className="text-center">
+                    <div className="d-flex justify-content-center gap-2">
+                      <Button color="success" size="sm" onClick={addSchemeRow}>+</Button>
+                      <Button color="danger" size="sm" onClick={() => removeSchemeRow(index)} disabled={schemeRows.length === 1}>-</Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </ModalBody>
+        <ModalFooter>
+          <Button color="primary" onClick={saveScheme}>Save Scheme</Button>
+          <Button color="secondary" onClick={closeSchemeModal}>Cancel</Button>
+        </ModalFooter>
+      </Modal>
+
     </div>
   );
 };

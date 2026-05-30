@@ -110,7 +110,9 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/cityMaster`, Component: <PageList_CityMaster /> },
 
   {path:`${process.env.PUBLIC_URL}/salesInvoice`,Component:<SalesInvoice/>},
-    { path: `${process.env.PUBLIC_URL}/globalOptions`, Component: <GlobalOptions /> }
+    { path: `${process.env.PUBLIC_URL}/globalOptions`, Component: <GlobalOptions /> },
+{ path: `${process.env.PUBLIC_URL}/addEditMaterialMaster`, Component: <AddEdit_MaterialMaster /> },
+{ path: `${process.env.PUBLIC_URL}/materialMaster`, Component: <PageList_MaterialMaster /> },
   /*
   { path: `${process.env.PUBLIC_URL}/itemMaster`, Component: <PageList_ItemMaster /> },
   { path: `${process.env.PUBLIC_URL}/addEditItemGroup`, Component: <AddEdit_ItemGroup /> },

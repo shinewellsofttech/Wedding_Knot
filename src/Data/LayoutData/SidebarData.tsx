@@ -37,6 +37,15 @@ export const MenuList: MenuItem[] = [
         bookmark: true
 
       },
+      {
+        id: 1,
+        title: "Material Master",
+        path: `${process.env.PUBLIC_URL}/materialMaster`,
+        icon: "Box",
+        type: "link",
+        bookmark: true
+      },
+      
             { 
         id: 2, 
         title: "Ledger Master", 
