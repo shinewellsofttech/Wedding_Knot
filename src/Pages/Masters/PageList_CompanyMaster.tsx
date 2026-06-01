@@ -176,14 +176,7 @@ const PageList_CompanyMaster = () => {
                                 >
                                   Edit
                                 </Btn>
-                                <Btn
-                                  color="danger"
-                                  type="button"
-                                  size="sm"
-                                  onClick={() => handleDelete(company.Id || company.ID || 0)}
-                                >
-                                  Delete
-                                </Btn>
+
                               </td>
                             </tr>
                           ))

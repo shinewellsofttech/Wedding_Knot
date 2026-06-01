@@ -71,10 +71,21 @@ const PageList_UserMaster = () => {
   const handleDelete = (id: number | string) => {
     if (!id) return;
     if (window.confirm("Are you sure you want to delete this user master?")) {
-      Fn_DeleteData(dispatch, () => {}, Number(id), DELETE_API_URL)
-        .finally(() => {
-          loadData();
+      const itemToDelete = state.UserMasterList.find((item: any) => item?.Id === id);
+
+      Fn_DeleteData(dispatch, () => {}, Number(id), DELETE_API_URL).catch(() => {
+        // Rollback the optimistic UI update if delete fails
+        setState((prev) => {
+          if (!itemToDelete) return prev;
+          const newList = [...prev.UserMasterList, itemToDelete].sort((a, b) => a.Id - b.Id);
+          return { ...prev, UserMasterList: newList };
         });
+      });
+      
+      setState((prev) => ({
+        ...prev,
+        UserMasterList: prev.UserMasterList.filter((item: any) => item?.Id !== id),
+      }));
     }
   };
 

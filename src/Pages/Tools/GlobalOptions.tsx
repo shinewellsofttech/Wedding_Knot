@@ -119,7 +119,7 @@ const GlobalOptions: React.FC = () => {
       dispatch,
       setDropdowns,
       "financialYearList",
-      `${API_WEB_URLS.MASTER}/0/token/CompanyYearMaster/Id/0`,
+      `${API_WEB_URLS.MASTER}/0/token/FinancialYearMaster/Id/0`,
       () => {},
       () => {}
     ).catch((error) => {

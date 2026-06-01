@@ -66,14 +66,21 @@ const PageList_CityMaster = () => {
   const handleDelete = (id: number | string) => {
     if (!id) return;
     if (window.confirm("Are you sure you want to delete this city?")) {
-      Fn_DeleteData(dispatch, setState as any, Number(id), DELETE_API_URL, LIST_API_URL)
-        .then(() => {
-          loadData();
-        })
-        .catch((error) => {
-          console.error("Failed to delete city:", error);
-          alert("Failed to delete city. Please try again.");
+      const itemToDelete = state.CityMasterList.find((item: any) => item?.Id === id);
+
+      Fn_DeleteData(dispatch, () => {}, Number(id), DELETE_API_URL).catch(() => {
+        // Rollback the optimistic UI update if delete fails
+        setState((prev) => {
+          if (!itemToDelete) return prev;
+          const newList = [...prev.CityMasterList, itemToDelete].sort((a, b) => a.Id - b.Id);
+          return { ...prev, CityMasterList: newList };
         });
+      });
+      
+      setState((prev) => ({
+        ...prev,
+        CityMasterList: prev.CityMasterList.filter((item: any) => item?.Id !== id),
+      }));
     }
   };
 

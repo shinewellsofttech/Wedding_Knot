@@ -8,8 +8,8 @@ import CardHeaderCommon from "../../CommonElements/CardHeaderCommon/CardHeaderCo
 import { Fn_DeleteData, Fn_FillListData } from "../../store/Functions";
 import { API_WEB_URLS } from "../../constants/constAPI";
 
-const LIST_API_URL = `${API_WEB_URLS.MASTER}/0/token/CompanyYearMaster/Id/0`;
-const DELETE_API_URL = `${API_WEB_URLS.MASTER}/0/token/CompanyYearMaster`;
+const LIST_API_URL = `${API_WEB_URLS.MASTER}/0/token/FinancialYearMaster/Id/0`;
+const DELETE_API_URL = `${API_WEB_URLS.MASTER}/0/token/FinancialYearMaster`;
 
 interface CompanyYearListState {
   CompanyYearsList: any[];
@@ -166,7 +166,6 @@ const PageList_CompanyYears = () => {
                           <tr>
                             <th>#</th>
                             <th>Financial Year</th>
-                            <th>Company</th>
                             <th>Actions</th>
                           </tr>
                         </thead>
@@ -182,7 +181,6 @@ const PageList_CompanyYears = () => {
                               <tr key={item?.Id ?? index}>
                                 <td>{index + 1}</td>
                                 <td>{formatDate(item?.FinancialYearFrom)} - {formatDate(item?.FinancialYearTo)}</td>
-                                <td>{item?.FirmName ?? "-"}</td>
                                 <td>
                                   <Btn color="primary" size="sm" className="me-2" onClick={() => handleEdit(item?.Id)}>
                                     <i className="fa fa-edit" />

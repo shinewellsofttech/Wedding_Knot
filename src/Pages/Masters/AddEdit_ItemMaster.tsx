@@ -204,7 +204,23 @@ const AddEdit_ItemMaster = () => {
 
   /* ── Load pre-filled data ── */
   const loadData = useCallback(() => {
-    Fn_FillListData(dispatch, (prev: any) => (typeof prev === "function" ? prev : prev), "items", ITEM_MASTER_DATA_URL)
+    const stateId = location.state?.Id;
+    if (!stateId || stateId === 0 || stateId === "0") {
+      const initEmpty = async () => {
+        const newId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemCreate/Id/0`);
+        const newRowId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemDesignCreate/Id/${newId}`);
+        const newSec = makeSection();
+        newSec.id = newId;
+        newSec.rows[0].id = newRowId;
+        setSections([newSec]);
+      };
+      initEmpty();
+      return;
+    }
+
+    const fetchUrl = `${API_WEB_URLS.MASTER}/0/token/ItemMasterData/Id/${stateId}`;
+
+    Fn_FillListData(dispatch, (prev: any) => (typeof prev === "function" ? prev : prev), "items", fetchUrl)
       .then((data: any) => {
         const list = Array.isArray(data) ? data : data?.dataList ?? data?.data?.dataList ?? [];
         if (list.length > 0) {
@@ -272,20 +288,6 @@ const AddEdit_ItemMaster = () => {
              };
           });
           setSections(prefilledSections);
-          const stateId = location.state?.Id;
-          if (stateId && stateId !== 0) {
-            setTimeout(() => {
-              const el = document.getElementById(`item-section-${stateId}`);
-              if (el) {
-                el.scrollIntoView({ behavior: "smooth", block: "center" });
-                const originalBg = el.style.backgroundColor;
-                el.style.backgroundColor = "#fff3cd";
-                setTimeout(() => {
-                  el.style.backgroundColor = originalBg;
-                }, 2000);
-              }
-            }, 500);
-          }
         } else {
           setSections([]);
         }
@@ -293,7 +295,7 @@ const AddEdit_ItemMaster = () => {
       .catch(() => {
         setSections([]);
       });
-  }, [dispatch, location.state?.Id]);
+  }, [dispatch, location.state?.Id, fetchNewId]);
 
   useEffect(() => {
     loadData();

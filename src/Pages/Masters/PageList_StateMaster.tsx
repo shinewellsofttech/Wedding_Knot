@@ -66,14 +66,21 @@ const PageList_StateMaster = () => {
   const handleDelete = (id: number | string) => {
     if (!id) return;
     if (window.confirm("Are you sure you want to delete this state?")) {
-      Fn_DeleteData(dispatch, setState as any, Number(id), DELETE_API_URL, LIST_API_URL)
-        .then(() => {
-          loadData();
-        })
-        .catch((error) => {
-          console.error("Failed to delete state:", error);
-          alert("Failed to delete state. Please try again.");
+      const itemToDelete = state.StateMasterList.find((item: any) => item?.Id === id);
+
+      Fn_DeleteData(dispatch, () => {}, Number(id), DELETE_API_URL).catch(() => {
+        // Rollback the optimistic UI update if delete fails
+        setState((prev) => {
+          if (!itemToDelete) return prev;
+          const newList = [...prev.StateMasterList, itemToDelete].sort((a, b) => a.Id - b.Id);
+          return { ...prev, StateMasterList: newList };
         });
+      });
+      
+      setState((prev) => ({
+        ...prev,
+        StateMasterList: prev.StateMasterList.filter((item: any) => item?.Id !== id),
+      }));
     }
   };
 

@@ -60,6 +60,8 @@ interface StateData {
   isGridEditable: boolean;
   GlobalOptions: any[];
   GSTGroupMaster: any[];
+  StateMaster: any[];
+  CityMaster: any[];
 }
 
 function PurchaseEntry() {
@@ -93,6 +95,8 @@ function PurchaseEntry() {
     ItemGroupMaster: [],
     ItemMaster: [],
     WarehouseMaster: [],
+    StateMaster: [],
+    CityMaster: [],
     ColorMaster: [],
     BatchMaster: [],
     DefaultWarehouse: null,
@@ -164,6 +168,13 @@ function PurchaseEntry() {
 
         const API_URL_GSTGROUP = API_WEB_URLS.MASTER + "/0/token/GSTGroupMaster/Id/0";
         const gstData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_GSTGROUP);
+        const globalOptions = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_GLOBALOPTIONS);
+
+        const API_URL_STATEMASTER = API_WEB_URLS.MASTER + "/0/token/StateMaster/Id/0";
+        const stateMasterData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_STATEMASTER);
+
+        const API_URL_CITYMASTER = API_WEB_URLS.MASTER + "/0/token/CityMaster/Id/0";
+        const cityMasterData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_CITYMASTER);
 
         const extractArray = (data: any) => Array.isArray(data) ? data : (data?.data?.dataList || data?.dataList || data?.data?.response || data?.response || []);
 
@@ -173,6 +184,9 @@ function PurchaseEntry() {
           VendorMaster: extractArray(vendors),
           CreatedPurchaseEntries: peDataArray,
           GSTGroupMaster: extractArray(gstData),
+          GlobalOptions: extractArray(globalOptions),
+          StateMaster: extractArray(stateMasterData),
+          CityMaster: extractArray(cityMasterData),
         }));
 
         const params = new URLSearchParams(location.search);
@@ -510,6 +524,16 @@ function PurchaseEntry() {
 
   const handleBarcodeFetch = async (index: number, barcode: string) => {
     if (!barcode) return;
+
+    const isDuplicate = gridRows.some((row, rIndex) => rIndex !== index && row.ItemCode === barcode);
+    if (isDuplicate) {
+      alert("Item with this barcode is already added in the entry.");
+      const updatedRows = [...gridRows];
+      updatedRows[index] = { ...updatedRows[index], ItemCode: "" };
+      setGridRows(updatedRows);
+      return;
+    }
+
     try {
       const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");
       const userId = authUser?.uid ?? authUser?.Id ?? "0";
@@ -528,33 +552,55 @@ function PurchaseEntry() {
 
       if (list && list.length > 0) {
         const item = list[0];
+
+        let designs: any[] = [];
+        try {
+          if (typeof item.DesignDetails === "string") {
+            designs = JSON.parse(item.DesignDetails || "[]");
+          } else if (Array.isArray(item.DesignDetails)) {
+            designs = item.DesignDetails;
+          }
+        } catch (e) {
+          console.error("Error parsing DesignDetails:", e);
+        }
+
+        const matchedDesign = designs.find((d: any) => String(d.Barcode) === String(barcode)) || {};
+
         const groupId = item.F_CategoryMaster || item.F_ItemGroupMaster || "";
-        const itemId = item.F_ItemMaster || item.Id || "";
-        const designId = item.Id || "";
+        const itemId = item.Id || "";
+        const designId = matchedDesign.Id || "";
         
         const photos = [];
-        if (item.DesignPhoto) photos.push(item.DesignPhoto);
-        if (item.DesignPhoto2) photos.push(item.DesignPhoto2);
-        if (item.DesignPhoto3) photos.push(item.DesignPhoto3);
-        if (item.DesignPhoto4) photos.push(item.DesignPhoto4);
-        if (item.DesignPhoto5) photos.push(item.DesignPhoto5);
+        if (matchedDesign.DesignPhoto) photos.push(matchedDesign.DesignPhoto);
+        if (matchedDesign.DesignPhoto2) photos.push(matchedDesign.DesignPhoto2);
+        if (matchedDesign.DesignPhoto3) photos.push(matchedDesign.DesignPhoto3);
+        if (matchedDesign.DesignPhoto4) photos.push(matchedDesign.DesignPhoto4);
+        if (matchedDesign.DesignPhoto5) photos.push(matchedDesign.DesignPhoto5);
         
         const updatedRows = [...gridRows];
         updatedRows[index] = {
           ...updatedRows[index],
-          ItemCode: item.Barcode || barcode,
+          ItemCode: matchedDesign.Barcode || barcode,
           F_ItemGroupMaster: String(groupId),
           F_ItemMaster: String(itemId),
           F_ItemDesignMaster: String(designId),
           ItemName: item.ItemName || "Scanned Item",
-          DesignPhoto: item.DesignPhoto || "",
-          Variant: item.SizeName || "",
+          DesignPhoto: matchedDesign.DesignPhoto || "",
+          Variant: matchedDesign.SizeName || "",
           Photos: photos,
           F_GSTGroupMaster: item.F_GSTGroupMaster || "",
           ItemData: [{ Id: itemId, ItemName: item.ItemName || "Scanned Item", F_GSTGroupMaster: item.F_GSTGroupMaster }]
         };
         
         setGridRows(updatedRows);
+        
+        setTimeout(() => {
+          const qtyInput = document.querySelector(`input[data-row="${index}"][data-field="Qty"]`) as HTMLInputElement;
+          if (qtyInput) {
+            qtyInput.focus();
+            qtyInput.select();
+          }
+        }, 100);
       }
     } catch (e) {
       console.error("Error fetching barcode details:", e);
@@ -752,9 +798,9 @@ function PurchaseEntry() {
         };
       });
 
-      const finalCGST = taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST;
-      const finalSGST = taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST;
-      const finalIGST = taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST;
+      const finalCGST = Math.round(taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST);
+      const finalSGST = Math.round(taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST);
+      const finalIGST = Math.round(taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST);
       const finalTotalTax = finalCGST + finalSGST + finalIGST;
 
       const headerFormData = new FormData();
@@ -772,7 +818,7 @@ function PurchaseEntry() {
       headerFormData.append("F_CompanyMaster", "0");
       await Fn_AddEditData(dispatch, setState, { arguList: { id: state.id, formData: headerFormData } }, API_URL_SAVE, true, "memberid", navigate, "#");
       alert("Purchase Entry saved successfully");
-      navigate("/purchaseEntry");
+      window.location.reload();
     } catch (error) {
       console.error("Error saving purchase entry:", error);
     }
@@ -1065,6 +1111,13 @@ function PurchaseEntry() {
       <div className="purchase-print-layout">
         <div className="print-header">
           <div className="firm-name">{state.GlobalOptions[0]?.FirmName || "FIRM NAME"}</div>
+          <div style={{ fontSize: "12px", marginTop: "4px", color: "#555", fontWeight: "normal" }}>
+            {[
+              state.GlobalOptions[0]?.FirmAddress,
+              state.GlobalOptions[0]?.CityName || state.GlobalOptions[0]?.City || state.CityMaster?.find(c => String(c.Id) === String(state.GlobalOptions[0]?.F_CityMaster))?.Name,
+              state.GlobalOptions[0]?.StateName || state.GlobalOptions[0]?.State || state.GlobalOptions[0]?.StateMasterName || state.StateMaster?.find(s => String(s.Id) === String(state.GlobalOptions[0]?.F_StateMaster))?.StateName
+            ].filter(Boolean).join(", ")}
+          </div>
           <div className="print-title">PURCHASE INVOICE</div>
         </div>
         <div className="print-details">
@@ -1152,9 +1205,9 @@ function PurchaseEntry() {
                 }
               });
 
-              const finalCGST = taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST;
-              const finalSGST = taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST;
-              const finalIGST = taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST;
+              const finalCGST = Math.round(taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST);
+              const finalSGST = Math.round(taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST);
+              const finalIGST = Math.round(taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST);
 
               const totalTax = finalCGST + finalSGST + finalIGST;
               const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);

@@ -5,16 +5,16 @@ export const MenuList: MenuItem[] = [
   {
     title: "Masters",
     Items:[
+      // {
+      //   id:1,
+      //   title: "Item Master", 
+      //   path: `${process.env.PUBLIC_URL}/addEditItemMaster  `, 
+      //   icon: "Box", 
+      //   type: "link", 
+      //   bookmark: true 
+      // },
       {
-        id:1,
-        title: "Item Master", 
-        path: `${process.env.PUBLIC_URL}/addEditItemMaster  `, 
-        icon: "Box", 
-        type: "link", 
-        bookmark: true 
-      },
-      {
-        id: 2, title: "Item Master List",
+        id: 2, title: "Item Master ",
         path: `${process.env.PUBLIC_URL}/itemMaster`,
         icon: "Box",
         type: "link",
@@ -67,6 +67,14 @@ export const MenuList: MenuItem[] = [
         title: "City Master",
         path: `${process.env.PUBLIC_URL}/cityMaster`,
         icon: "User",
+        type: "link",
+        bookmark: true
+      },
+      {
+        id:7,
+        title: "Financial Year Master",
+        path: `${process.env.PUBLIC_URL}/companyYears`,
+        icon: "Calendar",
         type: "link",
         bookmark: true
       }

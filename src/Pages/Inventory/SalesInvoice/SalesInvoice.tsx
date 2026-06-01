@@ -65,6 +65,8 @@ interface StateData {
   GlobalOptions: any[];
   GSTGroupMaster: any[];
   OtherChargesLedgers: any[];
+  StateMaster: any[];
+  CityMaster: any[];
 }
 
 function SalesInvoice() {
@@ -98,6 +100,8 @@ function SalesInvoice() {
     ItemGroupMaster: [],
     ItemMaster: [],
     WarehouseMaster: [],
+    StateMaster: [],
+    CityMaster: [],
     ColorMaster: [],
     BatchMaster: [],
     DefaultWarehouse: null,
@@ -181,6 +185,12 @@ function SalesInvoice() {
         const API_URL_GLOBALOPTIONS = API_WEB_URLS.MASTER + "/0/token/GlobalOptions/Id/0";
         const globalOptionsData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_GLOBALOPTIONS);
 
+        const API_URL_STATEMASTER = API_WEB_URLS.MASTER + "/0/token/StateMaster/Id/0";
+        const stateMasterData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_STATEMASTER);
+
+        const API_URL_CITYMASTER = API_WEB_URLS.MASTER + "/0/token/CityMaster/Id/0";
+        const cityMasterData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_CITYMASTER);
+
         const extractArray = (data: any) => Array.isArray(data) ? data : (data?.data?.dataList || data?.dataList || data?.data?.response || data?.response || []);
 
         setState((prev) => ({
@@ -191,6 +201,8 @@ function SalesInvoice() {
           GSTGroupMaster: extractArray(gstData),
           OtherChargesLedgers: extractArray(otherLedgersData),
           GlobalOptions: extractArray(globalOptionsData),
+          StateMaster: extractArray(stateMasterData),
+          CityMaster: extractArray(cityMasterData),
         }));
 
         const params = new URLSearchParams(location.search);
@@ -540,6 +552,9 @@ function SalesInvoice() {
           const to = parseFloat(scheme.ToRange) || Infinity;
           if (qty >= from && qty <= to) {
             schemeRate = parseFloat(scheme.Rate) || 0;
+            if (schemeRate === 0) {
+              schemeRate = row.OriginalSalePrice || parseFloat(row.Rate) || 0;
+            }
             break;
           }
         }
@@ -576,6 +591,16 @@ function SalesInvoice() {
 
   const handleBarcodeFetch = async (index: number, barcode: string) => {
     if (!barcode) return;
+
+    const isDuplicate = gridRows.some((row, rIndex) => rIndex !== index && row.ItemCode === barcode);
+    if (isDuplicate) {
+      alert("Item with this barcode is already added in the entry.");
+      const updatedRows = [...gridRows];
+      updatedRows[index] = { ...updatedRows[index], ItemCode: "" };
+      setGridRows(updatedRows);
+      return;
+    }
+
     try {
       const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");
       const userId = authUser?.uid ?? authUser?.Id ?? "0";
@@ -653,7 +678,8 @@ function SalesInvoice() {
             const from = parseFloat(scheme.FromRange) || 0;
             const to = parseFloat(scheme.ToRange) || Infinity;
             if (qty >= from && qty <= to) {
-              finalSalePrice = parseFloat(scheme.Rate) || salePrice;
+              let sRate = parseFloat(scheme.Rate) || 0;
+              finalSalePrice = sRate === 0 ? salePrice : sRate;
               break;
             }
           }
@@ -683,6 +709,14 @@ function SalesInvoice() {
         };
         
         setGridRows(updatedRows);
+        
+        setTimeout(() => {
+          const qtyInput = document.querySelector(`input[data-row="${index}"][data-field="Qty"]`) as HTMLInputElement;
+          if (qtyInput) {
+            qtyInput.focus();
+            qtyInput.select();
+          }
+        }, 100);
       }
     } catch (e) {
       console.error("Error fetching barcode details:", e);
@@ -834,6 +868,9 @@ function SalesInvoice() {
       let totalCGST = 0;
       let totalSGST = 0;
       let totalIGST = 0;
+      let highestCGSTPercent = 0;
+      let highestSGSTPercent = 0;
+      let highestIGSTPercent = 0;
       const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
       const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
 
@@ -852,11 +889,19 @@ function SalesInvoice() {
         const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
 
         if (gstGroup) {
+          const cgstP = parseFloat(gstGroup.CGSTPercent) || 0;
+          const sgstP = parseFloat(gstGroup.SGSTPercent) || 0;
+          const igstP = parseFloat(gstGroup.IGSTPercent) || 0;
+          
+          if (cgstP > highestCGSTPercent) highestCGSTPercent = cgstP;
+          if (sgstP > highestSGSTPercent) highestSGSTPercent = sgstP;
+          if (igstP > highestIGSTPercent) highestIGSTPercent = igstP;
+
           if (isInState) {
-            itemCGST = amount * (parseFloat(gstGroup.CGSTPercent) / 100);
-            itemSGST = amount * (parseFloat(gstGroup.SGSTPercent) / 100);
+            itemCGST = amount * (cgstP / 100);
+            itemSGST = amount * (sgstP / 100);
           } else {
-            itemIGST = amount * (parseFloat(gstGroup.IGSTPercent) / 100);
+            itemIGST = amount * (igstP / 100);
           }
         }
         
@@ -880,17 +925,26 @@ function SalesInvoice() {
         };
       });
 
-      const finalCGST = taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST;
-      const finalSGST = taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST;
-      const finalIGST = taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST;
-      const finalTotalTax = finalCGST + finalSGST + finalIGST;
-
       const otherChargesArray = otherChargesRows
         .filter((row) => row.F_LedgerMaster && row.Amount)
         .map((row) => ({
           F_LedgerMaster: Number(row.F_LedgerMaster),
           Amount: Number(row.Amount),
         }));
+
+      const totalOtherCharges = otherChargesArray.reduce((sum, r) => sum + r.Amount, 0);
+
+      if (isInState) {
+        totalCGST += totalOtherCharges * (highestCGSTPercent / 100);
+        totalSGST += totalOtherCharges * (highestSGSTPercent / 100);
+      } else {
+        totalIGST += totalOtherCharges * (highestIGSTPercent / 100);
+      }
+
+      const finalCGST = Math.round(taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST);
+      const finalSGST = Math.round(taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST);
+      const finalIGST = Math.round(taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST);
+      const finalTotalTax = finalCGST + finalSGST + finalIGST;
 
       const headerFormData = new FormData();
       headerFormData.append("EntryDate", state.formData.PODate);
@@ -907,7 +961,7 @@ function SalesInvoice() {
       headerFormData.append("OtherChargesJson", JSON.stringify(otherChargesArray));
       await Fn_AddEditData(dispatch, setState, { arguList: { id: state.id, formData: headerFormData } }, API_URL_SAVE, true, "memberid", navigate, "#");
       alert("Sales Invoice saved successfully");
-      navigate("/salesInvoice");
+      window.location.reload();
     } catch (error) {
       console.error("Error saving sales entry:", error);
     }
@@ -1121,6 +1175,9 @@ function SalesInvoice() {
                       let totalCGST = 0;
                       let totalSGST = 0;
                       let totalIGST = 0;
+                      let highestCGSTPercent = 0;
+                      let highestSGSTPercent = 0;
+                      let highestIGSTPercent = 0;
 
                       const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
                       const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
@@ -1137,22 +1194,38 @@ function SalesInvoice() {
                         const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
                         
                         if (gstGroup) {
+                          const cgstP = parseFloat(gstGroup.CGSTPercent) || 0;
+                          const sgstP = parseFloat(gstGroup.SGSTPercent) || 0;
+                          const igstP = parseFloat(gstGroup.IGSTPercent) || 0;
+                          
+                          if (cgstP > highestCGSTPercent) highestCGSTPercent = cgstP;
+                          if (sgstP > highestSGSTPercent) highestSGSTPercent = sgstP;
+                          if (igstP > highestIGSTPercent) highestIGSTPercent = igstP;
+
                           if (isInState) {
-                            totalCGST += amount * (parseFloat(gstGroup.CGSTPercent) / 100);
-                            totalSGST += amount * (parseFloat(gstGroup.SGSTPercent) / 100);
+                            totalCGST += amount * (cgstP / 100);
+                            totalSGST += amount * (sgstP / 100);
                           } else {
-                            totalIGST += amount * (parseFloat(gstGroup.IGSTPercent) / 100);
+                            totalIGST += amount * (igstP / 100);
                           }
                         }
                       });
 
-                      const finalCGST = taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST;
-                      const finalSGST = taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST;
-                      const finalIGST = taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST;
+                      const totalOtherCharges = otherChargesRows.reduce((sum, r) => sum + (parseFloat(r.Amount) || 0), 0);
+
+                      if (isInState) {
+                        totalCGST += totalOtherCharges * (highestCGSTPercent / 100);
+                        totalSGST += totalOtherCharges * (highestSGSTPercent / 100);
+                      } else {
+                        totalIGST += totalOtherCharges * (highestIGSTPercent / 100);
+                      }
+
+                      const finalCGST = Math.round(taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST);
+                      const finalSGST = Math.round(taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST);
+                      const finalIGST = Math.round(taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST);
 
                       const totalTax = finalCGST + finalSGST + finalIGST;
                       const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
-                      const totalOtherCharges = otherChargesRows.reduce((sum, r) => sum + (parseFloat(r.Amount) || 0), 0);
                       const grandTotal = subTotal + totalTax + totalOtherCharges;
 
                       return (
@@ -1163,6 +1236,12 @@ function SalesInvoice() {
                                 <th className="text-end w-50">Sub Total:</th>
                                 <td className="text-end fw-bold">{subTotal.toFixed(2)}</td>
                               </tr>
+                              {totalOtherCharges > 0 && (
+                                <tr>
+                                  <th className="text-end w-50">Other Charges:</th>
+                                  <td className="text-end fw-bold">{totalOtherCharges.toFixed(2)}</td>
+                                </tr>
+                              )}
                               {isInState ? (
                                 <>
                                   <tr>
@@ -1208,12 +1287,6 @@ function SalesInvoice() {
                                 <th className="text-end text-danger">Total Tax:</th>
                                 <td className="text-end text-danger fw-bold">{totalTax.toFixed(2)}</td>
                               </tr>
-                              {totalOtherCharges > 0 && (
-                                <tr>
-                                  <th className="text-end text-info">Other Charges:</th>
-                                  <td className="text-end text-info fw-bold">{totalOtherCharges.toFixed(2)}</td>
-                                </tr>
-                              )}
                               <tr>
                                 <th className="text-end text-success fs-5">Grand Total:</th>
                                 <td className="text-end text-success fw-bold fs-5">{grandTotal.toFixed(2)}</td>
@@ -1286,6 +1359,13 @@ function SalesInvoice() {
           
           <div style={{ textAlign: "center", borderBottom: "1px solid #000", padding: "10px" }}>
             <h2 style={{ margin: "0", fontSize: "22px", fontWeight: "bold", textTransform: "uppercase" }}>{state.GlobalOptions[0]?.FirmName || "FIRM NAME"}</h2>
+            <div style={{ fontSize: "12px", marginTop: "4px", color: "#555" }}>
+              {[
+                state.GlobalOptions[0]?.FirmAddress,
+                state.GlobalOptions[0]?.CityName || state.GlobalOptions[0]?.City || state.CityMaster?.find(c => String(c.Id) === String(state.GlobalOptions[0]?.F_CityMaster))?.Name,
+                state.GlobalOptions[0]?.StateName || state.GlobalOptions[0]?.State || state.GlobalOptions[0]?.StateMasterName || state.StateMaster?.find(s => String(s.Id) === String(state.GlobalOptions[0]?.F_StateMaster))?.StateName
+              ].filter(Boolean).join(", ")}
+            </div>
             <h4 style={{ margin: "5px 0 0 0", fontSize: "16px", textDecoration: "underline" }}>SALES INVOICE</h4>
           </div>
 
@@ -1363,6 +1443,9 @@ function SalesInvoice() {
                 let totalCGST = 0;
                 let totalSGST = 0;
                 let totalIGST = 0;
+                let highestCGSTPercent = 0;
+                let highestSGSTPercent = 0;
+                let highestIGSTPercent = 0;
                 const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
                 const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
 
@@ -1376,23 +1459,39 @@ function SalesInvoice() {
                   const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
                   
                   if (gstGroup) {
+                    const cgstP = parseFloat(gstGroup.CGSTPercent) || 0;
+                    const sgstP = parseFloat(gstGroup.SGSTPercent) || 0;
+                    const igstP = parseFloat(gstGroup.IGSTPercent) || 0;
+                    
+                    if (cgstP > highestCGSTPercent) highestCGSTPercent = cgstP;
+                    if (sgstP > highestSGSTPercent) highestSGSTPercent = sgstP;
+                    if (igstP > highestIGSTPercent) highestIGSTPercent = igstP;
+
                     if (isInState) {
-                      totalCGST += amount * (parseFloat(gstGroup.CGSTPercent) / 100);
-                      totalSGST += amount * (parseFloat(gstGroup.SGSTPercent) / 100);
+                      totalCGST += amount * (cgstP / 100);
+                      totalSGST += amount * (sgstP / 100);
                     } else {
-                      totalIGST += amount * (parseFloat(gstGroup.IGSTPercent) / 100);
+                      totalIGST += amount * (igstP / 100);
                     }
                   }
                 });
 
-                const finalCGST = taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST;
-                const finalSGST = taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST;
-                const finalIGST = taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST;
+                const totalOtherCharges = otherChargesRows.reduce((sum, r) => sum + (parseFloat(r.Amount) || 0), 0);
+
+                if (isInState) {
+                  totalCGST += totalOtherCharges * (highestCGSTPercent / 100);
+                  totalSGST += totalOtherCharges * (highestSGSTPercent / 100);
+                } else {
+                  totalIGST += totalOtherCharges * (highestIGSTPercent / 100);
+                }
+
+                const finalCGST = Math.round(taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST);
+                const finalSGST = Math.round(taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST);
+                const finalIGST = Math.round(taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST);
 
                 const totalTax = finalCGST + finalSGST + finalIGST;
                 const totalQty = gridRows.reduce((sum, row) => sum + (parseFloat(row.Qty) || 0), 0);
                 const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
-                const totalOtherCharges = otherChargesRows.reduce((sum, r) => sum + (parseFloat(r.Amount) || 0), 0);
                 const grandTotal = subTotal + totalTax + totalOtherCharges;
 
                 return (
@@ -1403,6 +1502,13 @@ function SalesInvoice() {
                       <td style={{ padding: "6px", borderRight: "1px solid #000", textAlign: "right", fontWeight: "bold" }}>Sub Total:</td>
                       <td style={{ padding: "6px", textAlign: "right", fontWeight: "bold" }}>{subTotal.toFixed(2)}</td>
                     </tr>
+                    {totalOtherCharges > 0 && (
+                      <tr style={{ borderBottom: "1px solid #eee" }}>
+                        <td colSpan={3} style={{ borderRight: "1px solid #000" }}></td>
+                        <td style={{ padding: "6px", borderRight: "1px solid #000", textAlign: "right", fontWeight: "bold" }}>Other Charges:</td>
+                        <td style={{ padding: "6px", textAlign: "right", fontWeight: "bold" }}>{totalOtherCharges.toFixed(2)}</td>
+                      </tr>
+                    )}
                     {isInState ? (
                       <>
                         <tr style={{ borderBottom: "1px solid #eee" }}>
@@ -1421,13 +1527,6 @@ function SalesInvoice() {
                         <td colSpan={3} style={{ borderRight: "1px solid #000" }}></td>
                         <td style={{ padding: "4px 6px", borderRight: "1px solid #000", textAlign: "right" }}>IGST:</td>
                         <td style={{ padding: "4px 6px", textAlign: "right" }}>{finalIGST.toFixed(2)}</td>
-                      </tr>
-                    )}
-                    {totalOtherCharges > 0 && (
-                      <tr style={{ borderBottom: "1px solid #eee" }}>
-                        <td colSpan={3} style={{ borderRight: "1px solid #000" }}></td>
-                        <td style={{ padding: "4px 6px", borderRight: "1px solid #000", textAlign: "right" }}>Other Charges:</td>
-                        <td style={{ padding: "4px 6px", textAlign: "right" }}>{totalOtherCharges.toFixed(2)}</td>
                       </tr>
                     )}
                     <tr style={{ borderTop: "1px solid #000", fontSize: "14px" }}>

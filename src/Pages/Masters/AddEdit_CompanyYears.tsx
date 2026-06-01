@@ -45,8 +45,8 @@ interface DropdownState {
   isProgress?: boolean;
 }
 
-const API_URL_SAVE = `CompanyYearMaster/0/token`;
-const API_URL_EDIT = API_WEB_URLS.MASTER + `/0/token/CompanyYearMaster/Id`;
+const API_URL_SAVE = `FinancialYearMaster/0/token`;
+const API_URL_EDIT = API_WEB_URLS.MASTER + `/0/token/FinancialYearMaster/Id`;
 const FIRM_LIST_URL = `${API_WEB_URLS.MASTER}/0/token/${API_WEB_URLS.FirmMaster}/Id/0`;
 
 /**
@@ -83,7 +83,6 @@ const AddEdit_CompanyYears = () => {
         FinancialYearTo: Yup.date()
           .typeError("Financial year to must be a valid date")
           .required("Financial year to is required"),
-        F_FirmMaster: Yup.string().trim().required("Firm selection is required"),
         IsCurrentFinancialYear: Yup.boolean(),
       }),
     []
@@ -156,9 +155,9 @@ const AddEdit_CompanyYears = () => {
     try {
       const formData = new FormData();
       formData.append("Id", String(companyYearsState.id ?? 0));
-      formData.append("FinancialYearFrom", values.FinancialYearFrom || "");
-      formData.append("FinancialYearTo", values.FinancialYearTo || "");
-      formData.append("F_FirmMaster", values.F_FirmMaster || "");
+      formData.append("FinancialYearFrom", values.FinancialYearFrom || "0");
+      formData.append("FinancialYearTo", values.FinancialYearTo || "0");
+      formData.append("F_FirmMaster", values.F_FirmMaster || "0");
       formData.append("IsCurrentFinancialYear", values.IsCurrentFinancialYear ? "true" : "false");
       formData.append("UserId", getCurrentUserId());
       formData.append("F_CompanyMaster", (() => { try { const a = JSON.parse(localStorage.getItem("authUser")||"{}"); return String(a?.F_CompanyMaster ?? a?.CompanyId ?? a?.F_Company ?? "0"); } catch(e){return "0";} })());
@@ -230,29 +229,7 @@ const AddEdit_CompanyYears = () => {
                               <ErrorMessage name="FinancialYearTo" component="div" className="text-danger small" />
                             </FormGroup>
                           </Col>
-                          <Col md="6">
-                            <FormGroup>
-                              <Label>
-                                Firm <span className="text-danger">*</span>
-                              </Label>
-                              <Input
-                                type="select"
-                                name="F_FirmMaster"
-                                value={values.F_FirmMaster}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                                invalid={touched.F_FirmMaster && !!errors.F_FirmMaster}
-                              >
-                                <option value="">Select firm</option>
-                                {dropdowns.firms.map((firm) => (
-                                  <option key={firm?.Id} value={firm?.Id ?? ""}>
-                                    {firm?.Name || firm?.FirmName || `Firm ${firm?.Id ?? ""}`}
-                                  </option>
-                                ))}
-                              </Input>
-                              <ErrorMessage name="F_FirmMaster" component="div" className="text-danger small" />
-                            </FormGroup>
-                          </Col>
+
                           <Col md="6">
                             <FormGroup>
                               <div className="form-check form-switch">

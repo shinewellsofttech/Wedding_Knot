@@ -50,7 +50,7 @@ const PageList_ItemMaster = () => {
   const [selectedItemForPrint, setSelectedItemForPrint] = useState<any>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState<number>(20);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(10);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -155,10 +155,21 @@ const PageList_ItemMaster = () => {
   const handleDelete = (id: number | string) => {
     if (!id) return;
     if (window.confirm("Are you sure you want to delete this item?")) {
-      Fn_DeleteData(dispatch, () => {}, Number(id), DELETE_API_URL)
-        .finally(() => {
-          loadData();
+      const itemToDelete = state.ItemMasterList.find((item: any) => item?.Id === id);
+
+      Fn_DeleteData(dispatch, () => {}, Number(id), DELETE_API_URL).catch(() => {
+        // Rollback the optimistic UI update if delete fails
+        setState((prev) => {
+          if (!itemToDelete) return prev;
+          const newList = [...prev.ItemMasterList, itemToDelete].sort((a, b) => a.Id - b.Id);
+          return { ...prev, ItemMasterList: newList };
         });
+      });
+      
+      setState((prev) => ({
+        ...prev,
+        ItemMasterList: prev.ItemMasterList.filter((item: any) => item?.Id !== id),
+      }));
     }
   };
 
@@ -505,7 +516,7 @@ const PageList_ItemMaster = () => {
                                   setItemsPerPage(Math.min(20, Math.max(1, val)));
                                   setCurrentPage(1);
                                 } else {
-                                  setItemsPerPage(20);
+                                  setItemsPerPage(10);
                                   setCurrentPage(1);
                                 }
                               }}

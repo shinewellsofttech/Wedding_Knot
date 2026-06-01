@@ -66,14 +66,21 @@ const PageList_MaterialMaster = () => {
   const handleDelete = (id: number | string) => {
     if (!id) return;
     if (window.confirm("Are you sure you want to delete this material master?")) {
-      Fn_DeleteData(dispatch, setState as any, Number(id), DELETE_API_URL, LIST_API_URL)
-        .then(() => {
-          loadData();
-        })
-        .catch((error) => {
-          console.error("Failed to delete material master:", error);
-          alert("Failed to delete material master. Please try again.");
+      const itemToDelete = state.MaterialMasterList.find((item: any) => item?.Id === id);
+
+      Fn_DeleteData(dispatch, () => {}, Number(id), DELETE_API_URL).catch(() => {
+        // Rollback the optimistic UI update if delete fails
+        setState((prev) => {
+          if (!itemToDelete) return prev;
+          const newList = [...prev.MaterialMasterList, itemToDelete].sort((a, b) => a.Id - b.Id);
+          return { ...prev, MaterialMasterList: newList };
         });
+      });
+      
+      setState((prev) => ({
+        ...prev,
+        MaterialMasterList: prev.MaterialMasterList.filter((item: any) => item?.Id !== id),
+      }));
     }
   };
 

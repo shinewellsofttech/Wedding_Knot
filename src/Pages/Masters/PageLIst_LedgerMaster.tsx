@@ -66,14 +66,21 @@ const PageList_LedgerMaster = () => {
   const handleDelete = (id: number | string) => {
     if (!id) return;
     if (window.confirm("Are you sure you want to delete this ledger master?")) {
-      Fn_DeleteData(dispatch, setState as any, Number(id), DELETE_API_URL, LIST_API_URL)
-        .then(() => {
-          loadData();
-        })
-        .catch((error) => {
-          console.error("Failed to delete ledger master:", error);
-          alert("Failed to delete ledger master. Please try again.");
+      const itemToDelete = state.LedgerMasterList.find((item: any) => item?.Id === id);
+
+      Fn_DeleteData(dispatch, () => {}, Number(id), DELETE_API_URL).catch(() => {
+        // Rollback the optimistic UI update if delete fails
+        setState((prev) => {
+          if (!itemToDelete) return prev;
+          const newList = [...prev.LedgerMasterList, itemToDelete].sort((a, b) => a.Id - b.Id);
+          return { ...prev, LedgerMasterList: newList };
         });
+      });
+      
+      setState((prev) => ({
+        ...prev,
+        LedgerMasterList: prev.LedgerMasterList.filter((item: any) => item?.Id !== id),
+      }));
     }
   };
 
