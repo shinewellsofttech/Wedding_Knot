@@ -115,7 +115,7 @@ const Login = () => {
         localStorage.setItem("authUser", JSON.stringify({ ...userData, CompanyName: companyName || userData?.CompanyName }));
         localStorage.setItem("login", JSON.stringify(true));
         toast.success(loginMessage || "Login Successful");
-        navigate(`${process.env.PUBLIC_URL}/addEditItemMaster`);
+        navigate(`${process.env.PUBLIC_URL}/dashboard`);
       } else {
         toast.error(response?.message || loginMessage || "Login failed");
       }

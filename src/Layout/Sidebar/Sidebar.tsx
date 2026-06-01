@@ -106,8 +106,8 @@ const Sidebar = () => {
             <UL className="sidebar-links" id="simple-bar" >
               <SimpleBar style={{ margin: "0px"}}>
                 <LI className="back-btn">
-                  <Link to={`${process.env.PUBLIC_URL}/dashboard/defaULt`}>
-                    <Image className="img-fluid" src={dynamicImage("logo/logo-icon.png")} alt="logo" />
+                  <Link to={`${process.env.PUBLIC_URL}/dashboard/default`}>
+                    <Image className="img-fluid" src={`${process.env.PUBLIC_URL}/assets/images/image.png`} alt="logo" />
                   </Link>
                   <div className="mobile-back text-end ">
                     <span>{Back}</span>

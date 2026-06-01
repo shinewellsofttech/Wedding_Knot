@@ -444,7 +444,7 @@ function SalesInvoice() {
   const handleDeletePE = () => {
     if (!state.formData.F_SalesInvoiceH) return;
     if (window.confirm("Are you sure you want to delete this sales invoice?")) {
-      const DELETE_API_URL = `${API_WEB_URLS.MASTER}/0/token/SalesInvoiceH`;
+      const DELETE_API_URL = `${API_WEB_URLS.MASTER}/0/token/SalesEntryH`;
       Fn_DeleteData(dispatch, () => {}, Number(state.formData.F_SalesInvoiceH), DELETE_API_URL)
         .then(() => {
           alert("Sales Invoice deleted successfully.");

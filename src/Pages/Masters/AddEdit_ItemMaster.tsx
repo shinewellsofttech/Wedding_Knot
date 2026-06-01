@@ -207,12 +207,7 @@ const AddEdit_ItemMaster = () => {
     const stateId = location.state?.Id;
     if (!stateId || stateId === 0 || stateId === "0") {
       const initEmpty = async () => {
-        const newId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemCreate/Id/0`);
-        const newRowId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemDesignCreate/Id/${newId}`);
-        const newSec = makeSection();
-        newSec.id = newId;
-        newSec.rows[0].id = newRowId;
-        setSections([newSec]);
+        setSections([]);
       };
       initEmpty();
       return;

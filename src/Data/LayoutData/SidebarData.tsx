@@ -1,7 +1,19 @@
 import { MenuItem } from "../../Types/Layout/SidebarType";
 
 export const MenuList: MenuItem[] = [
-
+  {
+    title: "Dashboard",
+    Items: [
+      {
+        id: 0,
+        title: "Dashboard",
+        path: `${process.env.PUBLIC_URL}/dashboard`,
+        icon: "Home",
+        type: "link",
+        bookmark: true
+      }
+    ]
+  },
   {
     title: "Masters",
     Items:[

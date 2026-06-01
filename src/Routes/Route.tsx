@@ -75,6 +75,7 @@ import AddEdit_MaterialMaster from "../Pages/Masters/AddEdit_MaterialMaster";
 import PageList_MaterialMaster from "../Pages/Masters/PageList_MaterialMaster";
 import AddEdit_CategoryMaster from "../Pages/Masters/AddEdit_CategoryMaster";
 import PageList_CategoryMaster from "../Pages/Masters/PageList_CategoryMaster";
+import Dashboard from "../Pages/Dashboard/Dashboard";
 
 export const routes = [
   // Default landing route is /voucherEntry (see index.tsx Navigate)
@@ -115,7 +116,9 @@ export const routes = [
 { path: `${process.env.PUBLIC_URL}/materialMaster`, Component: <PageList_MaterialMaster /> },
 
   { path: `${process.env.PUBLIC_URL}/addEditCompanyYears`, Component: <AddEdit_CompanyYears /> },
-  { path: `${process.env.PUBLIC_URL}/companyYears`, Component: <PageList_CompanyYears /> }
+  { path: `${process.env.PUBLIC_URL}/companyYears`, Component: <PageList_CompanyYears /> },
+  
+  { path: `${process.env.PUBLIC_URL}/dashboard`, Component: <Dashboard /> }
   /*
   { path: `${process.env.PUBLIC_URL}/itemMaster`, Component: <PageList_ItemMaster /> },
   { path: `${process.env.PUBLIC_URL}/addEditItemGroup`, Component: <AddEdit_ItemGroup /> },

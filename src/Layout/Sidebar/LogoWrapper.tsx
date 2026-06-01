@@ -10,14 +10,14 @@ const LogoWrapper = () => {
         <div className="logo-wrapper">
           <Link to={`${process.env.PUBLIC_URL}/dashboard/default`} className="text-decoration-none">
             <div className="d-flex align-items-center gap-2">
-              <Image className="img-fluid" src={dynamicImage("logo/logo-icon.png")} alt="logo" style={{width: 25, height: 25}} />
+              <Image className="img-fluid" src={`${process.env.PUBLIC_URL}/assets/images/image.png`} alt="logo" style={{width: 45, height: 40}} />
               <H6 className="mb-0 text-uppercase fw-bold text-primary mb-0" style={{letterSpacing: "0.5px", fontSize: "18px",lineHeight: "1.2"}}>{Crocs}</H6>
             </div>
           </Link>
         </div>
         <div className="logo-icon-wrapper">
           <Link to={`${process.env.PUBLIC_URL}/dashboard/default`}>
-            <Image className="img-fluid" src={dynamicImage("logo/logo-icon.png")} alt="logo" />
+            <Image className="img-fluid" src={`${process.env.PUBLIC_URL}/assets/images/Wedding-logo.png`} alt="logo" />
           </Link>
         </div>
       </>
