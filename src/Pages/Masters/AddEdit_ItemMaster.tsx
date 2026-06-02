@@ -24,6 +24,7 @@ interface ItemRow {
   width: string;
   height: string;
   weight: string;
+  unitConversion: string;
   price: string;
   barcode: string;
   stock: string;
@@ -39,7 +40,6 @@ interface ItemSection {
   gstGroup: string;
   unit: string;
   material: string;
-  unitConversion: string;
   rows: ItemRow[];
 }
 
@@ -48,7 +48,7 @@ const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const makeRow = (): ItemRow => ({
   id: uid(), photos: [null, null, null, null, null],
-  videoFile: null, videoName: "", length: "", width: "", height: "", weight: "", price: "", barcode: "", stock: "0", schemes: [],
+  videoFile: null, videoName: "", length: "", width: "", height: "", weight: "", unitConversion: "", price: "", barcode: "", stock: "0", schemes: [],
 });
 
 const makeSection = (): ItemSection => ({
@@ -60,7 +60,6 @@ const makeSection = (): ItemSection => ({
   gstGroup: "",
   unit: "",
   material: "",
-  unitConversion: "",
   rows: [makeRow()]
 });
 
@@ -249,7 +248,6 @@ const AddEdit_ItemMaster = () => {
                 gstGroup: item.F_GSTGroupMaster ? String(item.F_GSTGroupMaster) : "",
                 unit: item.F_UnitMaster ? String(item.F_UnitMaster) : "",
                 material: item.F_MaterialMaster ? String(item.F_MaterialMaster) : "",
-                unitConversion: item.UnitConversion ? String(item.UnitConversion) : "",
                 rows: parsedDesignDetails.map((d: any) => {
                     const rowSchemes = parsedSchemeDetails
                       .filter((s: any) => String(s.F_ItemDesignMaster) === String(d.Id))
@@ -274,6 +272,7 @@ const AddEdit_ItemMaster = () => {
                     width: d.Width || "",
                     height: d.Height || "",
                     weight: d.Weight || "",
+                    unitConversion: d.UnitConversion ? String(d.UnitConversion) : "",
                     price: d.SalePrice ? String(d.SalePrice) : "",
                     barcode: d.Barcode || "",
                     stock: d.OpeningStock ? String(d.OpeningStock) : "0",
@@ -610,6 +609,7 @@ const AddEdit_ItemMaster = () => {
                   <th style={{ width: 80 }}>Width</th>
                   <th style={{ width: 80 }}>Height</th>
                   <th style={{ width: 80 }}>Weight</th>
+                  <th style={{ width: 80 }}>Unit Val</th>
                   <th style={{ width: 110 }}>Price</th>
                   <th style={{ width: 200 }}>Barcode</th>
                   <th style={{ width: 110 }}>Stock</th>
@@ -619,7 +619,7 @@ const AddEdit_ItemMaster = () => {
               <tbody>
                 {sections.length === 0 ? (
                   <tr>
-                    <td colSpan={11}>
+                    <td colSpan={12}>
                       <div className="im-empty">
                         <div className="im-empty-icon">📋</div>
                         <h4>No items yet</h4>
@@ -637,7 +637,7 @@ const AddEdit_ItemMaster = () => {
                       <React.Fragment key={section.id}>
                         {/* Section Header Row inside the Table */}
                         <tr className="im-section-header-row" id={`item-section-${section.id}`}>
-                          <td colSpan={11} className="text-start">
+                          <td colSpan={12} className="text-start">
                             <div className="im-section-info-grid">
                               <div className="im-section-info-field">
                                 <label>Item Name <span className="req">*</span></label>
@@ -737,19 +737,6 @@ const AddEdit_ItemMaster = () => {
                                     </option>
                                   ))}
                                 </select>
-                              </div>
-                              <div className="im-section-info-field">
-                                <label>Unit Value</label>
-                                <input
-                                  type="text"
-                                  className="im-cell-input"
-                                  placeholder="e.g. 10"
-                                  value={section.unitConversion}
-                                  onChange={e => {
-                                    updateSectionField(secIdx, 'unitConversion', e.target.value);
-                                    handleFieldUpdate(section.id, "ItemMaster", "UnitConversion", e.target.value);
-                                  }}
-                                />
                               </div>
                               <div className="im-section-info-field" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", flex: 1 }}>
                                 <button
@@ -869,6 +856,19 @@ const AddEdit_ItemMaster = () => {
                                   onChange={e => {
                                     updateRow(secIdx, rowIdx, { weight: e.target.value });
                                     handleFieldUpdate(row.id, "ItemDesignMaster", "Weight", e.target.value);
+                                  }}
+                                />
+                              </td>
+
+                              {/* Unit Value */}
+                              <td>
+                                <input
+                                  className="im-cell-input"
+                                  placeholder="Unit Val"
+                                  value={row.unitConversion}
+                                  onChange={e => {
+                                    updateRow(secIdx, rowIdx, { unitConversion: e.target.value });
+                                    handleFieldUpdate(row.id, "ItemDesignMaster", "UnitConversion", e.target.value);
                                   }}
                                 />
                               </td>

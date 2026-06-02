@@ -309,6 +309,7 @@ const PageList_ItemMaster = () => {
                             <th>Width</th>
                             <th>Height</th>
                             <th>Weight</th>
+                            <th>Unit Val</th>
                             <th>Price</th>
                             <th>Barcode</th>
                             <th>Stock</th>
@@ -342,7 +343,7 @@ const PageList_ItemMaster = () => {
                                 <React.Fragment key={item?.Id ?? index}>
                                   {/* Item Master Header Row */}
                                   <tr className="table-primary">
-                                    <td colSpan={10}>
+                                    <td colSpan={11}>
                                       <Btn 
                                         color="primary" 
                                         outline 
@@ -378,14 +379,6 @@ const PageList_ItemMaster = () => {
                                         ?? item?.F_UnitMaster 
                                         ?? "-"
                                       }
-                                      <span className="mx-2">|</span>
-                                      <strong>Alter Unit:</strong> {
-                                        alterUnits.find(a => String(a.Id) === String(item?.F_AlterUnitMaster))?.AlterUnitName
-                                        ?? item?.F_AlterUnitMaster 
-                                        ?? "-"
-                                      }
-                                      <span className="mx-2">|</span>
-                                      <strong>Conv:</strong> {item?.UnitConversion || "-"}
                                     </td>
                                     <td>
                                       <Btn color="info" size="sm" className="me-2" onClick={() => handlePrintBarcodes(item)} title="Print Barcodes">
@@ -404,7 +397,7 @@ const PageList_ItemMaster = () => {
                                   {expandedRows[String(item?.Id ?? index)] && (
                                     parsedDesign.length === 0 ? (
                                       <tr>
-                                        <td colSpan={11} className="text-center text-muted py-2">
+                                        <td colSpan={12} className="text-center text-muted py-2">
                                           No variants available for this item.
                                         </td>
                                       </tr>
@@ -425,6 +418,7 @@ const PageList_ItemMaster = () => {
                                           <td>{d.Width || "-"}</td>
                                           <td>{d.Height || "-"}</td>
                                           <td>{d.Weight || "-"}</td>
+                                          <td>{d.UnitConversion || "-"}</td>
                                           <td>₹{d.SalePrice || "0"}</td>
                                           <td>
                                             {d.Barcode && d.Barcode.trim() !== "" ? (

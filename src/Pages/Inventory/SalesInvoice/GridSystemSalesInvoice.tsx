@@ -48,6 +48,7 @@ interface GridRow {
   Photos?: string[];
   ItemData: any[] | null;
   AvailableQty?: number;
+  UnitValue?: number;
 }
 
 interface GridSystemSalesInvoiceProps {
@@ -281,6 +282,7 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
                   <th>Barcode</th>
                   <th>Category</th>
                   <th>Item</th>
+                  <th>Unit Val</th>
                   <th>Varient</th>
                   <th>Quantity</th>
                   <th>Rate</th>
@@ -304,6 +306,9 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
                         onChange={(e) => {
                           const itemCode = e.target.value;
                           onUpdateRow(index, 'ItemCode', itemCode);
+                          if (itemCode.length === 13 && onBarcodeFetch) {
+                            onBarcodeFetch(index, itemCode);
+                          }
                         }}
                         onBlur={(e) => {
                           if (onBarcodeFetch && e.target.value) {
@@ -358,6 +363,10 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
                             </option>
                           ))}
                       </select>
+                    </td>
+
+                    <td className="py-0" style={{ textAlign: 'right', verticalAlign: 'middle' }}>
+                      <span style={{ padding: '0 8px', display: 'inline-block' }}>{row.UnitValue ?? 1}</span>
                     </td>
 
                     <td className="py-0">

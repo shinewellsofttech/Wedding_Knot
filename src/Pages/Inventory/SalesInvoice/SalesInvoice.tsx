@@ -34,6 +34,7 @@ interface GridRow {
   OriginalSalePrice?: number;
   SchemeDetails?: any[];
   GSTPercent?: number;
+  UnitValue?: number;
 }
 
 interface StateData {
@@ -158,6 +159,7 @@ function SalesInvoice() {
   });
 
   const [taxOverrides, setTaxOverrides] = useState<{ CGST?: string, SGST?: string, IGST?: string }>({});
+  const [printModalOpen, setPrintModalOpen] = useState(false);
 
   const saveButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -419,6 +421,7 @@ function SalesInvoice() {
                 Qty: line.Qty || "",
                 Rate: line.Rate || "",
                 ItemData: extractArray(itemData) || [],
+                UnitValue: (line.UnitConversion && parseFloat(line.UnitConversion) > 0) ? parseFloat(line.UnitConversion) : 1,
               };
             })
           );
@@ -437,7 +440,7 @@ function SalesInvoice() {
   const addRow = () => {
     setGridRows((prevRows) => [
       ...prevRows,
-      { ItemCode: "", F_ItemGroupMaster: "", F_ItemMaster: "", F_ColorMaster: state.DefaultColor?.Id || "", F_WarehouseMaster: state.DefaultWarehouse?.Id || "", F_BatchMaster: "", Variant: "", Photos: [], Qty: "", Rate: "", ItemData: null, AvailableQty: 0 },
+      { ItemCode: "", F_ItemGroupMaster: "", F_ItemMaster: "", F_ColorMaster: state.DefaultColor?.Id || "", F_WarehouseMaster: state.DefaultWarehouse?.Id || "", F_BatchMaster: "", Variant: "", Photos: [], Qty: "", Rate: "", ItemData: null, AvailableQty: 0, UnitValue: 1 },
     ]);
   };
 
@@ -565,9 +568,6 @@ function SalesInvoice() {
 
       const gstPercent = row.GSTPercent || 0;
       let baseRate = newSalePrice;
-      if (gstPercent > 0) {
-        baseRate = (newSalePrice * 100) / (100 + gstPercent);
-      }
       
       if (row.OriginalSalePrice !== undefined) {
         updatedRows[index].Rate = String(baseRate > 0 ? baseRate.toFixed(2) : "");
@@ -592,12 +592,46 @@ function SalesInvoice() {
   const handleBarcodeFetch = async (index: number, barcode: string) => {
     if (!barcode) return;
 
-    const isDuplicate = gridRows.some((row, rIndex) => rIndex !== index && row.ItemCode === barcode);
-    if (isDuplicate) {
-      alert("Item with this barcode is already added in the entry.");
+    const duplicateIndex = gridRows.findIndex((row, rIndex) => rIndex !== index && row.ItemCode === barcode);
+    if (duplicateIndex !== -1) {
       const updatedRows = [...gridRows];
+      const dupRow = updatedRows[duplicateIndex];
+      const newQty = (parseFloat(dupRow.Qty) || 0) + 1;
+      dupRow.Qty = String(newQty);
+      
+      let newSalePrice = dupRow.OriginalSalePrice || parseFloat(dupRow.Rate) || 0;
+      if (dupRow.SchemeDetails && Array.isArray(dupRow.SchemeDetails) && dupRow.SchemeDetails.length > 0 && newQty > 0) {
+        let schemeRate: number | null = null;
+        for (const scheme of dupRow.SchemeDetails) {
+          const from = parseFloat(scheme.FromRange) || 0;
+          const to = parseFloat(scheme.ToRange) || Infinity;
+          if (newQty >= from && newQty <= to) {
+            schemeRate = parseFloat(scheme.Rate) || 0;
+            if (schemeRate === 0) {
+              schemeRate = dupRow.OriginalSalePrice || parseFloat(dupRow.Rate) || 0;
+            }
+            break;
+          }
+        }
+        if (schemeRate !== null) {
+          newSalePrice = schemeRate;
+        }
+      }
+
+      if (dupRow.OriginalSalePrice !== undefined) {
+        dupRow.Rate = String(newSalePrice > 0 ? newSalePrice.toFixed(2) : "");
+      }
+      
+      updatedRows[duplicateIndex] = dupRow;
       updatedRows[index] = { ...updatedRows[index], ItemCode: "" };
       setGridRows(updatedRows);
+      
+      setTimeout(() => {
+        const barcodeInput = document.querySelector(`input[data-row="${index}"][data-field="ItemCode"]`) as HTMLInputElement;
+        if (barcodeInput) {
+          barcodeInput.focus();
+        }
+      }, 100);
       return;
     }
 
@@ -669,7 +703,7 @@ function SalesInvoice() {
         } catch(e) {}
 
         const updatedRows = [...gridRows];
-        const qty = parseFloat(updatedRows[index].Qty) || (updatedRows[index].Qty === "" ? 0 : 0);
+        const qty = 1; // Auto fill qty to 1
         
         // Auto-apply scheme rate if quantity already exists in the row
         let finalSalePrice = salePrice;
@@ -685,10 +719,10 @@ function SalesInvoice() {
           }
         }
 
+        let unitVal = parseFloat(designItem.UnitConversion);
+        if (isNaN(unitVal) || unitVal === 0) unitVal = 1;
+
         let baseRate = finalSalePrice;
-        if (gstPercent > 0) {
-          baseRate = (finalSalePrice * 100) / (100 + gstPercent);
-        }
 
         updatedRows[index] = {
           ...updatedRows[index],
@@ -700,21 +734,43 @@ function SalesInvoice() {
           DesignPhoto: designItem.DesignPhoto || item.DesignPhoto || "",
           Variant: designItem.SizeName || item.SizeName || "",
           Photos: photos,
+          Qty: "1",
           Rate: baseRate > 0 ? String(baseRate.toFixed(2)) : "",
           F_GSTGroupMaster: item.F_GSTGroupMaster || "",
           ItemData: [{ Id: itemId, ItemName: item.ItemName || "Scanned Item", F_GSTGroupMaster: item.F_GSTGroupMaster }],
           OriginalSalePrice: salePrice,
           SchemeDetails: parsedSchemes,
-          GSTPercent: gstPercent
+          GSTPercent: gstPercent,
+          UnitValue: unitVal
         };
+        
+        let nextRowIndex = index;
+        if (index === gridRows.length - 1) {
+          updatedRows.push({
+            ItemCode: "",
+            F_ItemGroupMaster: "",
+            F_ItemMaster: "",
+            F_ColorMaster: state.DefaultColor?.Id || "",
+            F_WarehouseMaster: state.DefaultWarehouse?.Id || "",
+            F_BatchMaster: "",
+            Variant: "",
+            Photos: [],
+            Qty: "",
+            Rate: "",
+            ItemData: null,
+            AvailableQty: 0,
+          });
+          nextRowIndex = index + 1;
+        } else {
+          nextRowIndex = index + 1;
+        }
         
         setGridRows(updatedRows);
         
         setTimeout(() => {
-          const qtyInput = document.querySelector(`input[data-row="${index}"][data-field="Qty"]`) as HTMLInputElement;
-          if (qtyInput) {
-            qtyInput.focus();
-            qtyInput.select();
+          const barcodeInput = document.querySelector(`input[data-row="${nextRowIndex}"][data-field="ItemCode"]`) as HTMLInputElement;
+          if (barcodeInput) {
+            barcodeInput.focus();
           }
         }, 100);
       }
@@ -854,9 +910,10 @@ function SalesInvoice() {
 
   const handleSave = async () => {
     if (!state.formData.F_VendorMaster) { alert("Please select a Vendor"); return; }
-    if (gridRows.length === 0) { alert("Please add at least one item"); return; }
-    for (let i = 0; i < gridRows.length; i++) {
-      const row = gridRows[i];
+    const validGridRows = gridRows.filter(row => row.ItemCode || row.F_ItemMaster);
+    if (validGridRows.length === 0) { alert("Please add at least one valid item"); return; }
+    for (let i = 0; i < validGridRows.length; i++) {
+      const row = validGridRows[i];
       if (!row.F_ItemMaster || !row.Qty || parseFloat(row.Qty) <= 0 || !row.Rate || parseFloat(row.Rate) < 0) {
         alert(`Row ${i + 1}: Please fill all required fields correctly (Item, Quantity, Rate)`);
         return;
@@ -874,7 +931,7 @@ function SalesInvoice() {
       const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
       const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
 
-      const jsonDataArray = gridRows.map((row) => {
+      const jsonDataArray = validGridRows.map((row) => {
         const qty = Number(row.Qty) || 0;
         const rate = Number(row.Rate) || 0;
         const amount = qty * rate;
@@ -898,10 +955,17 @@ function SalesInvoice() {
           if (igstP > highestIGSTPercent) highestIGSTPercent = igstP;
 
           if (isInState) {
-            itemCGST = amount * (cgstP / 100);
-            itemSGST = amount * (sgstP / 100);
+            const totalPercent = cgstP + sgstP;
+            if (totalPercent > 0) {
+              const taxAmount = (amount * totalPercent) / (100 + totalPercent);
+              itemCGST = taxAmount * (cgstP / totalPercent);
+              itemSGST = taxAmount * (sgstP / totalPercent);
+            }
           } else {
-            itemIGST = amount * (igstP / 100);
+            const totalPercent = igstP;
+            if (totalPercent > 0) {
+              itemIGST = (amount * totalPercent) / (100 + totalPercent);
+            }
           }
         }
         
@@ -967,11 +1031,70 @@ function SalesInvoice() {
     }
   };
 
-  const handlePrint = () => {
+  const executePrint = () => {
     const oldTitle = document.title;
     document.title = "";
     window.print();
     document.title = oldTitle;
+    setPrintModalOpen(false);
+  };
+
+  const handleDownloadPdf = async () => {
+    const element = document.querySelector(".sales-print-layout") as HTMLElement;
+    if (!element) {
+      alert("Print layout not found.");
+      return;
+    }
+    
+    element.style.display = "block";
+    element.style.position = "absolute";
+    element.style.top = "-9999px";
+    
+    setTimeout(async () => {
+      try {
+        const html2pdfModule = require("html2pdf.js");
+        const html2pdf = html2pdfModule.default || html2pdfModule;
+        
+        if (typeof html2pdf !== "function") {
+           alert("PDF Library could not be loaded correctly.");
+           return;
+        }
+
+        const opt = {
+          margin:       5,
+          filename:     `Invoice_${state.formData.PONo || 'Draft'}.pdf`,
+          image:        { type: 'jpeg' as const, quality: 0.98 },
+          html2canvas:  { scale: 2 },
+          jsPDF:        { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
+        };
+        
+        await html2pdf().set(opt).from(element).save();
+      } catch(e) {
+        console.error("Error generating PDF", e);
+        alert("Error generating PDF. Check console.");
+      } finally {
+        element.style.display = "";
+        element.style.position = "";
+        element.style.top = "";
+        setPrintModalOpen(false);
+      }
+    }, 100);
+  };
+
+  const handleSharePdf = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Sales Invoice",
+          text: `Invoice No: ${state.formData.PONo || "N/A"}`,
+          url: window.location.href,
+        });
+      } catch (err) {
+        console.error("Error sharing:", err);
+      }
+    } else {
+      alert("Sharing is not supported in this browser. Please download the PDF and share manually.");
+    }
   };
 
   const salesInvoiceCompactStyles = `
@@ -1317,7 +1440,7 @@ function SalesInvoice() {
                 <button ref={saveButtonRef} type="button" className="btn btn-primary m-0" onClick={handleSave} disabled={!state.isGridEditable}>
                   <i className="bx bx-save me-2"></i>Save
                 </button>
-                <Btn color="success" type="button" className="m-0" onClick={handlePrint}>
+                <Btn color="success" type="button" className="m-0" onClick={() => setPrintModalOpen(true)}>
                   <i className="bx bx-printer me-2"></i>Print
                 </Btn>
                 <Btn color="secondary" type="button" className="m-0" onClick={() => navigate(-1)}>Cancel</Btn>
@@ -1351,6 +1474,23 @@ function SalesInvoice() {
           </Form>
         </ModalBody>
         <ModalFooter><Button color="primary" onClick={handleVendorSubmit} disabled={vendorSubmitting}>Save</Button><Button color="secondary" onClick={closeVendorModal}>Cancel</Button></ModalFooter>
+      </Modal>
+
+      <Modal isOpen={printModalOpen} toggle={() => setPrintModalOpen(false)} centered>
+        <ModalHeader toggle={() => setPrintModalOpen(false)}>Print / Share Invoice</ModalHeader>
+        <ModalBody className="text-center py-4">
+          <div className="d-flex flex-column gap-3 align-items-center">
+            <Button color="primary" size="lg" className="w-75 d-flex align-items-center justify-content-center gap-2" onClick={handleDownloadPdf}>
+              <i className="fa fa-download"></i> Download PDF
+            </Button>
+            <Button color="success" size="lg" className="w-75 d-flex align-items-center justify-content-center gap-2" onClick={handleSharePdf}>
+              <i className="fa fa-share-alt"></i> Share PDF
+            </Button>
+            <Button color="secondary" size="lg" className="w-75 d-flex align-items-center justify-content-center gap-2" onClick={executePrint}>
+              <i className="fa fa-print"></i> Print
+            </Button>
+          </div>
+        </ModalBody>
       </Modal>
 
       {/* ── SALES INVOICE PRINT LAYOUT ── */}

@@ -30,6 +30,7 @@ interface GridRow {
   F_PurchaseOrderH?: string | number;
   F_PurchaseOrderL?: string | number;
   F_GSTGroupMaster?: string;
+  UnitValue?: number;
 }
 
 interface StateData {
@@ -384,6 +385,7 @@ function PurchaseEntry() {
                 Qty: line.Qty || "",
                 Rate: line.Rate || "",
                 ItemData: extractArray(itemData) || [],
+                UnitValue: (line.UnitConversion && parseFloat(line.UnitConversion) > 0) ? parseFloat(line.UnitConversion) : 1,
               };
             })
           );
@@ -402,7 +404,7 @@ function PurchaseEntry() {
   const addRow = () => {
     setGridRows((prevRows) => [
       ...prevRows,
-      { ItemCode: "", F_ItemGroupMaster: "", F_ItemMaster: "", F_ColorMaster: state.DefaultColor?.Id || "", F_WarehouseMaster: state.DefaultWarehouse?.Id || "", F_BatchMaster: "", Variant: "", Photos: [], Qty: "", Rate: "", ItemData: null, AvailableQty: 0 },
+      { ItemCode: "", F_ItemGroupMaster: "", F_ItemMaster: "", F_ColorMaster: state.DefaultColor?.Id || "", F_WarehouseMaster: state.DefaultWarehouse?.Id || "", F_BatchMaster: "", Variant: "", Photos: [], Qty: "", Rate: "", ItemData: null, AvailableQty: 0, UnitValue: 1 },
     ]);
   };
 
@@ -525,12 +527,21 @@ function PurchaseEntry() {
   const handleBarcodeFetch = async (index: number, barcode: string) => {
     if (!barcode) return;
 
-    const isDuplicate = gridRows.some((row, rIndex) => rIndex !== index && row.ItemCode === barcode);
-    if (isDuplicate) {
-      alert("Item with this barcode is already added in the entry.");
+    const duplicateIndex = gridRows.findIndex((row, rIndex) => rIndex !== index && row.ItemCode === barcode);
+    if (duplicateIndex !== -1) {
       const updatedRows = [...gridRows];
+      const existingQty = parseFloat(updatedRows[duplicateIndex].Qty) || 0;
+      updatedRows[duplicateIndex].Qty = String(existingQty + 1);
+      
       updatedRows[index] = { ...updatedRows[index], ItemCode: "" };
       setGridRows(updatedRows);
+      
+      setTimeout(() => {
+        const barcodeInput = document.querySelector(`input[data-row="${index}"][data-field="ItemCode"]`) as HTMLInputElement;
+        if (barcodeInput) {
+          barcodeInput.focus();
+        }
+      }, 100);
       return;
     }
 
@@ -577,6 +588,9 @@ function PurchaseEntry() {
         if (matchedDesign.DesignPhoto4) photos.push(matchedDesign.DesignPhoto4);
         if (matchedDesign.DesignPhoto5) photos.push(matchedDesign.DesignPhoto5);
         
+        let unitVal = parseFloat(matchedDesign.UnitConversion);
+        if (isNaN(unitVal) || unitVal === 0) unitVal = 1;
+
         const updatedRows = [...gridRows];
         updatedRows[index] = {
           ...updatedRows[index],
@@ -588,17 +602,40 @@ function PurchaseEntry() {
           DesignPhoto: matchedDesign.DesignPhoto || "",
           Variant: matchedDesign.SizeName || "",
           Photos: photos,
+          Qty: "1",
+          Rate: "",
           F_GSTGroupMaster: item.F_GSTGroupMaster || "",
-          ItemData: [{ Id: itemId, ItemName: item.ItemName || "Scanned Item", F_GSTGroupMaster: item.F_GSTGroupMaster }]
+          ItemData: [{ Id: itemId, ItemName: item.ItemName || "Scanned Item", F_GSTGroupMaster: item.F_GSTGroupMaster }],
+          UnitValue: unitVal
         };
         
+        let nextRowIndex = index;
+        if (index === gridRows.length - 1) {
+          updatedRows.push({
+            ItemCode: "",
+            F_ItemGroupMaster: "",
+            F_ItemMaster: "",
+            F_ColorMaster: state.DefaultColor?.Id || "",
+            F_WarehouseMaster: state.DefaultWarehouse?.Id || "",
+            F_BatchMaster: "",
+            Variant: "",
+            Photos: [],
+            Qty: "",
+            Rate: "",
+            ItemData: null,
+            AvailableQty: 0,
+          });
+          nextRowIndex = index + 1;
+        } else {
+          nextRowIndex = index + 1;
+        }
+
         setGridRows(updatedRows);
         
         setTimeout(() => {
-          const qtyInput = document.querySelector(`input[data-row="${index}"][data-field="Qty"]`) as HTMLInputElement;
-          if (qtyInput) {
-            qtyInput.focus();
-            qtyInput.select();
+          const barcodeInput = document.querySelector(`input[data-row="${nextRowIndex}"][data-field="ItemCode"]`) as HTMLInputElement;
+          if (barcodeInput) {
+            barcodeInput.focus();
           }
         }, 100);
       }
@@ -738,9 +775,10 @@ function PurchaseEntry() {
 
   const handleSave = async () => {
     if (!state.formData.F_VendorMaster) { alert("Please select a Vendor"); return; }
-    if (gridRows.length === 0) { alert("Please add at least one item"); return; }
-    for (let i = 0; i < gridRows.length; i++) {
-      const row = gridRows[i];
+    const validGridRows = gridRows.filter(row => row.ItemCode || row.F_ItemMaster);
+    if (validGridRows.length === 0) { alert("Please add at least one valid item"); return; }
+    for (let i = 0; i < validGridRows.length; i++) {
+      const row = validGridRows[i];
       if (!row.F_ItemMaster || !row.Qty || parseFloat(row.Qty) <= 0 || !row.Rate || parseFloat(row.Rate) < 0) {
         alert(`Row ${i + 1}: Please fill all required fields correctly (Item, Quantity, Rate)`);
         return;
@@ -755,7 +793,7 @@ function PurchaseEntry() {
       const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
       const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
 
-      const jsonDataArray = gridRows.map((row) => {
+      const jsonDataArray = validGridRows.map((row) => {
         const qty = Number(row.Qty) || 0;
         const rate = Number(row.Rate) || 0;
         const amount = qty * rate;
