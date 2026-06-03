@@ -18,7 +18,8 @@ const Layout = () => {
   const {layout} = useAppSelector((state)=>state.themeCustomizer)
   const {toggleSidebar,scroll} = useAppSelector((state)=>state.layout)
   const dispatch = useAppDispatch()
-  const { loadUserRights } = useUserRights()
+  const { loadUserRights } = useUserRights();
+  
 
   useEffect(() => {
     const authUser = JSON.parse(localStorage.getItem("authUser") || "{}")

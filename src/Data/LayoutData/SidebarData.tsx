@@ -89,7 +89,15 @@ export const MenuList: MenuItem[] = [
         icon: "Calendar",
         type: "link",
         bookmark: true
-      }
+      },
+       {
+        id: 1,
+        title: "Voucher Type",
+        path: `${process.env.PUBLIC_URL}/voucherTypeMaster`,
+        icon: "Box",
+        type: "link",
+        bookmark: true
+      },
       // {
       //   id: 5, title: "Tax Group Master",
       //   path: `${process.env.PUBLIC_URL}/taxGroupMaster`,
@@ -118,6 +126,32 @@ export const MenuList: MenuItem[] = [
         icon: "Box",
         type: "link",
         bookmark: true
+      }
+    ]
+  },
+  {
+title:"Accounting",
+Items:[
+  {
+    id:1,
+    title:"Voucher Entry",
+    path:`${process.env.PUBLIC_URL}/voucherEntry`,
+    icon:"Box",
+    type:"link",
+    bookmark:true
+  }
+]
+  },
+  {
+    title:"Reports",
+    Items:[
+      {
+        id:1,
+        title:"Ledger Details Report",
+        path:`${process.env.PUBLIC_URL}/ledgerDetailsReport`,
+        icon:"Box",
+        type:"link",
+        bookmark:true
       }
     ]
   },

@@ -114,11 +114,17 @@ export const routes = [
     { path: `${process.env.PUBLIC_URL}/globalOptions`, Component: <GlobalOptions /> },
 { path: `${process.env.PUBLIC_URL}/addEditMaterialMaster`, Component: <AddEdit_MaterialMaster /> },
 { path: `${process.env.PUBLIC_URL}/materialMaster`, Component: <PageList_MaterialMaster /> },
+  { path: `${process.env.PUBLIC_URL}/voucherTypeMaster`, Component: <PageList_VoucherType /> },
+  { path: `${process.env.PUBLIC_URL}/addEditVoucherType`, Component: <AddEdit_VoucherType /> },
 
   { path: `${process.env.PUBLIC_URL}/addEditCompanyYears`, Component: <AddEdit_CompanyYears /> },
   { path: `${process.env.PUBLIC_URL}/companyYears`, Component: <PageList_CompanyYears /> },
   
-  { path: `${process.env.PUBLIC_URL}/dashboard`, Component: <Dashboard /> }
+  { path: `${process.env.PUBLIC_URL}/dashboard`, Component: <Dashboard /> },
+
+    { path: `${process.env.PUBLIC_URL}/voucherEntry`, Component: <VoucherEntry /> },
+
+    { path: `${process.env.PUBLIC_URL}/ledgerDetailsReport`, Component: <LedgerDetailsReport /> }
   /*
   { path: `${process.env.PUBLIC_URL}/itemMaster`, Component: <PageList_ItemMaster /> },
   { path: `${process.env.PUBLIC_URL}/addEditItemGroup`, Component: <AddEdit_ItemGroup /> },

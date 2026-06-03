@@ -137,8 +137,8 @@ const VoucherEntry: React.FC = () => {
   const API_URL_Account = `${API_WEB_URLS.MASTER}/0/token/LedgerMaster`;
   const API_URL_Account_BankAndCash = `${API_WEB_URLS.MASTER}/0/token/GetLedgerMasterForBankAndCash/Id/0`;
   const API_URL_Account_ExceptBankAndCash = `${API_WEB_URLS.MASTER}/0/token/GetLedgerMasterExceptBankAndCash/Id/0`;
-  const API_URL_Created = `${API_WEB_URLS.MASTER}/0/token/CreatedVouchers`;
-  const API_URL_VoucherType = `${API_WEB_URLS.MASTER}/0/token/VoucherTypeMaster/Id/0`;
+  const API_URL_Created = `${API_WEB_URLS.MASTER}/0/token/VoucherData/Id/0`;
+  const API_URL_VoucherType = `${API_WEB_URLS.MASTER}/0/token/VoucherTypeMasterAll/Id/0`;
   const API_H = `${API_WEB_URLS.MASTER}/0/token/VoucherH`;
   const API_L = `${API_WEB_URLS.MASTER}/0/token/VoucherLById`;
 
@@ -253,7 +253,7 @@ const VoucherEntry: React.FC = () => {
       const searchVoucherNo = locState.searchVoucherNo || "";
 
       try {
-        const createdList = await Fn_FillListData(dispatch, setState, "CreatedVouchers", API_H + "/Id/0");
+        const createdList = await Fn_FillListData(dispatch, setState, "CreatedVouchers", API_URL_Created);
         const accountMasterData = await Fn_FillListData(dispatch, setState, "AccountMaster", API_URL_Account + "/Id/0");
         await Fn_FillListData(dispatch, setState, "VoucherTypeMaster", API_URL_VoucherType);
 
@@ -270,7 +270,7 @@ const VoucherEntry: React.FC = () => {
 
         if (voucherIdToLoad > 0) {
           setState((prevState) => ({ ...prevState, id: voucherIdToLoad }));
-          await DataFillFunction(voucherIdToLoad, accountMasterData || []);
+          await DataFillFunction(voucherIdToLoad, accountMasterData || [], createdList);
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -552,7 +552,7 @@ const VoucherEntry: React.FC = () => {
   };
 
   // Load an existing Voucher's header and lines
-  const DataFillFunction = async (id: number, accountMasterData?: any[]) => {
+  const DataFillFunction = async (id: number, accountMasterData?: any[], createdListOverride?: any[]) => {
     if (!id || id === 0) {
       throw new Error("Invalid voucher ID");
     }
@@ -560,18 +560,25 @@ const VoucherEntry: React.FC = () => {
     try {
       setState((prev) => ({ ...prev, isEditMode: true }));
 
-      // First fetch header from generic API to determine voucher type
-      const hData = await Fn_FillListData(dispatch, setState, "hData", API_H + "/Id/" + id);
-      
-      const voucherType = String((Array.isArray(hData) && hData[0]) ? (hData[0].F_VoucherType ?? hData[0].VoucherType ?? hData[0].F_VoucherTypeMaster ?? "") : "");
+      // Find header from state or override list
+      const list = Array.isArray(createdListOverride) && createdListOverride.length > 0 ? createdListOverride : state.CreatedVouchers;
+      let header = list.find((v: any) => Number(v.Id || v.id) === id);
+
+      // If not found in the list, fallback to API fetch
+      if (!header) {
+        const hData = await Fn_FillListData(dispatch, setState, "hData", API_H + "/Id/" + id);
+        header = Array.isArray(hData) && hData.length > 0 ? hData[0] : null;
+      }
+
+      const voucherType = String(header ? (header.F_VoucherType ?? header.VoucherType ?? header.F_VoucherTypeMaster ?? "") : "");
       let accountMaster: any[] = accountMasterData || state.AccountMaster || [];
       let bankCashList: any[] = [];
 
       if (voucherType === "6") {
-        const list = await fetchBankAndCashLedgers();
-        if (Array.isArray(list) && list.length > 0) {
-          accountMaster = list;
-          setState((prev) => ({ ...prev, AccountMaster: list, AccountMasterBankAndCash: [] }));
+        const accList = await fetchBankAndCashLedgers();
+        if (Array.isArray(accList) && accList.length > 0) {
+          accountMaster = accList;
+          setState((prev) => ({ ...prev, AccountMaster: accList, AccountMasterBankAndCash: [] }));
         }
       } else if (voucherType === "2" || voucherType === "3") {
         const [allLedgers, bankCash] = await Promise.all([
@@ -584,10 +591,10 @@ const VoucherEntry: React.FC = () => {
         bankCashList = Array.isArray(bankCash) ? bankCash : [];
         setState((prev) => ({ ...prev, AccountMaster: accountMaster, AccountMasterBankAndCash: bankCashList }));
       } else {
-        const list = await fetchAccountMasterByVoucherType(voucherType);
-        if (Array.isArray(list) && list.length > 0) {
-          accountMaster = list;
-          setState((prev) => ({ ...prev, AccountMaster: list, AccountMasterBankAndCash: [] }));
+        const accList = await fetchAccountMasterByVoucherType(voucherType);
+        if (Array.isArray(accList) && accList.length > 0) {
+          accountMaster = accList;
+          setState((prev) => ({ ...prev, AccountMaster: accList, AccountMasterBankAndCash: [] }));
         }
       }
       
@@ -597,27 +604,34 @@ const VoucherEntry: React.FC = () => {
       let isPayment = false;
       let isDCCType = false;
       
-      const header = Array.isArray(hData) && hData.length > 0 ? hData[0] : null;
-      
       if (header) {
-        const voucherType = String(header.F_VoucherType || header.VoucherType || header.F_VoucherTypeMaster || "");
-        if (voucherType === "1") isJournal = true;
-        else if (voucherType === "2") isReceipt = true;
-        else if (voucherType === "3") isPayment = true;
-        else if (voucherType && !["1", "2", "3"].includes(voucherType)) isDCCType = true;
+        const vType = String(header.F_VoucherType || header.VoucherType || header.F_VoucherTypeMaster || "");
+        if (vType === "1") isJournal = true;
+        else if (vType === "2") isReceipt = true;
+        else if (vType === "3") isPayment = true;
+        else if (vType && !["1", "2", "3"].includes(vType)) isDCCType = true;
       }
       
-      // Fetch line data using VoucherLById (API may return { data: { dataList: [...] } })
-      const lDataRaw = await Fn_FillListData(dispatch, setState, "lData", API_L + "/Id/" + id);
-      const lData = Array.isArray(lDataRaw)
-        ? lDataRaw
-        : Array.isArray((lDataRaw as any)?.data?.dataList)
-          ? (lDataRaw as any).data.dataList
-          : Array.isArray((lDataRaw as any)?.dataList)
-            ? (lDataRaw as any).dataList
-            : [];
-
-    const lines = lData;
+      // Fetch line data using VoucherDetails if present, else fallback to API_L
+      let lines: any[] = [];
+      if (header && header.VoucherDetails) {
+        try {
+          lines = JSON.parse(header.VoucherDetails);
+        } catch (e) {
+          console.error("Error parsing VoucherDetails:", e);
+        }
+      }
+      
+      if (lines.length === 0) {
+        const lDataRaw = await Fn_FillListData(dispatch, setState, "lData", API_L + "/Id/" + id);
+        lines = Array.isArray(lDataRaw)
+          ? lDataRaw
+          : Array.isArray((lDataRaw as any)?.data?.dataList)
+            ? (lDataRaw as any).data.dataList
+            : Array.isArray((lDataRaw as any)?.dataList)
+              ? (lDataRaw as any).dataList
+              : [];
+      }
 
     if (!header) {
       // Still set the F_VoucherMaster even if no header data
@@ -764,7 +778,7 @@ const VoucherEntry: React.FC = () => {
         const amount = parseFloat(l.Amount || l.AmountL || "0");
         const ledgerDr = Number(l.F_LedgerMasterDr);
         const ledgerCr = Number(l.F_LedgerMasterCr);
-        const lineType = String(l.CrDrType || l.Type || "").toLowerCase();
+        const lineType = String(l.DrCrType || l.CrDrType || l.Type || "").toLowerCase();
 
         const drLedgerName = l.DrLedgerName ?? (l as any).drLedgerName ?? "";
         const crLedgerName = l.CrLedgerName ?? (l as any).crLedgerName ?? "";
@@ -1076,80 +1090,55 @@ const VoucherEntry: React.FC = () => {
 
     const obj = JSON.parse(localStorage.getItem("user") || "{}");
     
-    let formData = new FormData();
+    // Build JsonData array according to SQL OPENJSON schema
+    const jsonDataArray = gridRows.map(r => {
+      const account = state.AccountMaster.find((acc) => String(acc.Id) === String(r.F_AccountMaster));
+      const ledgerId = Number(account?.F_LedgerMaster || account?.Id || r.F_AccountMaster || "0");
+      const debitAmt = parseFloat(r.DebitAmt || "0") || 0;
+      const creditAmt = parseFloat(r.CreditAmt || "0") || 0;
+      const amount = r.Type === "Dr" ? debitAmt : creditAmt;
 
-    // StrVoucherL format: F_LedgerMasterDr~F_LedgerMasterCr~Amount#
-    // Example: 3~2~1000#
-    const buildCommonStrL = (rows: GridRow[]) => {
-      const debits: Array<{ ledgerId: string; amount: number }> = [];
-      const credits: Array<{ ledgerId: string; amount: number }> = [];
-
-      rows.forEach((r) => {
-        const account = state.AccountMaster.find((acc) => String(acc.Id) === String(r.F_AccountMaster));
-        const ledgerId = String(account?.F_LedgerMaster || account?.Id || r.F_AccountMaster || "0");
-        const debitAmt = parseFloat(r.DebitAmt || "0") || 0;
-        const creditAmt = parseFloat(r.CreditAmt || "0") || 0;
-
-        if (debitAmt > 0) debits.push({ ledgerId, amount: debitAmt });
-        if (creditAmt > 0) credits.push({ ledgerId, amount: creditAmt });
-      });
-
-      const rowStrings: string[] = [];
-      let d = 0;
-      let c = 0;
-
-      // Pair debit and credit amounts sequentially to build StrL rows.
-      while (d < debits.length && c < credits.length) {
-        const pairAmount = Math.min(debits[d].amount, credits[c].amount);
-        if (pairAmount > 0) {
-          rowStrings.push([debits[d].ledgerId, credits[c].ledgerId, String(pairAmount)].join("~"));
-        }
-
-        debits[d].amount -= pairAmount;
-        credits[c].amount -= pairAmount;
-
-        if (debits[d].amount <= 0.000001) d++;
-        if (credits[c].amount <= 0.000001) c++;
-      }
-
-      return rowStrings;
-    };
-
-    // VoucherH parameters: F_VoucherTypeMaster, VoucherNo, VoucherDate, ChequeNo, ChequeDate, ReceiptNo, ReceiptDate, Amount, Narration, UserId, StrVoucherL
-    formData.append("F_VoucherTypeMaster", state.formData.F_VoucherType || "0");
-    formData.append("VoucherNo", state.formData.VoucherNo || "0");
-    formData.append("VoucherDate", state.formData.VoucherDate || "");
-    formData.append("ChequeNo", state.formData.ChequeNo || "0");
-    formData.append("ChequeDate", state.formData.ChequeDate || "");
-    formData.append("ReceiptNo", state.formData.ReceiptNo || "0");
-    formData.append("ReceiptDate", state.formData.ReceiptDate || "");
-    formData.append("Amount", String(totals.totalDebit + totals.totalCredit)); // Dr + Cr total (e.g. 5000+5000=10000)
-    formData.append("Narration", state.formData.Narration || "0");
-    formData.append("UserId", obj === undefined || obj === null ? "0" : String(obj.uid || obj.id || "0"));
-      formData.append("F_CompanyMaster", (() => { try { const a = JSON.parse(localStorage.getItem("authUser")||"{}"); return String(a?.F_CompanyMaster ?? a?.CompanyId ?? a?.F_Company ?? "0"); } catch(e){return "0";} })());
-
-    const rowStrings = buildCommonStrL(gridRows);
-    const gridDataString = rowStrings.join("#") + "#";
-    formData.append("StrVoucherL", gridDataString);
+      return {
+        DrCrType: r.Type,
+        F_LedgerMasterDr: r.Type === "Dr" ? ledgerId : 0,
+        F_LedgerMasterCr: r.Type === "Cr" ? ledgerId : 0,
+        Amount: amount
+      };
+    }).filter(item => item.Amount > 0);
 
     const voucherId = Number(state.formData.F_VoucherMaster || 0);
-    if (voucherId > 0) {
-      formData.append("Id", String(voucherId));
-    }
+
+    const formData = new FormData();
+    if (voucherId > 0) formData.append("Id", String(voucherId));
+    formData.append("VoucherNo", state.formData.VoucherNo || "0");
+    formData.append("VoucherDate", state.formData.VoucherDate || "");
+    formData.append("F_VoucherTypeMaster", String(Number(state.formData.F_VoucherType || "0")));
+    formData.append("ReferenceNo", state.formData.ChequeNo || "0");
+    formData.append("ReferenceDate", state.formData.ChequeDate || "");
+    formData.append("Narration", state.formData.Narration || "");
+    formData.append("TotalDr", String(totals.totalDebit));
+    formData.append("TotalCr", String(totals.totalCredit));
+    formData.append("CurBal", "0");
+    formData.append("UserId", String(Number(obj === undefined || obj === null ? "0" : String(obj.uid || obj.id || "0"))));
+    
+    const companyId = (() => { try { const a = JSON.parse(localStorage.getItem("authUser")||"{}"); return String(a?.F_CompanyMaster ?? a?.CompanyId ?? a?.F_Company ?? "0"); } catch(e){return "0";} })();
+    formData.append("F_CompanyMaster", companyId);
+    
+    formData.append("JsonData", JSON.stringify(jsonDataArray));
 
     const res = await Fn_AddEditData(
       dispatch,
       setState,
       { arguList: { id: voucherId > 0 ? voucherId : 0, formData } },
-      API_SAVE,
-      true,
+      "Voucher/0/token",
+      true, // Must be true because Functions.js has a bug when isMultiPart is false
       undefined,
       navigate,
       "#"
     );
     
     // Refresh CreatedVouchers list
-    const updatedVouchers = await Fn_FillListData(dispatch, setState, "CreatedVouchers", API_H + "/Id/0");
+    const updatedVouchers = await Fn_FillListData(dispatch, setState, "CreatedVouchers", API_URL_Created);
 
     // New voucher save: always reset page. Edit mode: load saved record.
     const wasNewVoucher = voucherId === 0;
@@ -1424,7 +1413,7 @@ const VoucherEntry: React.FC = () => {
       ]);
 
       // Refresh Voucher list
-      await Fn_FillListData(dispatch, setState, "CreatedVouchers", API_H + "/Id/0");
+      await Fn_FillListData(dispatch, setState, "CreatedVouchers", API_URL_Created);
     } catch (error) {
       console.error("Error deleting Voucher:", error);
       alert("An error occurred while deleting the Voucher.");
