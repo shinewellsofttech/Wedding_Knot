@@ -177,9 +177,16 @@ const AddEdit_ItemMaster = () => {
       formData.append("FieldName", fieldName);
       formData.append("FieldValue", fieldValue);
       
+      let isPhoto = false;
       if (filesMap) {
         Object.entries(filesMap).forEach(([key, file]) => formData.append(key, file));
+        isPhoto = true;
       }
+      
+      const loadingMsg = isPhoto ? "Uploading photo..." : (fieldValue === "" && !isPhoto && fieldName.includes("Photo") ? "Removing photo..." : "Saving changes...");
+      const successMsg = isPhoto ? "Photo uploaded!" : (fieldValue === "" && !isPhoto && fieldName.includes("Photo") ? "Photo removed!" : "Changes saved!");
+      
+      const toastId = toast.loading(loadingMsg, { position: "bottom-right", autoClose: false });
       
       try {
         await Fn_AddEditData(
@@ -192,8 +199,10 @@ const AddEdit_ItemMaster = () => {
           () => {},
           ""
         );
+        toast.update(toastId, { render: successMsg, type: "success", isLoading: false, autoClose: 1000, hideProgressBar: true });
       } catch (e) {
         console.error("handleFieldUpdate Error", e);
+        toast.update(toastId, { render: "Failed to save", type: "error", isLoading: false, autoClose: 2000, hideProgressBar: true });
       }
     };
 
@@ -313,15 +322,20 @@ const AddEdit_ItemMaster = () => {
   }, []);
 
   const addRowToSection = useCallback(async (secIdx: number) => {
-    const itemId = sections[secIdx].id;
-    const newRowId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemDesignCreate/Id/${itemId}`);
-    setSections(prev => {
-      const updated = prev.map((s, si) =>
-        si !== secIdx ? s : { ...s, rows: [...s.rows, { ...makeRow(), id: newRowId }] }
-      );
-      return updated;
-    });
-    toast.success("Row added!", { autoClose: 1200, className: "im-toast" });
+    const toastId = toast.loading("Adding row...", { position: "bottom-right" });
+    try {
+      const itemId = sections[secIdx].id;
+      const newRowId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemDesignCreate/Id/${itemId}`);
+      setSections(prev => {
+        const updated = prev.map((s, si) =>
+          si !== secIdx ? s : { ...s, rows: [...s.rows, { ...makeRow(), id: newRowId }] }
+        );
+        return updated;
+      });
+      toast.update(toastId, { render: "Row added!", type: "success", isLoading: false, autoClose: 1200, className: "im-toast", hideProgressBar: true });
+    } catch (e) {
+      toast.update(toastId, { render: "Failed to add row", type: "error", isLoading: false, autoClose: 2000, hideProgressBar: true });
+    }
   }, [sections, fetchNewId]);
 
 
@@ -338,7 +352,10 @@ const AddEdit_ItemMaster = () => {
       
       const rowId = s.rows[rowIdx].id;
       if (rowId) {
+        const toastId = toast.loading("Deleting row...", { position: "bottom-right" });
         Fn_DeleteData(dispatch, () => {}, Number(rowId), `${API_WEB_URLS.MASTER}/0/token/ItemDesignMaster`)
+          .then(() => toast.update(toastId, { render: "Row deleted!", type: "success", isLoading: false, autoClose: 1200, hideProgressBar: true }))
+          .catch(() => toast.update(toastId, { render: "Failed to delete row", type: "error", isLoading: false, autoClose: 2000, hideProgressBar: true }))
           .finally(() => loadData());
       }
 
@@ -358,7 +375,10 @@ const AddEdit_ItemMaster = () => {
 
       const sectionId = s.id;
       if (sectionId) {
+        const toastId = toast.loading("Deleting item...", { position: "bottom-right" });
         Fn_DeleteData(dispatch, () => {}, Number(sectionId), `${API_WEB_URLS.MASTER}/0/token/ItemMaster`)
+          .then(() => toast.update(toastId, { render: "Item deleted!", type: "success", isLoading: false, autoClose: 1200, hideProgressBar: true }))
+          .catch(() => toast.update(toastId, { render: "Failed to delete item", type: "error", isLoading: false, autoClose: 2000, hideProgressBar: true }))
           .finally(() => loadData());
       }
 
@@ -368,32 +388,37 @@ const AddEdit_ItemMaster = () => {
   }, [dispatch, loadData]);
 
   const addNewItemSection = useCallback(async (secIdx?: number) => {
-    const newId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemCreate/Id/0`);
-    const newRowId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemDesignCreate/Id/${newId}`);
-    
-    setSections(prev => {
-      const copy = [...prev];
-      const newSec = makeSection();
-      newSec.id = newId;
-      newSec.rows[0].id = newRowId;
-      if (typeof secIdx === "number") {
-        copy.splice(secIdx + 1, 0, newSec);
-      } else {
-        copy.push(newSec);
-      }
-      return copy;
-    });
-    toast.success("New Item block created below!", { autoClose: 1500, className: "im-toast" });
-    
-    // Auto focus the newly added item's Name input
-    setTimeout(() => {
-      const inputs = tableRef.current?.querySelectorAll<HTMLInputElement>('.im-item-name-input');
-      if (inputs && inputs.length > 0) {
-        const targetIndex = typeof secIdx === "number" ? secIdx + 1 : inputs.length - 1;
-        const targetInput = inputs[targetIndex] as HTMLInputElement;
-        targetInput?.focus();
-      }
-    }, 100);
+    const toastId = toast.loading("Creating new item...", { position: "bottom-right" });
+    try {
+      const newId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemCreate/Id/0`);
+      const newRowId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemDesignCreate/Id/${newId}`);
+      
+      setSections(prev => {
+        const copy = [...prev];
+        const newSec = makeSection();
+        newSec.id = newId;
+        newSec.rows[0].id = newRowId;
+        if (typeof secIdx === "number") {
+          copy.splice(secIdx + 1, 0, newSec);
+        } else {
+          copy.push(newSec);
+        }
+        return copy;
+      });
+      toast.update(toastId, { render: "New Item block created below!", type: "success", isLoading: false, autoClose: 1500, className: "im-toast", hideProgressBar: true });
+      
+      // Auto focus the newly added item's Name input
+      setTimeout(() => {
+        const inputs = tableRef.current?.querySelectorAll<HTMLInputElement>('.im-item-name-input');
+        if (inputs && inputs.length > 0) {
+          const targetIndex = typeof secIdx === "number" ? secIdx + 1 : inputs.length - 1;
+          const targetInput = inputs[targetIndex] as HTMLInputElement;
+          targetInput?.focus();
+        }
+      }, 100);
+    } catch (e) {
+      toast.update(toastId, { render: "Failed to create item", type: "error", isLoading: false, autoClose: 2000, hideProgressBar: true });
+    }
   }, [fetchNewId]);
 
   /* ── Photo handling ── */
@@ -559,6 +584,8 @@ const AddEdit_ItemMaster = () => {
       formData.append("UserId", userId);
       formData.append("SchemeJson", JSON.stringify(validRows));
       
+      const toastId = toast.loading("Saving scheme...", { position: "bottom-right" });
+      
       await Fn_AddEditData(dispatch, () => {}, { arguList: { id: 0, formData } }, "ItemSchemeMaster/0/token", true, "", () => {}, "");
       
       setSections(prev => {
@@ -568,10 +595,11 @@ const AddEdit_ItemMaster = () => {
         }));
       });
 
-      toast.success("Scheme saved successfully");
+      toast.update(toastId, { render: "Scheme saved successfully", type: "success", isLoading: false, autoClose: 1200, hideProgressBar: true });
       closeSchemeModal();
     } catch (error) {
       console.error("Error saving scheme:", error);
+      toast.error("Failed to save scheme");
     }
   };
 
