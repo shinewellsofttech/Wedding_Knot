@@ -489,7 +489,7 @@ const PageList_ItemMaster = () => {
                         </tbody>
                       </Table>
                     </div>
-                    
+                          
                     {totalPages > 0 && (
                       <div className="d-flex justify-content-between align-items-center mt-3 p-2 bg-light rounded border">
                         <div className="d-flex align-items-center flex-wrap gap-2">

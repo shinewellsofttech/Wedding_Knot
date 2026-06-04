@@ -200,6 +200,7 @@ const LedgerDetailsReport: React.FC = () => {
       return;
     }
 
+
     try {
       setIsLoading(true);
       const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");

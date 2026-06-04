@@ -238,10 +238,10 @@ const VoucherEntry: React.FC = () => {
   };
 
   // Fetch AccountMaster (ledgers) based on voucher type
-  // VT 1, 4, 5 = GetLedgerMasterExceptBankAndCash; VT 6 = Bank & Cash only; VT 2/3 need both; others = all ledgers
+  // VT 1 = GetLedgerMasterExceptBankAndCash; VT 6 = Bank & Cash only; VT 2/3 need both; others (including 4, 5) = all ledgers
   const fetchAccountMasterByVoucherType = async (voucherTypeId: string): Promise<any[]> => {
     if (voucherTypeId === "6") return fetchBankAndCashLedgers();
-    if (voucherTypeId === "1" || voucherTypeId === "4" || voucherTypeId === "5") return fetchLedgersExceptBankAndCash();
+    if (voucherTypeId === "1") return fetchLedgersExceptBankAndCash();
     const dataList = await Fn_FillListData(dispatch, setState, "AccountMaster", API_URL_Account + "/Id/0");
     return Array.isArray(dataList) ? dataList : [];
   };

@@ -159,7 +159,9 @@ function SalesInvoice() {
   });
 
   const [taxOverrides, setTaxOverrides] = useState<{ CGST?: string, SGST?: string, IGST?: string }>({});
-  const [printModalOpen, setPrintModalOpen] = useState(false);
+
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrData, setQrData] = useState<string | null>(null);
 
   const saveButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -1031,12 +1033,99 @@ function SalesInvoice() {
     }
   };
 
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+
   const executePrint = () => {
     const oldTitle = document.title;
     document.title = "";
     window.print();
     document.title = oldTitle;
     setPrintModalOpen(false);
+  };
+
+  const handleGenerateQR = async () => {
+    if (!state.formData.PONo || state.id === 0) {
+      alert("Please save or select an invoice first.");
+      return;
+    }
+
+    // Calculate Grand Total
+    const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
+    const totalOtherCharges = otherChargesRows.reduce((sum, r) => sum + (parseFloat(r.Amount) || 0), 0);
+    let finalCGST = 0, finalSGST = 0, finalIGST = 0;
+
+    const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
+    const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+
+    if (isInState) {
+        finalCGST = taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0) * (row.GSTPercent || 0) / 200), 0);
+        finalSGST = taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : finalCGST;
+    } else {
+        finalIGST = taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0) * (row.GSTPercent || 0) / 100), 0);
+    }
+    const grandTotal = Math.round(subTotal + finalCGST + finalSGST + finalIGST + totalOtherCharges);
+
+    try {
+      const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");
+      const userId = authUser?.uid ?? authUser?.Id ?? "0";
+      const userToken = authUser?.Token ?? authUser?.token ?? "token";
+      
+      const url = `${API_WEB_URLS.BASE}CreateOrder/${userId}/${userToken}`;
+      const fd = new FormData();
+      fd.append("F_SalesEntryH", String(state.id));
+      fd.append("Amount", String(Math.round(grandTotal))); // Send amount in rupees
+      
+      const fetchRes = await fetch(url, {
+          method: "POST",
+          body: fd
+      });
+
+      const res = await fetchRes.json();
+
+      if (!fetchRes.ok || res.status === 400) {
+        console.error("CreateOrder failed with status:", fetchRes.status, res);
+        alert(`Failed to create order: ${res?.message || res?.title || "Bad Request"}`);
+        return;
+      }
+
+      let qrCode = "";
+      
+      // Based on image and raw fetch response: res.data.data.qrCode
+      if (res?.data?.data?.qrCode) {
+         qrCode = res.data.data.qrCode;
+      } else if (res?.data?.data?.QRCode) {
+         qrCode = res.data.data.QRCode;
+      } else if (res?.data?.qrCode) {
+         qrCode = res.data.qrCode;
+      } else if (res?.data?.QRCode) {
+         qrCode = res.data.QRCode;
+      } else if (res?.qrCode) {
+         qrCode = res.qrCode;
+      } else if (res?.QRCode) {
+         qrCode = res.QRCode;
+      } else if (res?.data?.response && res.data.response.length > 0) {
+         qrCode = res.data.response[0].QRCode || res.data.response[0].qrCode || res.data.response[0].qrcode || res.data.response[0].qrUrl || "";
+      } else if (res?.response && res.response.length > 0) {
+         qrCode = res.response[0].QRCode || res.response[0].qrCode || res.response[0].qrcode || res.response[0].qrUrl || "";
+      } else if (Array.isArray(res) && res.length > 0) {
+         qrCode = res[0].QRCode || res[0].qrCode || res[0].qrcode || res[0].qrUrl || "";
+      } else if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+         qrCode = res.data[0].QRCode || res.data[0].qrCode || res.data[0].qrcode || res.data[0].qrUrl || "";
+      }
+
+      if (!qrCode) {
+        alert("Failed to generate QR Code from server.");
+        console.error("CreateOrder response:", res);
+        return;
+      }
+
+      setQrData(qrCode);
+      setQrModalOpen(true);
+
+    } catch (e) {
+      console.error("Error generating QR:", e);
+      alert("Error generating QR code.");
+    }
   };
 
   const handleDownloadPdf = async () => {
@@ -1443,6 +1532,9 @@ function SalesInvoice() {
                 <Btn color="success" type="button" className="m-0" onClick={() => setPrintModalOpen(true)}>
                   <i className="bx bx-printer me-2"></i>Print
                 </Btn>
+                <Btn color="info" type="button" className="m-0" onClick={handleGenerateQR} disabled={!state.isEditMode || state.id === 0}>
+                  <i className="bx bx-qr me-2"></i>Generate QR
+                </Btn>
                 <Btn color="secondary" type="button" className="m-0" onClick={() => navigate(-1)}>Cancel</Btn>
               </CardFooter>
             </Card>
@@ -1474,6 +1566,24 @@ function SalesInvoice() {
           </Form>
         </ModalBody>
         <ModalFooter><Button color="primary" onClick={handleVendorSubmit} disabled={vendorSubmitting}>Save</Button><Button color="secondary" onClick={closeVendorModal}>Cancel</Button></ModalFooter>
+      </Modal>
+
+      <Modal isOpen={qrModalOpen} toggle={() => setQrModalOpen(false)} centered>
+        <ModalHeader toggle={() => setQrModalOpen(false)}>Scan to Pay</ModalHeader>
+        <ModalBody className="text-center py-4">
+          {qrData ? (
+            <div>
+              <img 
+                src={qrData.startsWith('http') || qrData.startsWith('data:image') ? qrData : `data:image/png;base64,${qrData}`} 
+                alt="Payment QR" 
+                style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'contain' }} 
+              />
+              <p className="mt-3 text-muted">Scan this QR code with any UPI app to pay.</p>
+            </div>
+          ) : (
+            <p className="text-danger">Failed to load QR code.</p>
+          )}
+        </ModalBody>
       </Modal>
 
       <Modal isOpen={printModalOpen} toggle={() => setPrintModalOpen(false)} centered>
