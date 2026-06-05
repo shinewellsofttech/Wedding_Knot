@@ -1070,7 +1070,7 @@ function SalesInvoice() {
       const userId = authUser?.uid ?? authUser?.Id ?? "0";
       const userToken = authUser?.Token ?? authUser?.token ?? "token";
       
-      const url = `${API_WEB_URLS.BASE}CreateOrder/${userId}/${userToken}`;
+      const url = `${API_WEB_URLS.BASE}Payment/${userId}/${userToken}`;
       const fd = new FormData();
       fd.append("F_SalesEntryH", String(state.id));
       fd.append("Amount", String(Math.round(grandTotal))); // Send amount in rupees
@@ -1183,6 +1183,41 @@ function SalesInvoice() {
       }
     } else {
       alert("Sharing is not supported in this browser. Please download the PDF and share manually.");
+    }
+  };
+
+  const handleShareQR = async () => {
+    if (!qrData) return;
+    try {
+      const qrImageUrl = qrData.startsWith('http') || qrData.startsWith('data:image') ? qrData : `data:image/png;base64,${qrData}`;
+      
+      if (navigator.share) {
+        if (qrImageUrl.startsWith('data:image')) {
+           const res = await fetch(qrImageUrl);
+           const blob = await res.blob();
+           const file = new File([blob], "payment_qr.png", { type: blob.type });
+           
+           if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              await navigator.share({
+                title: "Payment QR",
+                text: "Please scan the QR code to make a payment.",
+                files: [file]
+              });
+           } else {
+              alert("Your device doesn't support sharing this image directly.");
+           }
+        } else {
+           await navigator.share({
+              title: "Payment QR",
+              text: "Please scan the QR code to make a payment.",
+              url: qrImageUrl,
+           });
+        }
+      } else {
+        alert("Sharing is not supported in this browser.");
+      }
+    } catch (err) {
+      console.error("Error sharing QR:", err);
     }
   };
 
@@ -1584,6 +1619,13 @@ function SalesInvoice() {
             <p className="text-danger">Failed to load QR code.</p>
           )}
         </ModalBody>
+        {qrData && (
+          <ModalFooter className="justify-content-center border-0 pt-0">
+            <Button color="success" className="d-flex align-items-center gap-2" onClick={handleShareQR}>
+              <i className="fa fa-share-alt"></i> Share QR
+            </Button>
+          </ModalFooter>
+        )}
       </Modal>
 
       <Modal isOpen={printModalOpen} toggle={() => setPrintModalOpen(false)} centered>
