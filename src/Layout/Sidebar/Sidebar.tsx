@@ -8,7 +8,7 @@ import { dynamicImage } from '../../Service';
 import { ArrowLeft, ArrowRight, X } from 'react-feather';
 import SidebarMenuList from './SidebarMenuList';
 import { scrollToLeft, scrollToRight, setToggleSidebar } from '../../ReduxToolkit/Reducers/LayoutSlice';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 const Sidebar = () => {
   const dispatch = useAppDispatch();
@@ -16,6 +16,7 @@ const Sidebar = () => {
   const { toggleSidebar, margin } = useAppSelector((state) => state.layout);
   const { pinedMenu } = useAppSelector((state) => state.layout);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 992);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -28,16 +29,22 @@ const Sidebar = () => {
   const handleMouseEnter = () => {
     // Only apply hover on desktop screens
     if (isDesktop) {
-      // Open sidebar on hover
-      dispatch(setToggleSidebar(false));
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = setTimeout(() => {
+        // Open sidebar on hover
+        dispatch(setToggleSidebar(false));
+      }, 150); // Small delay to prevent flickering and lag
     }
   };
 
   const handleMouseLeave = () => {
     // Only apply hover on desktop screens
     if (isDesktop) {
-      // Close sidebar when mouse leaves
-      dispatch(setToggleSidebar(true));
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = setTimeout(() => {
+        // Close sidebar when mouse leaves
+        dispatch(setToggleSidebar(true));
+      }, 150); // Small delay before closing
     }
   };
 

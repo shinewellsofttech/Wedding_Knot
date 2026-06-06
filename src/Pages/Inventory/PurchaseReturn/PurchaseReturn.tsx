@@ -1,1332 +1,1303 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Col, Row, Card, CardBody, CardHeader, Container } from "reactstrap";
-import { Fn_AddEditData, Fn_DisplayData, Fn_FillListData, Fn_DeleteData } from "../../../store/Functions";
+import React, { useState, useEffect, useRef } from "react";
+import { Col, Row, Card, CardBody, CardFooter, Button, Modal, ModalBody, ModalHeader, ModalFooter, Form, FormGroup, Label, Input, Container } from "reactstrap";
+import { Fn_AddEditData, Fn_DisplayData, Fn_FillListData, Fn_GetReport, Fn_DeleteData } from "../../../store/Functions";
 import { useDispatch } from "react-redux";
 import { API_WEB_URLS } from "../../../constants/constAPI";
 import { useLocation, useNavigate } from "react-router-dom";
 import GridSystemPurchaseReturn from "./GridSystemPurchaseReturn";
-import { getCurrentDateYYYYMMDD } from "../../../helpers/dateUtils";
+import { getCurrentDateYYYYMMDD, parseDateFromAPI } from "../../../helpers/dateUtils";
+import DateInput from "../../../CommonElements/DateInput/DateInput";
 import Breadcrumbs from "../../../CommonElements/Breadcrumbs/Breadcrumbs";
-import CardHeaderCommon from "../../../CommonElements/CardHeaderCommon/CardHeaderCommon";
 import { Btn } from "../../../AbstractElements";
-
-const API_URL_SAVE = "PurchaseReturnH/0/token";
-const API_URL_EDIT = `${API_WEB_URLS.MASTER}/0/token/PurchaseReturnH/Id`;
-const API_URL_DELETE = `${API_WEB_URLS.MASTER}/0/token/PurchaseReturnH`;
-const API_URL_LINES = `${API_WEB_URLS.MASTER}/0/token/PurchaseReturnLById`;
-const API_URL_FETCH_NO = `${API_WEB_URLS.MASTER}/0/token/GetPurchaseReturnNo`;
-const API_URL_CREATED = `${API_WEB_URLS.MASTER}/0/token/CreatedPurchaseReturns/Id/0`;
-const API_URL_VENDOR = `${API_WEB_URLS.MASTER}/0/token/VendorMaster/Id/0`;
-const API_URL_ITEM_GROUP = `${API_WEB_URLS.MASTER}/0/token/ItemGroupMaster/Id/0`;
-const API_URL_ITEM_BY_GROUP = `${API_WEB_URLS.MASTER}/0/token/ItemMasterById`;
-const API_URL_ITEM_BY_CODE = `${API_WEB_URLS.MASTER}/0/token/ItemMasterByItemCode/Id/0`;
-const API_URL_COLOR = `${API_WEB_URLS.MASTER}/0/token/ColorMaster/Id/0`;
-const API_URL_BARCODE = `${API_WEB_URLS.MASTER}/0/token/ItemMasterByBarcode/Id`;
-
-const RETURN_CONDITIONS = ["Fresh", "Replacement", "Scrap"];
-const RETURN_STATUS_MAP = {
-  Fresh: 1,
-  Replacement: 2,
-  Scrap: 3,
-};
+import CardHeaderCommon from "../../../CommonElements/CardHeaderCommon/CardHeaderCommon";
 
 interface GridRow {
-  BarCodeId: string;
-  F_PurchaseMasterL: string;
   ItemCode: string;
   F_ItemGroupMaster: string;
   F_ItemMaster: string;
-  F_ColorMaster: string;
-  ReturnCondition: string;
+  F_ItemDesignMaster?: string;
+  ItemName?: string;
+  DesignPhoto?: string;
+  F_ColorMaster?: string;
+  F_WarehouseMaster: string;
+  F_BatchMaster?: string;
   Qty: string;
+  Rate: string;
+  Variant?: string;
+  Photos?: string[];
   ItemData: any[] | null;
+  AvailableQty?: number;
+  F_PurchaseEntryH?: string | number;
+  F_PurchaseEntryL?: string | number;
+  F_GSTGroupMaster?: string;
+  UnitValue?: number;
 }
 
-interface FormDataType {
-  ReturnNo: string;
-  ReturnDate: string;
-  F_VendorMaster: string;
-  F_PurchaseReturn: string;
-  ReturnType: string;
-  F_ReturnStatus: string;
-  Remarks: string;
-  F_PurchaseMasterH: string;
-  F_StatusMaster: string;
-}
-
-interface StateType {
+interface StateData {
   id: number;
-  formData: FormDataType;
+  formData: {
+    PONo: string;
+    PODate: string;
+    F_VendorMaster: string;
+    Remarks: string;
+    F_PurchaseEntryH?: string;
+    F_PurchaseReturnH?: string;
+  };
+  CreatedPurchaseEntries?: any[];
+  PurchaseEntryLinesMap?: Record<string, any[]>;
+  CreatedPurchaseReturnEntries?: any[];
+  PurchaseReturnLinesMap?: Record<string, any[]>;
   VendorMaster: any[];
   ItemGroupMaster: any[];
+  ItemMaster: any[];
+  WarehouseMaster: any[];
   ColorMaster: any[];
-  CreatedPurchaseReturns: any[];
-  DefaultColor: any;
-  itemColorApplyMap: { [key: string]: boolean };
+  BatchMaster: any[];
+  DefaultWarehouse: any | null;
+  DefaultColor: any | null;
+  IsBatchAllowed: boolean;
+  itemColorApplyMap: Record<string | number, boolean>;
   isEditMode: boolean;
+  isGridEditable: boolean;
+  GlobalOptions: any[];
+  GSTGroupMaster: any[];
+  StateMaster: any[];
+  CityMaster: any[];
 }
 
-const createReturnRow = (condition = "Fresh"): GridRow => ({
-  BarCodeId: "",
-  F_PurchaseMasterL: "",
-  ItemCode: "",
-  F_ItemGroupMaster: "",
-  F_ItemMaster: "",
-  F_ColorMaster: "",
-  ReturnCondition: condition,
-  Qty: "",
-  ItemData: null,
-});
+function PurchaseReturn() {
+  const API_URL_SAVE = "PurchaseReturn/0/token";
+  const API_URL_EDIT = API_WEB_URLS.MASTER + "/0/token/PurchaseReturnH/Id";
+  const API_URL_LINES = API_WEB_URLS.MASTER + "/0/token/PurchaseReturnL/Id";
+  const API_URL_ITEMGROUP = API_WEB_URLS.MASTER + "/0/token/CategoryMaster/Id/0";
+  const API_URL_ITEMS = API_WEB_URLS.MASTER + "/0/token/ItemMaster/Id";
+  const API_URL_VENDOR = API_WEB_URLS.MASTER + "/0/token/PartyLedgerMaster/Id/0";
+  const API_URL_WAREHOUSE = API_WEB_URLS.MASTER + "/0/token/WarehouseMaster/Id/0";
+  const API_URL_COLOR = API_WEB_URLS.MASTER + "/0/token/ColorMaster/Id/0";
+  const API_URL_BATCH = API_WEB_URLS.MASTER + "/0/token/BatchMaster/Id/0";
+  const API_URL_GLOBALOPTIONS = API_WEB_URLS.MASTER + "/0/token/GlobalOptions/Id/0";
+  const API_ITEM_SAVE = "ItemMaster/0/token";
+  const API_ITEMGROUP_SAVE = "ItemGroupMaster/0/token";
+  const API_VENDOR_SAVE = "LedgerMaster/0/token";
 
-const PurchaseReturn: React.FC = () => {
   const dispatch = useDispatch();
-  const location = useLocation();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const returnNoRef = useRef<HTMLInputElement>(null);
-  const returnDateRef = useRef<HTMLInputElement>(null);
-  const vendorRef = useRef<HTMLSelectElement>(null);
-  const returnTypeRef = useRef<HTMLSelectElement>(null);
-  const remarksRef = useRef<HTMLInputElement>(null);
-
-  const [state, setState] = useState<StateType>({
+  const [state, setState] = useState<StateData>({
     id: 0,
     formData: {
-      ReturnNo: "",
-      ReturnDate: getCurrentDateYYYYMMDD(),
+      PONo: "",
+      PODate: getCurrentDateYYYYMMDD(),
       F_VendorMaster: "",
-      F_PurchaseReturn: "",
-      ReturnType: "Fresh",
-      F_ReturnStatus: "Fresh",
       Remarks: "",
-      F_PurchaseMasterH: "0",
-      F_StatusMaster: "0",
     },
     VendorMaster: [],
     ItemGroupMaster: [],
+    ItemMaster: [],
+    WarehouseMaster: [],
+    StateMaster: [],
+    CityMaster: [],
     ColorMaster: [],
-    CreatedPurchaseReturns: [],
+    BatchMaster: [],
+    DefaultWarehouse: null,
     DefaultColor: null,
+    IsBatchAllowed: false,
     itemColorApplyMap: {},
     isEditMode: false,
+    isGridEditable: true,
+    GlobalOptions: [],
+    GSTGroupMaster: [],
   });
 
-  const [gridRows, setGridRows] = useState<GridRow[]>([createReturnRow()]);
+  const [gridRows, setGridRows] = useState<GridRow[]>([
+    {
+      ItemCode: "",
+      F_ItemGroupMaster: "",
+      F_ItemMaster: "",
+      F_ColorMaster: "",
+      F_WarehouseMaster: "",
+      F_BatchMaster: "",
+      Variant: "",
+      Photos: [],
+      Qty: "",
+      Rate: "",
+      ItemData: null,
+      AvailableQty: 0,
+    },
+  ]);
 
-  const getLastCreatedPurchaseReturnId = (sourceList?: any[]): any => {
-    const list = Array.isArray(sourceList) && sourceList.length > 0
-      ? sourceList
-      : (state.CreatedPurchaseReturns || []);
+  const [quickItemModalOpen, setQuickItemModalOpen] = useState(false);
+  const [quickItemTargetRow, setQuickItemTargetRow] = useState<number | null>(null);
+  const [quickItemSubmitting, setQuickItemSubmitting] = useState(false);
+  const [quickItemForm, setQuickItemForm] = useState({
+    ItemName: "",
+    ItemCode: "",
+    F_ItemGroupMaster: "",
+    F_ColorMaster: "",
+    ItemColorApply: false,
+  });
 
-    if (!Array.isArray(list) || list.length === 0) {
-      return null;
-    }
+  const [vendorModalOpen, setVendorModalOpen] = useState(false);
+  const [vendorSubmitting, setVendorSubmitting] = useState(false);
+  const [vendorForm, setVendorForm] = useState({
+    Name: "",
+    CompanyName: "",
+    Phone: "",
+    Email: "",
+    Address: "",
+  });
 
-    const lastEntry = list[list.length - 1];
-    return (
-      lastEntry?.Id ??
-      lastEntry?.id ??
-      lastEntry?.F_PurchaseReturn ??
-      lastEntry?.PurchaseReturnId ??
-      lastEntry?.PurchaseReturnID ??
-      null
-    );
-  };
+  const [taxOverrides, setTaxOverrides] = useState<{ CGST?: string, SGST?: string, IGST?: string }>({});
 
-  const setSelectedPurchaseReturn = (returnId: string) => {
-    if (!returnId) return;
-    setState((prev) => ({
-      ...prev,
-      formData: {
-        ...prev.formData,
-        F_PurchaseReturn: returnId,
-      },
-    }));
-  };
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
 
-  const loadPurchaseReturnRecord = async (recordId: any): Promise<boolean> => {
-    if (!recordId) return false;
-    await DataFillFunction(recordId);
-    setSelectedPurchaseReturn(recordId);
-    return true;
-  };
+  // Fetch master data on component mount
+  useEffect(() => {
+    const fetchMasterData = async () => {
+      try {
+        const itemGroups = await Fn_FillListData(dispatch, setState, "ItemGroupMaster", API_URL_ITEMGROUP);
+        const vendors = await Fn_FillListData(dispatch, setState, "VendorMaster", API_URL_VENDOR);
+        const API_URL_PE_LIST = API_WEB_URLS.MASTER + "/0/token/PurchaseReturnData/Id/0";
+        const peData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_PE_LIST);
+        
+        let peDataArray: any[] = [];
+        if (Array.isArray(peData)) peDataArray = peData;
+        else if (peData?.data?.dataList && Array.isArray(peData.data.dataList)) peDataArray = peData.data.dataList;
+        else if (peData?.dataList && Array.isArray(peData.dataList)) peDataArray = peData.dataList;
+        else if (peData?.data?.response && Array.isArray(peData.data.response)) peDataArray = peData.data.response;
 
-  const selectLastPurchaseReturnRecord = async (listOverride?: any[]): Promise<any> => {
-    const targetId = getLastCreatedPurchaseReturnId(listOverride);
-    if (!targetId) return null;
-    await loadPurchaseReturnRecord(targetId);
-    return targetId;
-  };
+        const API_URL_GSTGROUP = API_WEB_URLS.MASTER + "/0/token/GSTGroupMaster/Id/0";
+        const gstData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_GSTGROUP);
+        const globalOptions = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_GLOBALOPTIONS);
 
-  const resolveReturnStatusLabel = useCallback((value: any): string => {
-    if (value == null || value === "") {
-      return "Fresh";
-    }
-    const entry = Object.entries(RETURN_STATUS_MAP).find(
-      ([, statusId]) => String(statusId) === String(value)
-    );
-    if (entry) {
-      return entry[0];
-    }
-    if (RETURN_CONDITIONS.includes(value)) {
-      return value;
-    }
-    return "Fresh";
-  }, []);
+        const API_URL_STATEMASTER = API_WEB_URLS.MASTER + "/0/token/StateMaster/Id/0";
+        const stateMasterData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_STATEMASTER);
 
-  const requestPurchaseReturnNo = useCallback(async (): Promise<string> => {
-    try {
-      const returnNoResponse = await Fn_FillListData(
-        dispatch,
-        setState,
-        "GetPurchaseReturnNo",
-        `${API_URL_FETCH_NO}/Id/0`
-      );
-      if (Array.isArray(returnNoResponse) && returnNoResponse.length > 0) {
-        return (
-          returnNoResponse[0].ReturnNo ||
-          returnNoResponse[0].PRNo ||
-          returnNoResponse[0].PrNo ||
-          returnNoResponse[0].PRNO ||
-          ""
-        );
-      }
-    } catch (error) {
-      console.error("Failed to generate Purchase Return number", error);
-    }
-    return "";
-  }, [dispatch]);
+        const API_URL_CITYMASTER = API_WEB_URLS.MASTER + "/0/token/CityMaster/Id/0";
+        const cityMasterData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_CITYMASTER);
 
-  const fetchReturnNumber = useCallback(async () => {
-    const generatedNo = await requestPurchaseReturnNo();
-    if (generatedNo) {
-      setState((prev) => ({
-        ...prev,
-        formData: {
-          ...prev.formData,
-          ReturnNo: generatedNo,
-        },
-      }));
-    }
-  }, [requestPurchaseReturnNo]);
+        const extractArray = (data: any) => Array.isArray(data) ? data : (data?.data?.dataList || data?.dataList || data?.data?.response || data?.response || []);
 
-  const fetchInitialData = useCallback(async () => {
-    try {
-      await Fn_FillListData(dispatch, setState, "VendorMaster", API_URL_VENDOR);
-      await Fn_FillListData(dispatch, setState, "ItemGroupMaster", API_URL_ITEM_GROUP);
-      const colorResponse = await Fn_FillListData(dispatch, setState, "ColorMaster", API_URL_COLOR);
-      await Fn_FillListData(dispatch, setState, "CreatedPurchaseReturns", API_URL_CREATED);
-
-      if (Array.isArray(colorResponse) && colorResponse.length > 0) {
-        const defaultColor =
-          colorResponse.find(
-            (color) =>
-              color.IsDefault === true || color.IsDefault === 1 || color.IsDefault === "1"
-          ) || colorResponse[0];
         setState((prev) => ({
           ...prev,
-          DefaultColor: defaultColor,
+          ItemGroupMaster: extractArray(itemGroups),
+          VendorMaster: extractArray(vendors),
+          CreatedPurchaseReturnEntries: peDataArray,
+          GSTGroupMaster: extractArray(gstData),
+          GlobalOptions: extractArray(globalOptions),
+          StateMaster: extractArray(stateMasterData),
+          CityMaster: extractArray(cityMasterData),
         }));
-      }
 
-      await fetchReturnNumber();
-    } catch (error) {
-      console.error("Error fetching purchase return data", error);
-    }
-  }, [dispatch, fetchReturnNumber]);
-
-  useEffect(() => {
-    fetchInitialData();
-  }, [fetchInitialData]);
-
-  useEffect(() => {
-    if (returnNoRef.current) {
-      returnNoRef.current.focus();
-    }
-  }, []);
-
-  useEffect(() => {
-    const locationState = location.state as { Id?: number } | undefined;
-    if (locationState?.Id) {
-      DataFillFunction(locationState.Id);
-    }
-  }, [location.state]);
-
-  const addRow = useCallback(() => {
-    setGridRows((prev) => [...prev, createReturnRow(state.formData.ReturnType || "Fresh")]);
-  }, [state.formData.ReturnType]);
-
-  const removeRow = useCallback((index: number) => {
-    setGridRows((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
-  }, []);
-
-  const getItemColorApply = useCallback(
-    async (itemId: string, forceRefresh = false): Promise<boolean> => {
-      try {
-        if (!itemId) return true;
-        if (
-          !forceRefresh &&
-          Object.prototype.hasOwnProperty.call(state.itemColorApplyMap, itemId)
-        ) {
-          return state.itemColorApplyMap[itemId];
-        }
-
-        const response = await Fn_FillListData(
-          dispatch,
-          setState,
-          "ItemMaster",
-          `${API_WEB_URLS.MASTER}/0/token/ItemMaster/Id/${itemId}`
-        );
-        if (Array.isArray(response) && response.length > 0) {
-          const item = response[0];
-          const requiresColor =
-            item.ItemColorApply === "1" ||
-            item.ItemColorApply === 1 ||
-            item.ItemColorApply === true;
-          setState((prev) => ({
-            ...prev,
-            itemColorApplyMap: {
-              ...prev.itemColorApplyMap,
-              [itemId]: requiresColor,
-            },
-          }));
-          return requiresColor;
-        }
-        return true;
-      } catch (error) {
-        console.error("Error fetching item color apply", error);
-        return true;
-      }
-    },
-    [dispatch, state.itemColorApplyMap]
-  );
-
-  const populateRowFromItem = useCallback(
-    async (index: number, matchedItem: any, options: any = {}): Promise<boolean> => {
-      if (!matchedItem) return false;
-
-      const currentRows = gridRows;
-      const currentRow = currentRows[index] || {};
-      const itemGroupId = matchedItem.F_ItemGroupMaster;
-      const itemId = matchedItem.Id;
-
-      const itemRequiresColor = await getItemColorApply(itemId, true);
-      const defaultColorId = itemRequiresColor ? "" : (state.DefaultColor?.Id || "");
-      const resolvedColorId = itemRequiresColor
-        ? options.colorId ?? currentRow.F_ColorMaster ?? ""
-        : options.colorId ?? defaultColorId;
-
-      const isDuplicate = currentRows.some(
-        (row, i) =>
-          i !== index &&
-          row.F_ItemGroupMaster === itemGroupId &&
-          row.F_ItemMaster === itemId &&
-          (itemRequiresColor ? (row.F_ColorMaster || "") === (resolvedColorId || "") : true)
-      );
-
-      if (isDuplicate) {
-        alert("This item, group, and color combination is already selected in another row.");
-        return false;
-      }
-
-      let itemList: any[] = [];
-      try {
-        const res = await Fn_FillListData(
-          dispatch,
-          setState,
-          "ItemData",
-          `${API_URL_ITEM_BY_GROUP}/Id/${itemGroupId}`
-        );
-        itemList = Array.isArray(res) ? res : [];
-      } catch (error) {
-        console.error("Error loading items for the selected item group.", error);
-        alert(`Error loading items for the selected item group. Please try again.`);
-        return false;
-      }
-
-      setGridRows((prevRows) =>
-        prevRows.map((row, i) => {
-          if (i !== index) return row;
-          return {
-            ...row,
-            BarCodeId:
-              options.barCodeId ??
-              row.BarCodeId ??
-              matchedItem.BarCodeId ??
-              matchedItem.BarcodeId ??
-              matchedItem.BarCodeID ??
-              matchedItem.BarcodeID ??
-              matchedItem.BarCode ??
-              matchedItem.Barcode ??
-              "",
-            F_PurchaseMasterL: matchedItem.F_PurchaseMasterL ?? row.F_PurchaseMasterL ?? "",
-            ItemCode: matchedItem.ItemCode || row.ItemCode || "",
-            F_ItemGroupMaster: itemGroupId,
-            F_ItemMaster: itemId,
-            F_ColorMaster: itemRequiresColor
-              ? resolvedColorId || ""
-              : state.DefaultColor?.Id || row.F_ColorMaster || "",
-            ItemData: itemList,
-          };
-        })
-      );
-
-      return true;
-    },
-    [dispatch, getItemColorApply, gridRows, state.DefaultColor?.Id]
-  );
-
-  const updateGridRow = useCallback(
-    async (index: number, field: string, value: any) => {
-      if (field === "Barcode") {
-        setGridRows((prevRows) =>
-          prevRows.map((row, i) => (i === index ? { ...row, BarCodeId: value } : row))
-        );
-        return;
-      }
-
-      if (field === "BarcodeSearch") {
-        const barcodeValue = String(value || "").trim();
-        if (!barcodeValue) return;
-        try {
-          const result = await Fn_FillListData(
-            dispatch,
-            setState,
-            "ItemMasterByBarcode",
-            `${API_URL_BARCODE}/0`
-          );
-          if (Array.isArray(result) && result.length > 0) {
-            const normalizedValue = barcodeValue.toLowerCase();
-            const matched =
-              result.find((item) => {
-                const possibleId =
-                  item?.BarCodeId ??
-                  item?.BarcodeId ??
-                  item?.BarCodeID ??
-                  item?.BarcodeID ??
-                  item?.BarCode ??
-                  item?.Barcode;
-                return (
-                  possibleId !== undefined &&
-                  String(possibleId).trim().toLowerCase() === normalizedValue
-                );
-              }) || null;
-
-            if (matched) {
-              await populateRowFromItem(index, matched, {
-                barCodeId:
-                  matched?.BarCodeId ??
-                  matched?.BarcodeId ??
-                  matched?.BarCodeID ??
-                  matched?.BarcodeID ??
-                  matched?.BarCode ??
-                  matched?.Barcode ??
-                  barcodeValue,
-              });
-              return;
-            }
-          }
-
-          console.warn(
-            `Barcode ${barcodeValue} not found in master. Please select item manually.`
-          );
-          setGridRows((prevRows) =>
-            prevRows.map((row, i) =>
-              i === index ? { ...row, BarCodeId: barcodeValue } : row
-            )
-          );
-          alert(
-            "Barcode not found. Please select the item manually; the scanned barcode will be saved with it."
-          );
-        } catch (error) {
-          console.error("Error fetching item by barcode", error);
-        }
-        return;
-      }
-
-      if (field === "ItemCode") {
-        setGridRows((prevRows) =>
-          prevRows.map((row, i) => (i === index ? { ...row, ItemCode: value } : row))
-        );
-        return;
-      }
-
-      if (field === "ItemCodeSearch") {
-        setTimeout(async () => {
-          try {
-            const result = await Fn_FillListData(
-              dispatch,
-              setState,
-              "ItemMaster",
-              API_URL_ITEM_BY_CODE
-            );
-            const matchedItem = result?.find(
-              (item: any) => item.ItemCode?.toLowerCase() === value.toLowerCase()
-            );
-            if (!matchedItem) {
-              setGridRows((rows) =>
-                rows.map((row, i) =>
-                  i === index
-                    ? {
-                        ...createReturnRow(state.formData.ReturnType),
-                        BarCodeId: row.BarCodeId,
-                      }
-                    : row
-                )
-              );
-              return;
-            }
-
-            await populateRowFromItem(index, matchedItem, {
-              barCodeId:
-                matchedItem?.BarCodeId ??
-                matchedItem?.BarcodeId ??
-                matchedItem?.BarCodeID ??
-                matchedItem?.BarcodeID,
-            });
-          } catch (err) {
-            console.error("Item code search failed", err);
-          }
-        }, 0);
-        return;
-      }
-
-      if (field === "F_ItemGroupMaster") {
-        setGridRows((prevRows) => {
-          const updatedRows = prevRows.map((row, i) =>
-            i === index
-              ? {
-                  ...row,
-                  F_ItemGroupMaster: value,
-                  F_ItemMaster: "",
-                  ItemData: [],
-                  BarCodeId: "",
-                  ItemCode: "",
-                }
-              : row
-          );
-
-          setTimeout(async () => {
-            if (!value) {
-              setGridRows((rows) =>
-                rows.map((row, i) =>
-                  i === index
-                    ? {
-                        ...createReturnRow(state.formData.ReturnType),
-                        BarCodeId: row.BarCodeId,
-                      }
-                    : row
-                )
-              );
-              return;
-            }
-            try {
-              const items = await Fn_FillListData(
-                dispatch,
-                setState,
-                "ItemData",
-                `${API_URL_ITEM_BY_GROUP}/Id/${value}`
-              );
-              setGridRows((rows) =>
-                rows.map((row, i) =>
-                  i === index
-                    ? {
-                        ...row,
-                        F_ItemGroupMaster: value,
-                        F_ItemMaster: "",
-                        ItemData: Array.isArray(items) ? items : [],
-                        BarCodeId: "",
-                        ItemCode: "",
-                      }
-                    : row
-                )
-              );
-            } catch (err) {
-              console.error("Error loading item group data", err);
-            }
-          }, 0);
-
-          return updatedRows;
-        });
-        return;
-      }
-
-      if (field === "F_ItemMaster") {
-        setGridRows((prevRows) =>
-          prevRows.map((row, i) => (i === index ? { ...row, F_ItemMaster: value } : row))
-        );
-
-        if (value) {
-          setTimeout(async () => {
-            const requiresColor = await getItemColorApply(value);
-            const defaultColorId = requiresColor ? "" : state.DefaultColor?.Id || "";
-            setGridRows((rows) =>
-              rows.map((row, i) => {
-                if (i !== index) return row;
-                const itemList = Array.isArray(row.ItemData) ? row.ItemData : [];
-                const selectedItem = itemList.find((item: any) => item.Id === value);
-                const existingBarcode =
-                  row.BarCodeId && String(row.BarCodeId).trim() !== "" ? row.BarCodeId : "";
-                const selectedBarcode =
-                  selectedItem?.BarCodeId ??
-                  selectedItem?.BarcodeId ??
-                  selectedItem?.BarCodeID ??
-                  selectedItem?.BarcodeID ??
-                  selectedItem?.BarCode ??
-                  selectedItem?.Barcode ??
-                  "";
-
-                return {
-                  ...row,
-                  F_ItemMaster: value,
-                  F_ColorMaster: defaultColorId,
-                  ItemCode: selectedItem?.ItemCode ?? row.ItemCode ?? "",
-                  BarCodeId: existingBarcode || selectedBarcode || "",
-                };
-              })
-            );
-          }, 0);
+        const params = new URLSearchParams(location.search);
+        const recordId = params.get("id");
+        if (recordId) {
+          await loadPurchaseReturnRecord(parseInt(recordId));
         } else {
-          setGridRows((prevRows) =>
-            prevRows.map((row, i) =>
-              i === index
-                ? { ...row, F_ItemMaster: "", F_ColorMaster: "", ItemCode: "", BarCodeId: "" }
-                : row
-            )
-          );
-        }
-        return;
-      }
-
-      if (field === "F_ColorMaster") {
-        setGridRows((prevRows) =>
-          prevRows.map((row, i) => (i === index ? { ...row, F_ColorMaster: value } : row))
-        );
-        return;
-      }
-
-      if (field === "ReturnCondition") {
-        setGridRows((prevRows) =>
-          prevRows.map((row, i) => (i === index ? { ...row, ReturnCondition: value } : row))
-        );
-        return;
-      }
-
-      if (field === "Qty") {
-        setGridRows((prevRows) =>
-          prevRows.map((row, i) => (i === index ? { ...row, Qty: value } : row))
-        );
-        return;
-      }
-
-      setGridRows((prevRows) =>
-        prevRows.map((row, i) => (i === index ? { ...row, [field]: value } : row))
-      );
-    },
-    [
-      dispatch,
-      getItemColorApply,
-      gridRows,
-      populateRowFromItem,
-      state.DefaultColor?.Id,
-      state.formData.ReturnType,
-    ]
-  );
-
-  const handleCreatedReturnChange = useCallback(async (returnId: string) => {
-    if (!returnId) return;
-    await loadPurchaseReturnRecord(returnId);
-    setSelectedPurchaseReturn(returnId);
-  }, []);
-
-  const handleFormKeyDown = useCallback((event: React.KeyboardEvent<any>, fieldName: string) => {
-    if (event.key !== "Enter") {
-      return;
-    }
-
-    event.preventDefault();
-
-    switch (fieldName) {
-      case "ReturnNo":
-        returnDateRef.current?.focus();
-        break;
-      case "ReturnDate":
-        vendorRef.current?.focus();
-        break;
-      case "F_VendorMaster":
-        returnTypeRef.current?.focus();
-        break;
-      case "ReturnType":
-        remarksRef.current?.focus();
-        break;
-      case "Remarks":
-        setTimeout(() => {
-          const selectors = [
-            'input[data-row="0"][data-field="Barcode"]',
-            'input[data-row="0"][data-field="ItemCode"]',
-            'select[data-row="0"][data-field="F_ItemGroupMaster"]',
-          ];
-          const target = selectors
-            .map((selector) => document.querySelector(selector))
-            .find(Boolean) as HTMLElement | undefined;
-          target?.focus();
-        }, 100);
-        break;
-      default:
-        break;
-    }
-  }, []);
-
-  async function DataFillFunction(id: any) {
-    if (!id) return;
-
-    try {
-      const headerData = await Fn_DisplayData(dispatch, setState, id, API_URL_EDIT, {
-        autoAssign: false,
-      });
-      const linesData = await Fn_FillListData(
-        dispatch,
-        setState,
-        "ReturnLines",
-        `${API_URL_LINES}/Id/${id}`
-      );
-
-      if (Array.isArray(headerData) && headerData.length > 0) {
-        const header = headerData[0];
-
-        setState((prev) => {
-          const resolvedStatusForType =
-            header.ReturnType ??
-            header.F_ReturnStatus ??
-            header.ReturnStatus ??
-            header.Status ??
-            prev.formData.ReturnType ??
-            "Fresh";
-          const resolvedStatusForStatus =
-            header.F_ReturnStatus ??
-            header.ReturnType ??
-            header.ReturnStatus ??
-            header.Status ??
-            prev.formData.F_ReturnStatus ??
-            prev.formData.ReturnType ??
-            "Fresh";
-          const resolvedReturnNo =
-            header.ReturnNo ??
-            header.PRNo ??
-            header.PRNO ??
-            header.PrNo ??
-            header.Prno ??
-            header.PR_Number ??
-            prev.formData.ReturnNo ??
-            "";
-          const rawDate =
-            header.ReturnDate ??
-            header.PRDate ??
-            header.PRDATE ??
-            header.PrDate ??
-            header.PR_Date ??
-            header.PurchaseReturnDate;
-          const mappedDate = rawDate
-            ? new Date(rawDate).toISOString().split("T")[0]
-            : getCurrentDateYYYYMMDD();
-
-          return {
-            ...prev,
-            isEditMode: true,
-            formData: {
-              ...prev.formData,
-              F_PurchaseReturn: id,
-              ReturnNo: resolvedReturnNo,
-              ReturnDate: mappedDate,
-              F_VendorMaster: header.F_VendorMaster || "",
-              Remarks:
-                header.Remarks || header.Remark || header.Description || header.Notes || "",
-              ReturnType: resolveReturnStatusLabel(resolvedStatusForType),
-              F_ReturnStatus: resolveReturnStatusLabel(resolvedStatusForStatus),
-              F_PurchaseMasterH:
-                header.F_PurchaseMasterH != null
-                  ? String(header.F_PurchaseMasterH)
-                  : header.F_PurchaseMaster != null
-                  ? String(header.F_PurchaseMaster)
-                  : prev.formData.F_PurchaseMasterH || "0",
-              F_StatusMaster:
-                header.F_StatusMaster != null
-                  ? String(header.F_StatusMaster)
-                  : prev.formData.F_StatusMaster || "0",
-            },
-          };
-        });
-      }
-
-      if (Array.isArray(linesData) && linesData.length > 0) {
-        const mappedRows = await Promise.all(
-          linesData.map(async (line: any) => {
-            const requiresColor = await getItemColorApply(line.F_ItemMaster, true);
-            const defaultColorId = requiresColor ? line.F_ColorMaster || "" : state.DefaultColor?.Id || "";
-
-            return {
-              BarCodeId:
-                line.BarCodeId ||
-                line.BarcodeId ||
-                line.BarCodeID ||
-                line.BarcodeID ||
-                line.BarCode ||
-                line.Barcode ||
-                "",
-              F_PurchaseMasterL: line.F_PurchaseMasterL || "",
-              ItemCode: line.ItemCode || "",
-              F_ItemGroupMaster: line.F_ItemGroupMaster || "",
-              F_ItemMaster: line.F_ItemMaster || "",
-              F_ColorMaster: defaultColorId,
-              ReturnCondition:
-                line.ReturnCondition || line.Condition || state.formData.ReturnType || "Fresh",
-              Qty: String(line.Qty || line.Quantity || ""),
-              ItemData: null,
-            };
-          })
-        );
-
-        setGridRows(mappedRows);
-
-        mappedRows.forEach(async (row, idx) => {
-          if (row.F_ItemGroupMaster) {
-            const items = await Fn_FillListData(
-              dispatch,
-              setState,
-              "ItemData",
-              `${API_URL_ITEM_BY_GROUP}/Id/${row.F_ItemGroupMaster}`
-            );
-            setGridRows((rows) =>
-              rows.map((r, i) =>
-                i === idx ? { ...r, ItemData: Array.isArray(items) ? items : [] } : r
-              )
-            );
+          try {
+            const API_ENTRY_NO = API_WEB_URLS.MASTER + "/0/token/GetVoucherNoByVoucherTypeId/Id/7";
+            const entryNoData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_ENTRY_NO);
+            let newEntryNo = "";
+            let dataArray = extractArray(entryNoData);
+            if (dataArray.length > 0 && dataArray[0].VoucherNo) {
+              newEntryNo = String(dataArray[0].VoucherNo);
+            } else if (typeof entryNoData === "string") {
+              newEntryNo = entryNoData;
+            }
+            if (newEntryNo) {
+              setState((prev) => ({
+                ...prev,
+                formData: { ...prev.formData, PONo: newEntryNo }
+              }));
+            }
+          } catch (e) {
+            console.error("Error fetching auto entry no:", e);
           }
-        });
-      } else {
-        setGridRows([createReturnRow(state.formData.ReturnType)]);
-      }
-    } catch (error) {
-      console.error("Failed to load purchase return", error);
-    }
-  }
-
-  const handleReset = useCallback(async () => {
-    const today = getCurrentDateYYYYMMDD();
-    setState((prev) => ({
-      ...prev,
-      isEditMode: false,
-      formData: {
-        ...prev.formData,
-        ReturnNo: "",
-        ReturnDate: today,
-        F_VendorMaster: "",
-        F_PurchaseReturn: "",
-        ReturnType: "Fresh",
-        F_ReturnStatus: "Fresh",
-        Remarks: "",
-        F_PurchaseMasterH: "0",
-        F_StatusMaster: "0",
-      },
-    }));
-
-    setGridRows([createReturnRow()]);
-
-    await fetchReturnNumber();
-    setTimeout(() => {
-      if (returnNoRef.current) returnNoRef.current.focus();
-    }, 0);
-  }, [fetchReturnNumber]);
-
-  const handleCancel = useCallback(async () => {
-    const loadedId = await selectLastPurchaseReturnRecord();
-    if (!loadedId) {
-      await handleReset();
-    }
-  }, [handleReset]);
-
-  const ensureReturnNumber = useCallback(
-    async (currentNo: string): Promise<string> => {
-      if (state.formData.F_PurchaseReturn) {
-        return currentNo;
-      }
-
-      if (currentNo?.trim()) {
-        return currentNo;
-      }
-
-      const generatedNo = await requestPurchaseReturnNo();
-      if (generatedNo) {
-        setState((prev) => ({
-          ...prev,
-          formData: {
-            ...prev.formData,
-            ReturnNo: generatedNo,
-          },
-        }));
-        return generatedNo;
-      }
-
-      return currentNo;
-    },
-    [requestPurchaseReturnNo, state.formData.F_PurchaseReturn]
-  );
-
-  const handleReturnTypeChange = useCallback((value: string) => {
-    setState((prev) => {
-      const prevType = prev.formData.ReturnType;
-      if (prevType !== value) {
-        setGridRows((rows) =>
-          rows.map((row) =>
-            !row.ReturnCondition || row.ReturnCondition === prevType
-              ? { ...row, ReturnCondition: value }
-              : row
-          )
-        );
-      }
-      return {
-        ...prev,
-        formData: {
-          ...prev.formData,
-          ReturnType: value,
-          F_ReturnStatus: value,
-        },
-      };
-    });
-  }, []);
-
-  const handleSubmit = useCallback(async () => {
-    if (!state.formData.ReturnNo?.trim()) {
-      alert("Please enter Return No");
-      returnNoRef.current?.focus();
-      return;
-    }
-
-    if (!state.formData.F_VendorMaster) {
-      alert("Please select Party");
-      vendorRef.current?.focus();
-      return;
-    }
-
-    const errors: string[] = [];
-    for (let i = 0; i < gridRows.length; i += 1) {
-      const row = gridRows[i];
-      const qty = parseFloat(row.Qty);
-      const requiresColor = await getItemColorApply(row.F_ItemMaster);
-      const hasColor = requiresColor ? !!row.F_ColorMaster : true;
-
-      if (
-        !row.F_ItemGroupMaster ||
-        !row.F_ItemMaster ||
-        !hasColor ||
-        !row.ReturnCondition ||
-        Number.isNaN(qty) ||
-        qty <= 0
-      ) {
-        const missing: string[] = [];
-        if (!row.F_ItemGroupMaster) missing.push("Item Group");
-        if (!row.F_ItemMaster) missing.push("Item");
-        if (!row.ReturnCondition) missing.push("Return Type");
-        if (!hasColor) missing.push("Color");
-        if (Number.isNaN(qty) || qty <= 0) missing.push("Quantity");
-        errors.push(`Row ${i + 1}: ${missing.join(", ")}`);
-      }
-    }
-
-    if (errors.length) {
-      alert(errors.join("\n"));
-      return;
-    }
-
-    try {
-      const ensuredReturnNo = await ensureReturnNumber(state.formData.ReturnNo);
-      const formData = new FormData();
-      const purchaseMasterId = Number(state.formData.F_PurchaseMasterH) || 0;
-      const statusMasterId = Number(state.formData.F_StatusMaster) || 0;
-      const mappedReturnStatus =
-        RETURN_STATUS_MAP[state.formData.F_ReturnStatus as keyof typeof RETURN_STATUS_MAP] ??
-        RETURN_STATUS_MAP[state.formData.ReturnType as keyof typeof RETURN_STATUS_MAP];
-      const returnStatusId =
-        mappedReturnStatus != null ? mappedReturnStatus : Number(state.formData.F_ReturnStatus) || 0;
-
-      formData.append("F_PurchaseMasterH", String(purchaseMasterId));
-      formData.append("PRNo", ensuredReturnNo || "");
-      formData.append("PRDate", state.formData.ReturnDate);
-      formData.append("F_VendorMaster", state.formData.F_VendorMaster || "0");
-      formData.append("F_StatusMaster", String(statusMasterId));
-      formData.append("F_ReturnStatus", String(returnStatusId));
-      formData.append("ReturnType", state.formData.ReturnType || "Fresh");
-      formData.append("Remarks", state.formData.Remarks || "");
-
-      const rowStrings = await Promise.all(
-        gridRows.map(async (row) => {
-          const requiresColor = await getItemColorApply(row.F_ItemMaster);
-          const colorId = requiresColor ? row.F_ColorMaster || "" : state.DefaultColor?.Id || "";
-          const barcodeId = row.BarCodeId ?? "";
-          return [
-            row.F_ItemGroupMaster || "0",
-            row.F_ItemMaster || "0",
-            row.Qty || "0",
-            colorId || "0",
-            row.ItemCode || "",
-            row.F_PurchaseMasterL || "0",
-            barcodeId,
-          ].join("~");
-        })
-      );
-
-      formData.append("StrPurchaseReturnL", `${rowStrings.join("#")}#`);
-
-      const totalQty = gridRows.reduce((sum, row) => sum + (parseFloat(row.Qty) || 0), 0);
-      formData.append("TotalQty", String(totalQty));
-
-      const response = await Fn_AddEditData(
-        dispatch,
-        setState,
-        { arguList: { id: state.formData.F_PurchaseReturn || 0, formData } },
-        API_URL_SAVE,
-        true,
-        "memberid",
-        navigate,
-        "#"
-      );
-
-      const updatedReturns = await Fn_FillListData(
-        dispatch,
-        setState,
-        "CreatedPurchaseReturns",
-        API_URL_CREATED
-      );
-
-      let nextRecordId = response?.id;
-      if (!nextRecordId) {
-        nextRecordId = state.formData.F_PurchaseReturn || getLastCreatedPurchaseReturnId(updatedReturns);
-      }
-
-      if (nextRecordId) {
-        await loadPurchaseReturnRecord(nextRecordId);
-      } else {
-        await handleReset();
-      }
-    } catch (error) {
-      console.error("Error saving purchase return", error);
-    }
-  }, [dispatch, ensureReturnNumber, getItemColorApply, gridRows, handleReset, navigate, state]);
-
-  const handleDelete = useCallback(async () => {
-    if (!state.formData.F_PurchaseReturn) {
-      alert("Please select a purchase return to delete");
-      return;
-    }
-
-    const confirmed = window.confirm("Are you sure you want to delete this Purchase Return?");
-    if (!confirmed) return;
-
-    try {
-      await Fn_DeleteData(
-        dispatch,
-        state.formData.F_PurchaseReturn,
-        API_URL_DELETE,
-        `${API_URL_DELETE}/0`
-      );
-      await Fn_FillListData(dispatch, setState, "CreatedPurchaseReturns", API_URL_CREATED);
-      handleReset();
-    } catch (error) {
-      console.error("Error deleting purchase return", error);
-    }
-  }, [dispatch, handleReset, state.formData.F_PurchaseReturn]);
-
-  const handlePrint = useCallback(async () => {
-    let purchaseReturnId = state.formData.F_PurchaseReturn;
-    if (!purchaseReturnId) {
-      purchaseReturnId = await selectLastPurchaseReturnRecord();
-    }
-
-    if (!purchaseReturnId) {
-      alert("Please select a Purchase Return to print");
-      return;
-    }
-
-    setSelectedPurchaseReturn(purchaseReturnId);
-
-    const printUrl = `/print?orderType=PurchaseReturn&orderId=${encodeURIComponent(
-      purchaseReturnId
-    )}&returnType=${state.formData.ReturnType}`;
-    const newTab = window.open(printUrl, "_blank", "noopener,noreferrer");
-    if (!newTab) {
-      alert("Please allow pop-ups to view the print preview.");
-    }
-  }, [selectLastPurchaseReturnRecord, state.formData.ReturnType, state.formData.F_PurchaseReturn]);
-
-  const totalQuantity = gridRows.reduce(
-    (sum, row) => sum + (parseInt(row.Qty, 10) || 0),
-    0
-  );
-
-  useEffect(() => {
-    const keyHandler = (e: KeyboardEvent) => {
-      const isSave = (e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S");
-      const isReset = (e.ctrlKey || e.metaKey) && (e.key === "r" || e.key === "R");
-      const isDelete = (e.ctrlKey || e.metaKey) && (e.key === "d" || e.key === "D");
-      const isPrint = (e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P");
-
-      if (isSave) {
-        e.preventDefault();
-        handleSubmit();
-      }
-
-      if (isReset) {
-        e.preventDefault();
-        handleReset();
-      }
-
-      if (isDelete && state.isEditMode) {
-        e.preventDefault();
-        handleDelete();
-      }
-
-      if (isPrint) {
-        e.preventDefault();
-        handlePrint();
+        }
+      } catch (error) {
+        console.error("Error fetching master data:", error);
       }
     };
 
-    window.addEventListener("keydown", keyHandler);
-    return () => window.removeEventListener("keydown", keyHandler);
-  }, [handleDelete, handlePrint, handleReset, handleSubmit, state.isEditMode]);
+    fetchMasterData();
+  }, []);
+
+  const fetchPODataAndPopulateGrid = async (poId: string) => {
+    if (!poId) return;
+    const prevState = state;
+    const lines = prevState.PurchaseEntryLinesMap?.[poId] || [];
+    if (lines.length > 0) {
+      // Fetch item data for each unique group first to avoid empty items list
+      const uniqueGroupIds = Array.from(new Set(lines.map((l: any) => l.F_ItemGroupMaster).filter(Boolean)));
+      const groupItemsMap: Record<string, any[]> = {};
+      await Promise.all(
+        uniqueGroupIds.map(async (groupId) => {
+          try {
+            const data = await Fn_FillListData(dispatch, setState, `itemData_${groupId}`, API_URL_ITEMS + "/" + groupId);
+            const extractArray = (d: any) => Array.isArray(d) ? d : (d?.data?.dataList || d?.dataList || d?.data?.response || d?.response || []);
+            groupItemsMap[String(groupId)] = extractArray(data);
+          } catch (e) {
+            console.error("Error fetching items for group in PO load:", e);
+          }
+        })
+      );
+
+      const mappedRows: GridRow[] = lines.map((l: any) => ({
+        ItemCode: l.ItemCode || l.itemCode || l.ItemMaster?.ItemCode || l.F_ItemMaster?.ItemCode || "",
+        F_ItemGroupMaster: l.F_ItemGroupMaster || "",
+        F_ItemMaster: l.F_ItemMaster || "",
+        F_ColorMaster: l.F_ColorMaster || prevState.DefaultColor?.Id || "",
+        F_WarehouseMaster: l.F_WarehouseMaster || prevState.DefaultWarehouse?.Id || "",
+        F_BatchMaster: l.F_BatchMaster || "",
+        Variant: l.Variant || l.Varient || "",
+        Photos: [],
+        Qty: String(l.ApprovedQty || l.OrderedQty || l.Qty || ""),
+        Rate: l.Rate ? String(l.Rate) : "",
+        ItemData: groupItemsMap[String(l.F_ItemGroupMaster)] || null,
+        AvailableQty: 0,
+        F_PurchaseEntryH: poId,
+        F_PurchaseEntryL: l.PurchaseEntryLId || l.Id || 0,
+      }));
+      setGridRows(mappedRows);
+      
+      let newVendorMasterId = prevState.formData.F_VendorMaster;
+      const poHeader = prevState.CreatedPurchaseEntries?.find((p: any) => String(p.Id) === String(poId));
+      if (poHeader && poHeader.F_LedgerMaster) {
+         newVendorMasterId = String(poHeader.F_LedgerMaster);
+      }
+      setState((prev) => ({
+        ...prev,
+        formData: { ...prev.formData, F_VendorMaster: newVendorMasterId, F_PurchaseEntryH: poId }
+      }));
+    } else {
+      alert("No approved lines found for the selected PO.");
+    }
+  };
+
+  const fetchPEDataAndPopulateGrid = async (peId: string) => {
+    if (!peId) return;
+    const prevState = state;
+    const pe = prevState.CreatedPurchaseReturnEntries?.find((p: any) => String(p.Id) === String(peId));
+    if (!pe) return;
+
+    let lines: any[] = [];
+    try {
+      if (pe.PurchaseReturnLDetails) {
+        const parsed = typeof pe.PurchaseReturnLDetails === "string" ? JSON.parse(pe.PurchaseReturnLDetails) : pe.PurchaseReturnLDetails;
+        lines = Array.isArray(parsed) ? parsed : [];
+      }
+    } catch (e) {
+      console.error("Error parsing PurchaseReturnLDetails", e);
+    }
+
+    setTaxOverrides({
+      CGST: pe.TotalCGST !== undefined ? String(pe.TotalCGST) : undefined,
+      SGST: pe.TotalSGST !== undefined ? String(pe.TotalSGST) : undefined,
+      IGST: pe.TotalIGST !== undefined ? String(pe.TotalIGST) : undefined,
+    });
+
+    setState((prev) => ({
+      ...prev,
+      isEditMode: true,
+      isGridEditable: false,
+      id: pe.Id,
+      formData: {
+        ...prev.formData,
+        PONo: pe.EntryNo || "",
+        PODate: pe.EntryDate ? pe.EntryDate.split('T')[0] : "",
+        F_VendorMaster: pe.F_LedgerMaster || "",
+        Remarks: pe.Remarks || "",
+        F_PurchaseReturnH: pe.Id,
+      }
+    }));
+
+    if (lines.length > 0) {
+      const mappedRows: GridRow[] = lines.map((l: any) => {
+        let cleanPhoto = l.DesignPhoto || "";
+        if (cleanPhoto.includes("https://") && cleanPhoto.lastIndexOf("https://") > 0) {
+           cleanPhoto = cleanPhoto.substring(cleanPhoto.lastIndexOf("https://"));
+        } else if (cleanPhoto.includes("http://") && cleanPhoto.lastIndexOf("http://") > 0) {
+           cleanPhoto = cleanPhoto.substring(cleanPhoto.lastIndexOf("http://"));
+        }
+
+        return {
+          ItemCode: l.Barcode || "",
+          F_ItemGroupMaster: String(l.F_CategoryMaster || ""),
+          F_ItemMaster: String(l.F_ItemMaster || ""),
+          F_ItemDesignMaster: String(l.F_ItemDesignMaster || ""),
+          F_ColorMaster: state.DefaultColor?.Id || "",
+          F_WarehouseMaster: state.DefaultWarehouse?.Id || "",
+          F_BatchMaster: "",
+          ItemName: l.ItemName || "",
+          DesignPhoto: cleanPhoto,
+          Variant: l.Variant || l.Varient || "",
+          Photos: cleanPhoto ? [cleanPhoto] : [],
+          Qty: String(l.Qty || ""),
+          Rate: l.Rate ? String(l.Rate) : "",
+          ItemData: [{ Id: l.F_ItemMaster, ItemName: l.ItemName || "Scanned Item" }],
+          AvailableQty: 0,
+          F_PurchaseEntryH: 0,
+          F_PurchaseEntryL: 0,
+        };
+      });
+      setGridRows(mappedRows);
+    } else {
+      setGridRows([{ ItemCode: "", F_ItemGroupMaster: "", F_ItemMaster: "", F_WarehouseMaster: state.DefaultWarehouse?.Id || "", F_BatchMaster: "", Variant: "", Qty: "", Rate: "", Photos: [], ItemData: null }]);
+      alert("No lines found for the selected Purchase Return.");
+    }
+  };
+
+  const loadPurchaseReturnRecord = async (id: number) => {
+    try {
+      setState((prev) => ({ ...prev, isEditMode: true }));
+      const headerData = await Fn_FillListData(dispatch, setState, "headerData", API_URL_EDIT + "/" + id);
+      const lineData = await Fn_FillListData(dispatch, setState, "lineData", API_URL_LINES + "/" + id);
+      const header = Array.isArray(headerData) && headerData.length > 0 ? headerData[0] : null;
+      const lines = Array.isArray(lineData) ? lineData : [];
+
+      if (header) {
+        setState((prev) => ({
+          ...prev,
+          id: id,
+          formData: {
+            PONo: header.PONo || "",
+            PODate: header.PODate ? parseDateFromAPI(header.PODate) : getCurrentDateYYYYMMDD(),
+            F_VendorMaster: header.F_VendorMaster || "",
+            Remarks: header.Remarks || "",
+          },
+        }));
+
+        if (lines.length > 0) {
+          const rowsData = await Promise.all(
+            lines.map(async (line: any) => {
+              const itemData = await Fn_FillListData(dispatch, setState, `itemData_${line.F_ItemGroupMaster}`, API_URL_ITEMS + "/" + line.F_ItemGroupMaster);
+              const extractArray = (data: any) => Array.isArray(data) ? data : (data?.data?.dataList || data?.dataList || data?.data?.response || data?.response || []);
+              return {
+                ItemCode: line.ItemCode || "",
+                F_ItemGroupMaster: line.F_ItemGroupMaster || "",
+                F_ItemMaster: line.F_ItemMaster || "",
+                F_ColorMaster: line.F_ColorMaster || "",
+                F_WarehouseMaster: line.F_WarehouseMaster || "",
+                F_BatchMaster: line.F_BatchMaster || "",
+                Variant: line.Variant || line.Varient || "",
+                Photos: [],
+                Qty: line.Qty || "",
+                Rate: line.Rate || "",
+                ItemData: extractArray(itemData) || [],
+                UnitValue: (line.UnitConversion && parseFloat(line.UnitConversion) > 0) ? parseFloat(line.UnitConversion) : 1,
+              };
+            })
+          );
+          setGridRows(rowsData);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading Purchase Return record:", error);
+    }
+  };
+
+  const handleFormFieldChange = (field: string, value: any) => {
+    setState((prev) => ({ ...prev, formData: { ...prev.formData, [field]: value } }));
+  };
+
+  const addRow = () => {
+    setGridRows((prevRows) => [
+      ...prevRows,
+      { ItemCode: "", F_ItemGroupMaster: "", F_ItemMaster: "", F_ColorMaster: state.DefaultColor?.Id || "", F_WarehouseMaster: state.DefaultWarehouse?.Id || "", F_BatchMaster: "", Variant: "", Photos: [], Qty: "", Rate: "", ItemData: null, AvailableQty: 0, UnitValue: 1 },
+    ]);
+  };
+
+  const handleDeletePE = () => {
+    if (!state.formData.F_PurchaseReturnH) return;
+    if (window.confirm("Are you sure you want to delete this Purchase Return?")) {
+      const DELETE_API_URL = `${API_WEB_URLS.MASTER}/0/token/PurchaseReturnH`;
+      Fn_DeleteData(dispatch, () => {}, Number(state.formData.F_PurchaseReturnH), DELETE_API_URL)
+        .then(() => {
+          alert("Purchase Return deleted successfully.");
+          window.location.reload();
+        })
+        .catch((error: any) => {
+          console.error("Failed to delete Purchase Return:", error);
+          alert("Failed to delete Purchase Return. Please try again.");
+        });
+    }
+  };
+
+  const handleEditPE = () => {
+    setState((prev) => ({ ...prev, isGridEditable: true }));
+  };
+
+  const removeRow = (index: number) => {
+    if (gridRows.length > 1) {
+      setGridRows((prevRows) => prevRows.filter((_, i) => i !== index));
+    }
+  };
+
+  const fetchRate = async (groupId: number | string, itemId: number | string, colorId: number | string, warehouseId: number | string) => {
+    try {
+      const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");
+      const userId = authUser?.uid ?? authUser?.Id ?? "0";
+      const userToken = authUser?.Token ?? authUser?.token ?? "token";
+      const url = `GetRateByItemId/${userId}/${userToken}`;
+      
+      const formData = new FormData();
+      formData.append("F_WarehouseMaster", "0");
+      formData.append("F_ItemGroupMaster", String(groupId || 0));
+      formData.append("F_ItemMaster", String(itemId || 0));
+      formData.append("F_ColorMaster", "0");
+
+      const res = await Fn_GetReport(
+        dispatch,
+        setState,
+        "ignored_rate",
+        url,
+        { arguList: { id: 0, formData } },
+        true
+      );
+
+      console.log("GetRateByItemId via Fn_GetReport response:", res);
+      let rate = 0;
+      
+      // Resolve the list from any potential response wrapper
+      let list: any[] | null = null;
+      if (Array.isArray(res)) {
+        list = res;
+      } else if (res && typeof res === "object") {
+        if (Array.isArray(res.response)) {
+          list = res.response;
+        } else if (res.data && Array.isArray(res.data.response)) {
+          list = res.data.response;
+        } else if (res.data && Array.isArray(res.data.dataList)) {
+          list = res.data.dataList;
+        } else if (Array.isArray(res.dataList)) {
+          list = res.dataList;
+        }
+      }
+
+      if (list && list.length > 0) {
+        const item = list[0];
+        rate = Number(item.Rate1 ?? item.rate1 ?? item.Rate ?? item.rate ?? item.Amount ?? item.amount ?? 0);
+      } else if (res && typeof res === "object") {
+        const resObj = res as any;
+        rate = Number(resObj.Rate1 ?? resObj.rate1 ?? resObj.Rate ?? resObj.rate ?? resObj.Amount ?? resObj.amount ?? resObj.RateValue ?? 0);
+      }
+      return rate;
+    } catch (e) {
+      console.error("Error fetching rate:", e);
+    }
+    return 0;
+  };
+
+  const updateGridRow = async (index: number, field: string, value: any) => {
+    const updatedRows = [...gridRows];
+    updatedRows[index] = { ...updatedRows[index], [field]: value };
+    if (field === "F_ItemGroupMaster") {
+      updatedRows[index].F_ItemMaster = "";
+      updatedRows[index].ItemCode = "";
+      if (value) {
+        const itemData = await Fn_FillListData(dispatch, setState, `itemData_${value}`, API_URL_ITEMS + "/" + value);
+        const extractArray = (data: any) => Array.isArray(data) ? data : (data?.data?.dataList || data?.dataList || data?.data?.response || data?.response || []);
+        updatedRows[index].ItemData = extractArray(itemData) || [];
+      } else {
+        updatedRows[index].ItemData = null;
+      }
+    } else if (field === "F_ItemMaster") {
+      const selectedItem = updatedRows[index].ItemData?.find((item: any) => String(item.Id) === String(value));
+      if (selectedItem) {
+        updatedRows[index].ItemCode = selectedItem.ItemCode || selectedItem.Code || "";
+      }
+    }
+
+    if (field === "F_ItemMaster" || field === "F_ColorMaster" || field === "F_WarehouseMaster") {
+      const row = updatedRows[index];
+      if (row.F_ItemMaster) {
+        const fetchedRate = await fetchRate(
+          row.F_ItemGroupMaster || "0",
+          row.F_ItemMaster || "0",
+          row.F_ColorMaster || state.DefaultColor?.Id || "0",
+          row.F_WarehouseMaster || state.DefaultWarehouse?.Id || "0"
+        );
+        updatedRows[index].Rate = String(fetchedRate || "");
+      }
+    }
+    setGridRows(updatedRows);
+  };
+
+  const handleBarcodeFetch = async (index: number, barcode: string) => {
+    if (!barcode) return;
+
+    const duplicateIndex = gridRows.findIndex((row, rIndex) => rIndex !== index && row.ItemCode === barcode);
+    if (duplicateIndex !== -1) {
+      const updatedRows = [...gridRows];
+      const existingQty = parseFloat(updatedRows[duplicateIndex].Qty) || 0;
+      updatedRows[duplicateIndex].Qty = String(existingQty + 1);
+      
+      updatedRows[index] = { ...updatedRows[index], ItemCode: "" };
+      setGridRows(updatedRows);
+      
+      setTimeout(() => {
+        const barcodeInput = document.querySelector(`input[data-row="${index}"][data-field="ItemCode"]`) as HTMLInputElement;
+        if (barcodeInput) {
+          barcodeInput.focus();
+        }
+      }, 100);
+      return;
+    }
+
+    try {
+      const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");
+      const userId = authUser?.uid ?? authUser?.Id ?? "0";
+      const userToken = authUser?.Token ?? authUser?.token ?? "token";
+      const url = `GetItemDetailByBarcode/${userId}/${userToken}`;
+      const formData = new FormData();
+      formData.append("Barcode", barcode);
+
+      const res = await Fn_GetReport(dispatch, () => {}, "ignored", url, { arguList: { id: 0, formData } }, true);
+      let list: any[] = [];
+      if (Array.isArray(res)) list = res;
+      else if (res && typeof res === "object") {
+        if (Array.isArray(res.response)) list = res.response;
+        else if (res.data && Array.isArray(res.data.response)) list = res.data.response;
+      }
+
+      if (list && list.length > 0) {
+        const item = list[0];
+
+        let designs: any[] = [];
+        try {
+          if (typeof item.DesignDetails === "string") {
+            designs = JSON.parse(item.DesignDetails || "[]");
+          } else if (Array.isArray(item.DesignDetails)) {
+            designs = item.DesignDetails;
+          }
+        } catch (e) {
+          console.error("Error parsing DesignDetails:", e);
+        }
+
+        const matchedDesign = designs.find((d: any) => String(d.Barcode) === String(barcode)) || {};
+
+        const groupId = item.F_CategoryMaster || item.F_ItemGroupMaster || "";
+        const itemId = item.Id || "";
+        const designId = matchedDesign.Id || "";
+        
+        const photos = [];
+        if (matchedDesign.DesignPhoto) photos.push(matchedDesign.DesignPhoto);
+        if (matchedDesign.DesignPhoto2) photos.push(matchedDesign.DesignPhoto2);
+        if (matchedDesign.DesignPhoto3) photos.push(matchedDesign.DesignPhoto3);
+        if (matchedDesign.DesignPhoto4) photos.push(matchedDesign.DesignPhoto4);
+        if (matchedDesign.DesignPhoto5) photos.push(matchedDesign.DesignPhoto5);
+        
+        let unitVal = parseFloat(matchedDesign.UnitConversion);
+        if (isNaN(unitVal) || unitVal === 0) unitVal = 1;
+
+        const updatedRows = [...gridRows];
+        updatedRows[index] = {
+          ...updatedRows[index],
+          ItemCode: matchedDesign.Barcode || barcode,
+          F_ItemGroupMaster: String(groupId),
+          F_ItemMaster: String(itemId),
+          F_ItemDesignMaster: String(designId),
+          ItemName: item.ItemName || "Scanned Item",
+          DesignPhoto: matchedDesign.DesignPhoto || "",
+          Variant: matchedDesign.SizeName || "",
+          Photos: photos,
+          Qty: "1",
+          Rate: "",
+          F_GSTGroupMaster: item.F_GSTGroupMaster || "",
+          ItemData: [{ Id: itemId, ItemName: item.ItemName || "Scanned Item", F_GSTGroupMaster: item.F_GSTGroupMaster }],
+          UnitValue: unitVal
+        };
+        
+        let nextRowIndex = index;
+        if (index === gridRows.length - 1) {
+          updatedRows.push({
+            ItemCode: "",
+            F_ItemGroupMaster: "",
+            F_ItemMaster: "",
+            F_ColorMaster: state.DefaultColor?.Id || "",
+            F_WarehouseMaster: state.DefaultWarehouse?.Id || "",
+            F_BatchMaster: "",
+            Variant: "",
+            Photos: [],
+            Qty: "",
+            Rate: "",
+            ItemData: null,
+            AvailableQty: 0,
+          });
+          nextRowIndex = index + 1;
+        } else {
+          nextRowIndex = index + 1;
+        }
+
+        setGridRows(updatedRows);
+        
+        setTimeout(() => {
+          const barcodeInput = document.querySelector(`input[data-row="${nextRowIndex}"][data-field="ItemCode"]`) as HTMLInputElement;
+          if (barcodeInput) {
+            barcodeInput.focus();
+          }
+        }, 100);
+      }
+    } catch (e) {
+      console.error("Error fetching barcode details:", e);
+    }
+  };
+
+  const openQuickItemModal = (rowIndex: number) => {
+    if (state.isEditMode) return;
+    setQuickItemTargetRow(rowIndex);
+    setQuickItemForm({
+      ItemName: "",
+      ItemCode: gridRows[rowIndex]?.ItemCode || "",
+      F_ItemGroupMaster: gridRows[rowIndex]?.F_ItemGroupMaster || "",
+      F_ColorMaster: gridRows[rowIndex]?.F_ColorMaster || state.DefaultColor?.Id || "",
+      ItemColorApply: false,
+    });
+    setQuickItemModalOpen(true);
+  };
+
+  const closeQuickItemModal = () => {
+    if (quickItemSubmitting) return;
+    setQuickItemModalOpen(false);
+    setQuickItemTargetRow(null);
+  };
+
+  const handleQuickItemSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (quickItemSubmitting) return;
+    const trimmedName = (quickItemForm.ItemName || "").trim();
+    const trimmedCode = (quickItemForm.ItemCode || "").trim();
+    if (!trimmedName || !trimmedCode || !quickItemForm.F_ItemGroupMaster || !quickItemForm.F_ColorMaster) {
+      alert("Please fill all required fields");
+      return;
+    }
+    setQuickItemSubmitting(true);
+    try {
+      const obj = JSON.parse(localStorage.getItem("user") || "{}");
+      const formData = new FormData();
+      formData.append("ItemName", trimmedName);
+      formData.append("ItemCode", trimmedCode);
+      formData.append("F_ItemGroupMaster", quickItemForm.F_ItemGroupMaster);
+      formData.append("F_ColorMaster", quickItemForm.F_ColorMaster);
+      formData.append("ItemColorApply", quickItemForm.ItemColorApply ? "true" : "false");
+      formData.append("UserId", obj?.uid || "0");
+      await Fn_AddEditData(dispatch, setState, { arguList: { id: 0, formData } }, API_ITEM_SAVE, true, "memberid", navigate, "#");
+      const groupItems = await Fn_FillListData(dispatch, setState, `itemData_${quickItemForm.F_ItemGroupMaster}`, API_URL_ITEMS + "/" + quickItemForm.F_ItemGroupMaster);
+      const newItem = groupItems?.find((item: any) => item.ItemCode?.toLowerCase() === trimmedCode.toLowerCase());
+      if (newItem && quickItemTargetRow !== null) {
+        setGridRows((prevRows) => prevRows.map((row, i) => i === quickItemTargetRow ? { ...row, F_ItemMaster: newItem.Id, ItemCode: newItem.ItemCode, ItemData: groupItems } : row));
+      }
+      setQuickItemModalOpen(false);
+    } catch (error) {
+      console.error("Error creating item:", error);
+    } finally {
+      setQuickItemSubmitting(false);
+    }
+  };
+
+  const openVendorModal = () => {
+    if (state.isEditMode) return;
+    setVendorForm({ Name: "", CompanyName: "", Phone: "", Email: "", Address: "" });
+    setVendorModalOpen(true);
+  };
+
+  const closeVendorModal = () => {
+    if (vendorSubmitting) return;
+    setVendorModalOpen(false);
+  };
+
+  const handleVendorSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (vendorSubmitting) return;
+    const companyName = (vendorForm.CompanyName || "").trim();
+    const phone = (vendorForm.Phone || "").trim();
+    const address = (vendorForm.Address || "").trim();
+    if (!companyName || !phone || !address) {
+      alert("Please fill all required fields");
+      return;
+    }
+    setVendorSubmitting(true);
+    try {
+      const obj = JSON.parse(localStorage.getItem("user") || "{}");
+      const formData = new FormData();
+      formData.append("Id", "0");
+      formData.append("Name", companyName);
+      formData.append("Alias", "0");
+      formData.append("F_LedgerGroupMaster", "40");
+      formData.append("Address", address);
+      formData.append("Address1", "0");
+      formData.append("F_CountryMaster", "0");
+      formData.append("F_StateMaster", "0");
+      formData.append("F_CityMaster", "0");
+      formData.append("PinCode", "0");
+      formData.append("PhoneNo", "0");
+      formData.append("MobileNo", phone);
+      formData.append("Email", vendorForm.Email || "0");
+      formData.append("GSTIN", "0");
+      formData.append("PANNo", "0");
+      formData.append("CreditDays", "0");
+      formData.append("CreditLimit", "0");
+      formData.append("Rate", "0");
+      formData.append("F_Type", "0");
+      formData.append("F_CalculationType", "0");
+      formData.append("F_AddLess", "0");
+      formData.append("YesNoActs", "false");
+      formData.append("F_GSTGroupMaster", "0");
+      formData.append("F_TaxPayerType", "0");
+      formData.append("F_LedgerMasterSales", "0");
+      formData.append("F_LedgerMasterPurchase", "0");
+      formData.append("F_YearScheme", "0");
+      formData.append("F_IntCalcMethod", "0");
+      formData.append("BankName", "0");
+      formData.append("BankAccountNo", "0");
+      formData.append("BankIFSCCode", "0");
+      formData.append("ISDalal", "false");
+      formData.append("F_LedgerMasterDalal", "0");
+      formData.append("IsTransport", "false");
+      formData.append("F_TCSonSales", "0");
+      formData.append("UserId", obj?.uid || "0");
+      formData.append("F_CompanyMaster", (() => { try { const a = JSON.parse(localStorage.getItem("authUser")||"{}"); return String(a?.F_CompanyMaster ?? a?.CompanyId ?? a?.F_Company ?? "0"); } catch(e){return "0";} })());
+
+      await Fn_AddEditData(dispatch, setState, { arguList: { id: 0, formData } }, API_VENDOR_SAVE, true, "memberid", navigate, "#");
+      const vendors = await Fn_FillListData(dispatch, setState, "VendorMaster", API_URL_VENDOR);
+      const newVendor = vendors?.find((v: any) => (v.CompanyName || v.Name || v.LedgerName)?.toLowerCase() === companyName.toLowerCase());
+      if (newVendor) {
+        setState((prev) => ({ ...prev, formData: { ...prev.formData, F_VendorMaster: newVendor.Id }, VendorMaster: vendors || [] }));
+      }
+      setVendorModalOpen(false);
+    } catch (error) {
+      console.error("Error creating vendor:", error);
+    } finally {
+      setVendorSubmitting(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!state.formData.F_VendorMaster) { alert("Please select a Vendor"); return; }
+    const validGridRows = gridRows.filter(row => row.ItemCode || row.F_ItemMaster);
+    if (validGridRows.length === 0) { alert("Please add at least one valid item"); return; }
+    for (let i = 0; i < validGridRows.length; i++) {
+      const row = validGridRows[i];
+      if (!row.F_ItemMaster || !row.Qty || parseFloat(row.Qty) <= 0 || !row.Rate || parseFloat(row.Rate) < 0) {
+        alert(`Row ${i + 1}: Please fill all required fields correctly (Item, Quantity, Rate)`);
+        return;
+      }
+    }
+    try {
+      const obj = JSON.parse(localStorage.getItem("user") || "{}");
+      
+      let totalCGST = 0;
+      let totalSGST = 0;
+      let totalIGST = 0;
+      const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
+      const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+
+      const jsonDataArray = validGridRows.map((row) => {
+        const qty = Number(row.Qty) || 0;
+        const rate = Number(row.Rate) || 0;
+        const amount = qty * rate;
+
+        let itemCGST = 0;
+        let itemSGST = 0;
+        let itemIGST = 0;
+
+        const itemObj = row.ItemData?.find((i: any) => String(i.Id) === String(row.F_ItemMaster)) ||
+                        state.ItemMaster?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
+        const gstGroupId = itemObj?.F_GSTGroupMaster || itemObj?.GSTGroupMasterId || itemObj?.GSTGroupId || row.F_GSTGroupMaster;
+        const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
+
+        if (gstGroup) {
+          if (isInState) {
+            itemCGST = amount * (parseFloat(gstGroup.CGSTPercent) / 100);
+            itemSGST = amount * (parseFloat(gstGroup.SGSTPercent) / 100);
+          } else {
+            itemIGST = amount * (parseFloat(gstGroup.IGSTPercent) / 100);
+          }
+        }
+        
+        totalCGST += itemCGST;
+        totalSGST += itemSGST;
+        totalIGST += itemIGST;
+
+        return {
+          F_ItemDesignMaster: Number(row.F_ItemDesignMaster) || 0,
+          F_CategoryMaster: Number(row.F_ItemGroupMaster) || 0,
+          F_ItemMaster: Number(row.F_ItemMaster) || 0,
+          Barcode: row.ItemCode || "",
+          ItemName: row.ItemName || row.ItemData?.[0]?.ItemName || "",
+          DesignPhoto: row.DesignPhoto || row.Photos?.[0] || "",
+          Qty: qty,
+          Rate: rate,
+          Amount: amount,
+          CGST: Number(itemCGST.toFixed(2)),
+          SGST: Number(itemSGST.toFixed(2)),
+          IGST: Number(itemIGST.toFixed(2))
+        };
+      });
+
+      const finalCGST = Math.round(taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST);
+      const finalSGST = Math.round(taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST);
+      const finalIGST = Math.round(taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST);
+      const finalTotalTax = finalCGST + finalSGST + finalIGST;
+
+      const headerFormData = new FormData();
+      headerFormData.append("EntryDate", state.formData.PODate);
+      headerFormData.append("EntryNo", state.formData.PONo || "");
+      headerFormData.append("F_LedgerMaster", state.formData.F_VendorMaster);
+      headerFormData.append("F_StatusMaster", "0");
+      headerFormData.append("Remarks", state.formData.Remarks || "");
+      headerFormData.append("UserId", obj?.uid || "0");
+      headerFormData.append("TotalCGST", finalCGST.toFixed(2));
+      headerFormData.append("TotalSGST", finalSGST.toFixed(2));
+      headerFormData.append("TotalIGST", finalIGST.toFixed(2));
+      headerFormData.append("TotalTax", finalTotalTax.toFixed(2));
+      headerFormData.append("JsonData", JSON.stringify(jsonDataArray));
+      headerFormData.append("F_CompanyMaster", "0");
+      await Fn_AddEditData(dispatch, setState, { arguList: { id: state.id, formData: headerFormData } }, API_URL_SAVE, true, "memberid", navigate, "#");
+      alert("Purchase Return saved successfully");
+      window.location.reload();
+    } catch (error) {
+      console.error("Error saving Purchase Return:", error);
+    }
+  };
+
+  const handlePrint = () => {
+    const oldTitle = document.title;
+    document.title = "";
+    window.print();
+    document.title = oldTitle;
+  };
+
+  const PurchaseReturnCompactStyles = `
+    @media (max-width: 991.98px) {
+      .purchase-return-page .container-fluid { padding: 0.4rem !important; }
+      .purchase-return-page .card-body { padding: 0.4rem !important; }
+      .purchase-return-page .card-footer { padding: 0.35rem 0.4rem !important; }
+      .purchase-return-page .form-label { font-size: 0.75rem; margin-bottom: 0.2rem; }
+      .purchase-return-page .form-control { font-size: 0.8rem; height: 26px; padding: 0.2rem 0.35rem; }
+      .purchase-return-page .btn { font-size: 0.8rem; padding: 0.22rem 0.4rem; }
+    }
+    @media (max-width: 767.98px) {
+      .purchase-return-page .container-fluid { padding: 0.25rem !important; }
+      .purchase-return-page .card-body { padding: 0.3rem !important; }
+      .purchase-return-page .card-footer { padding: 0.25rem 0.3rem !important; }
+      .purchase-return-page .form-label { font-size: 0.7rem; margin-bottom: 0.15rem; }
+      .purchase-return-page .form-control { font-size: 0.75rem; height: 24px; padding: 0.15rem 0.28rem; }
+      .purchase-return-page .btn { font-size: 0.75rem; padding: 0.18rem 0.35rem; }
+    }
+    .purchase-return-print-layout { display: none; }
+    @media print {
+      @page { margin: 0; }
+      body { margin: 0.2cm; line-height: 1.1; }
+      body * { visibility: hidden; }
+      .purchase-return-print-layout, .purchase-return-print-layout * { visibility: visible; }
+      .purchase-return-print-layout { 
+        display: block !important; 
+        position: absolute; 
+        left: 0; top: 0; 
+        width: 100%; 
+        padding: 5px; 
+        background: white; 
+        color: black; 
+        font-family: Arial, sans-serif; 
+      }
+      .purchase-return-print-layout .print-header { text-align: center; margin-bottom: 5px; border-bottom: 1px solid #000; padding-bottom: 2px; }
+      .purchase-return-print-layout .firm-name { font-size: 18px; font-weight: bold; text-transform: uppercase; margin-bottom: 0; }
+      .purchase-return-print-layout .print-title { font-size: 14px; font-weight: bold; margin-top: 0; }
+      .purchase-return-print-layout .print-details { margin-bottom: 5px; }
+      .purchase-return-print-layout .detail-row { display: flex; justify-content: space-between; margin-bottom: 1px; font-size: 11px; }
+      .purchase-return-print-layout table { width: 100%; border-collapse: collapse; margin-top: 2px; }
+      .purchase-return-print-layout th, .purchase-return-print-layout td { border: 1px solid #000; padding: 2px 4px; text-align: left; font-size: 11px; }
+      .purchase-return-print-layout th { background: #eee !important; -webkit-print-color-adjust: exact; }
+      .purchase-return-print-layout .text-right { text-align: right; }
+      .purchase-return-print-layout .total-row { font-weight: bold; }
+    }
+  `;
 
   return (
-    <div className="page-body">
+    <div className="page-body purchase-return-page" style={{ maxWidth: "100%", overflowX: "hidden" }}>
+      <style>{PurchaseReturnCompactStyles}</style>
       <Breadcrumbs mainTitle="Purchase Return" parent="Inventory" />
-      <Container fluid>
+      <Container fluid className="px-2 px-sm-3">
         <Row>
           <Col xs="12">
             <Card>
-              <CardHeaderCommon title="Purchase Return Form" tagClass="card-title mb-0" />
-              <CardBody>
-                <Row className="mb-3">
-                  <Col md="3" className="mb-3">
-                    <label className="form-label">Select Purchase Return</label>
-                    <select
-                      className="form-control"
-                      name="F_PurchaseReturn"
-                      value={state.formData.F_PurchaseReturn}
-                      onChange={(e) => {
-                        const id = e.target.value;
-                        setState((prev) => ({
-                          ...prev,
-                          formData: {
-                            ...prev.formData,
-                            F_PurchaseReturn: id,
-                          },
-                        }));
-                        handleCreatedReturnChange(id);
-                      }}
-                    >
-                      <option value="">Select Purchase Return</option>
-                      {state.CreatedPurchaseReturns?.map((ret) => (
-                        <option key={ret.Id} value={String(ret.Id)}>
-                          {ret.ReturnNo || ret.Name || ret.Id}
-                        </option>
+              <CardHeaderCommon title={`${state.isEditMode ? "Edit" : "Add"} Purchase Return`} tagClass="card-title mb-0" />
+              <CardBody className="p-2 p-sm-3">
+                <Row className="g-2 g-sm-3">
+                  <Col md="2">
+                    <label className="form-label">Created Purchase Return</label>
+                    <select className="form-control" value={state.formData.F_PurchaseReturnH || ""} onChange={(e) => { 
+                      const val = e.target.value;
+                      handleFormFieldChange("F_PurchaseReturnH", val); 
+                      if (!val) window.location.reload();
+                      else fetchPEDataAndPopulateGrid(val); 
+                    }}>
+                      <option value="">Select PE</option>
+                      {state.CreatedPurchaseReturnEntries?.map((pe: any) => (
+                        <option key={pe.Id} value={pe.Id}>{pe.EntryNo || pe.Id}</option>
                       ))}
                     </select>
                   </Col>
 
-                  <Col md="3" className="mb-3">
-                    <label className="form-label">Return No <span className="text-danger">*</span></label>
-                    <input
-                      ref={returnNoRef}
-                      className="form-control"
-                      type="text"
-                      value={state.formData.ReturnNo}
-                      disabled={state.isEditMode}
-                      onKeyDown={(e) => handleFormKeyDown(e, "ReturnNo")}
-                      onChange={(e) =>
-                        setState((prev) => ({
-                          ...prev,
-                          formData: { ...prev.formData, ReturnNo: e.target.value },
-                        }))
-                      }
-                      placeholder="Auto-generated or enter"
-                    />
+                  <Col md="2">
+                    <label className="form-label">Entry No</label>
+                    <Input type="text" value={state.formData.PONo} onChange={(e) => handleFormFieldChange("PONo", e.target.value)} disabled={state.isEditMode} placeholder="Auto-generated" />
                   </Col>
-
-                  <Col md="3" className="mb-3">
-                    <label className="form-label">Return Date <span className="text-danger">*</span></label>
-                    <input
-                      ref={returnDateRef}
-                      type="date"
-                      className="form-control"
-                      value={state.formData.ReturnDate}
-                      onKeyDown={(e) => handleFormKeyDown(e, "ReturnDate")}
-                      onChange={(e) =>
-                        setState((prev) => ({
-                          ...prev,
-                          formData: { ...prev.formData, ReturnDate: e.target.value },
-                        }))
-                      }
-                      disabled={state.isEditMode}
-                    />
+                  <Col md="2">
+                    <label className="form-label">Entry Date</label>
+                    <DateInput name="poDate" value={state.formData.PODate} onChange={(val: string) => handleFormFieldChange("PODate", val)} />
                   </Col>
-
-                  <Col md="3" className="mb-3">
-                    <label className="form-label">Party <span className="text-danger">*</span></label>
-                    <select
-                      ref={vendorRef}
-                      className="form-control"
-                      value={state.formData.F_VendorMaster}
-                      onKeyDown={(e) => handleFormKeyDown(e, "F_VendorMaster")}
-                      onChange={(e) =>
-                        setState((prev) => ({
-                          ...prev,
-                          formData: { ...prev.formData, F_VendorMaster: e.target.value },
-                        }))
-                      }
-                    >
-                      <option value="">Select Party</option>
-                      {state.VendorMaster?.map((vendor) => (
-                        <option key={vendor.Id} value={vendor.Id}>
-                          {vendor.Name}
-                          {vendor.CityName ? ` - ${vendor.CityName}` : ""}
-                        </option>
+                  <Col md="2">
+                    <div className="d-flex justify-content-between align-items-center">
+                      <label className="form-label">Vendor / Party</label>
+                      <Button color="link" size="sm" className="p-0 text-decoration-none" onClick={openVendorModal} tabIndex={-1}>+ New</Button>
+                    </div>
+                    <select className="form-control" value={state.formData.F_VendorMaster} onChange={(e) => handleFormFieldChange("F_VendorMaster", e.target.value)} disabled={!state.isGridEditable}>
+                      <option value="">Select Vendor</option>
+                      {state.VendorMaster?.map((v: any) => (
+                        <option key={v.Id} value={v.Id}>{v.CompanyName || v.Name || v.LedgerName}</option>
                       ))}
                     </select>
                   </Col>
-                </Row>
-
-                <Row className="mb-3">
-                  <Col md="3" className="mb-3">
-                    <label className="form-label">Return Type</label>
-                    <select
-                      ref={returnTypeRef}
-                      className="form-control"
-                      value={state.formData.ReturnType}
-                      onKeyDown={(e) => handleFormKeyDown(e, "ReturnType")}
-                      onChange={(e) => handleReturnTypeChange(e.target.value)}
-                    >
-                      {RETURN_CONDITIONS.map((condition) => (
-                        <option key={condition} value={condition}>
-                          {condition}
-                        </option>
-                      ))}
-                    </select>
-                  </Col>
-
-                  <Col md="9" className="mb-3">
+                  <Col md="2">
                     <label className="form-label">Remarks</label>
-                    <input
-                      ref={remarksRef}
-                      className="form-control"
-                      value={state.formData.Remarks}
-                      onKeyDown={(e) => handleFormKeyDown(e, "Remarks")}
-                      onChange={(e) =>
-                        setState((prev) => ({
-                          ...prev,
-                          formData: { ...prev.formData, Remarks: e.target.value },
-                        }))
-                      }
-                      placeholder="Enter remarks"
+                    <Input type="text" value={state.formData.Remarks} onChange={(e) => handleFormFieldChange("Remarks", e.target.value)} placeholder="Enter remarks" />
+                  </Col>
+                </Row>
+                <Row className="mt-3">
+                  <Col xs="12" className="overflow-auto">
+                    <GridSystemPurchaseReturn
+                      gridRows={gridRows}
+                      itemGroupMaster={state.ItemGroupMaster}
+                      colorMaster={state.ColorMaster}
+                      warehouseMaster={state.WarehouseMaster}
+                      batchMaster={state.BatchMaster}
+                      isBatchAllowed={state.IsBatchAllowed}
+                      onAddRow={addRow}
+                      onRemoveRow={removeRow}
+                      onUpdateRow={updateGridRow}
+                      disabled={!state.isGridEditable}
+                      defaultColor={state.DefaultColor}
+                      itemColorApplyMap={state.itemColorApplyMap}
+                      onQuickAddItem={openQuickItemModal}
+                      onBarcodeFetch={handleBarcodeFetch}
                     />
                   </Col>
                 </Row>
-              </CardBody>
-            </Card>
-
-            <Card>
-              <CardHeaderCommon title="Purchase Return Items" tagClass="card-title mb-0" />
-              <CardBody>
-                <GridSystemPurchaseReturn
-                  gridRows={gridRows}
-                  itemGroupMaster={state.ItemGroupMaster}
-                  colorMaster={state.ColorMaster}
-                  onAddRow={addRow}
-                  onRemoveRow={removeRow}
-                  onUpdateRow={updateGridRow}
-                  disabled={state.isEditMode}
-                  defaultColor={state.DefaultColor}
-                  itemColorApplyMap={state.itemColorApplyMap}
-                />
                 
-                <Row className="mt-3">
-                  <Col lg="12" className="text-end">
-                    <strong>Total Quantity: {gridRows.reduce((sum, row) => sum + (parseInt(row.Qty, 10) || 0), 0)}</strong>
+                {/* Tax Summary Section */}
+                <Row className="mt-4">
+                  <Col md={{ size: 4, offset: 8 }}>
+                    {(() => {
+                      let totalCGST = 0;
+                      let totalSGST = 0;
+                      let totalIGST = 0;
+
+                      const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
+                      const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+
+                      gridRows.forEach((row) => {
+                        const qty = parseFloat(row.Qty) || 0;
+                        const rate = parseFloat(row.Rate) || 0;
+                        const amount = qty * rate;
+
+                        const itemObj = row.ItemData?.find((i: any) => String(i.Id) === String(row.F_ItemMaster)) ||
+                                        state.ItemMaster?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
+                                        
+                        const gstGroupId = itemObj?.F_GSTGroupMaster || itemObj?.GSTGroupMasterId || itemObj?.GSTGroupId || row.F_GSTGroupMaster;
+                        const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
+                        
+                        if (gstGroup) {
+                          if (isInState) {
+                            totalCGST += amount * (parseFloat(gstGroup.CGSTPercent) / 100);
+                            totalSGST += amount * (parseFloat(gstGroup.SGSTPercent) / 100);
+                          } else {
+                            totalIGST += amount * (parseFloat(gstGroup.IGSTPercent) / 100);
+                          }
+                        }
+                      });
+
+                      const finalCGST = taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST;
+                      const finalSGST = taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST;
+                      const finalIGST = taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST;
+
+                      const totalTax = finalCGST + finalSGST + finalIGST;
+                      const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
+                      const grandTotal = subTotal + totalTax;
+
+                      return (
+                        <div className="table-responsive">
+                          <table className="table table-bordered table-sm mb-0 align-middle">
+                            <tbody>
+                              <tr>
+                                <th className="text-end w-50">Sub Total:</th>
+                                <td className="text-end fw-bold">{subTotal.toFixed(2)}</td>
+                              </tr>
+                              {isInState ? (
+                                <>
+                                  <tr>
+                                    <th className="text-end">Total CGST:</th>
+                                    <td className="text-end">
+                                      <Input 
+                                        type="number" 
+                                        bsSize="sm" 
+                                        className="text-end m-0 p-1" 
+                                        value={taxOverrides.CGST !== undefined ? taxOverrides.CGST : totalCGST.toFixed(2)} 
+                                        onChange={(e) => setTaxOverrides(prev => ({ ...prev, CGST: e.target.value }))} 
+                                      />
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <th className="text-end">Total SGST:</th>
+                                    <td className="text-end">
+                                      <Input 
+                                        type="number" 
+                                        bsSize="sm" 
+                                        className="text-end m-0 p-1" 
+                                        value={taxOverrides.SGST !== undefined ? taxOverrides.SGST : totalSGST.toFixed(2)} 
+                                        onChange={(e) => setTaxOverrides(prev => ({ ...prev, SGST: e.target.value }))} 
+                                      />
+                                    </td>
+                                  </tr>
+                                </>
+                              ) : (
+                                <tr>
+                                  <th className="text-end">Total IGST:</th>
+                                  <td className="text-end">
+                                    <Input 
+                                      type="number" 
+                                      bsSize="sm" 
+                                      className="text-end m-0 p-1" 
+                                      value={taxOverrides.IGST !== undefined ? taxOverrides.IGST : totalIGST.toFixed(2)} 
+                                      onChange={(e) => setTaxOverrides(prev => ({ ...prev, IGST: e.target.value }))} 
+                                    />
+                                  </td>
+                                </tr>
+                              )}
+                              <tr>
+                                <th className="text-end text-danger">Total Tax:</th>
+                                <td className="text-end text-danger fw-bold">{totalTax.toFixed(2)}</td>
+                              </tr>
+                              <tr>
+                                <th className="text-end text-success fs-5">Grand Total:</th>
+                                <td className="text-end text-success fw-bold fs-5">{grandTotal.toFixed(2)}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()}
                   </Col>
                 </Row>
               </CardBody>
-            </Card>
-
-            <Card>
-              <CardBody className="py-2">
-                <div className="d-flex justify-content-end gap-2 flex-wrap">
-                  {state.isEditMode && (
-                    <Btn
-                      type="button"
-                      color="warning"
-                      onClick={() =>
-                        setState((prev) => ({
-                          ...prev,
-                          isEditMode: false,
-                        }))
-                      }
-                      className="me-2"
-                    >
-                      <i className="fa fa-edit me-1"></i> Edit
-                    </Btn>
-                  )}
-
-                  {state.isEditMode && (
-                    <Btn
-                      type="button"
-                      color="danger"
-                      onClick={handleDelete}
-                      className="me-2"
-                    >
-                      <i className="fa fa-trash me-1"></i> Delete
-                    </Btn>
-                  )}
-
-                  <Btn
-                    type="submit"
-                    color="primary"
-                    onClick={handleSubmit}
-                    className="me-2"
-                  >
-                    <i className="fa fa-save me-1"></i> Save
-                  </Btn>
-
+              <CardFooter className="d-flex flex-row flex-nowrap gap-2 justify-content-end p-2 p-sm-3">
+                {state.isEditMode && !state.isGridEditable && (
                   <Btn
                     type="button"
-                    color="secondary"
-                    onClick={handleReset}
-                    className="me-2"
+                    color="warning"
+                    onClick={handleEditPE}
                   >
-                    <i className="fa fa-refresh me-1"></i> Reset
+                    <i className="fa fa-edit me-1"></i> Edit
                   </Btn>
-
-                  <Btn
-                    type="button"
-                    color="info"
-                    onClick={handlePrint}
-                    className="me-2"
-                  >
-                    <i className="fa fa-print me-1"></i> Print
+                )}
+                {state.isEditMode && !state.isGridEditable && (
+                  <Btn type="button" color="danger" onClick={handleDeletePE}>
+                    <i className="fa fa-trash me-1"></i> Delete
                   </Btn>
-
-                  <Btn
-                    type="button"
-                    color="light"
-                    onClick={handleCancel}
-                  >
-                    <i className="fa fa-times me-1"></i> Cancel
-                  </Btn>
-                </div>
-              </CardBody>
+                )}
+                <button ref={saveButtonRef} type="button" className="btn btn-primary m-0" onClick={handleSave} disabled={!state.isGridEditable}>
+                  <i className="bx bx-save me-2"></i>Save
+                </button>
+                <Btn color="success" type="button" className="m-0" onClick={handlePrint}>
+                  <i className="bx bx-printer me-2"></i>Print
+                </Btn>
+                <Btn color="secondary" type="button" className="m-0" onClick={() => navigate(-1)}>Cancel</Btn>
+              </CardFooter>
             </Card>
           </Col>
         </Row>
       </Container>
+
+      <Modal isOpen={quickItemModalOpen} toggle={closeQuickItemModal} size="lg">
+        <ModalHeader toggle={closeQuickItemModal}>Add New Item</ModalHeader>
+        <ModalBody>
+          <Form>
+            <FormGroup><Label>Item Name *</Label><Input type="text" value={quickItemForm.ItemName} onChange={(e) => setQuickItemForm({ ...quickItemForm, ItemName: e.target.value })} /></FormGroup>
+            <FormGroup><Label>Item Code *</Label><Input type="text" value={quickItemForm.ItemCode} onChange={(e) => setQuickItemForm({ ...quickItemForm, ItemCode: e.target.value })} /></FormGroup>
+            <FormGroup><Label>Item Group *</Label><select className="form-control" value={quickItemForm.F_ItemGroupMaster} onChange={(e) => setQuickItemForm({ ...quickItemForm, F_ItemGroupMaster: e.target.value })}><option value="">Select Group</option>{state.ItemGroupMaster?.map((g: any) => (<option key={g.Id} value={g.Id}>{g.Name}</option>))}</select></FormGroup>
+            <FormGroup><Label>Color *</Label><select className="form-control" value={quickItemForm.F_ColorMaster} onChange={(e) => setQuickItemForm({ ...quickItemForm, F_ColorMaster: e.target.value })}><option value="">Select Color</option>{state.ColorMaster?.map((c: any) => (<option key={c.Id} value={c.Id}>{c.Name}</option>))}</select></FormGroup>
+          </Form>
+        </ModalBody>
+        <ModalFooter><Button color="primary" onClick={handleQuickItemSubmit} disabled={quickItemSubmitting}>Save</Button><Button color="secondary" onClick={closeQuickItemModal}>Cancel</Button></ModalFooter>
+      </Modal>
+
+      <Modal isOpen={vendorModalOpen} toggle={closeVendorModal} size="lg">
+        <ModalHeader toggle={closeVendorModal}>Add New Vendor</ModalHeader>
+        <ModalBody>
+          <Form>
+            <FormGroup><Label>Vendor Name *</Label><Input type="text" value={vendorForm.CompanyName} onChange={(e) => setVendorForm({ ...vendorForm, CompanyName: e.target.value })} /></FormGroup>
+            <FormGroup><Label>Phone *</Label><Input type="tel" value={vendorForm.Phone} onChange={(e) => setVendorForm({ ...vendorForm, Phone: e.target.value })} /></FormGroup>
+            <FormGroup><Label>Email</Label><Input type="email" value={vendorForm.Email} onChange={(e) => setVendorForm({ ...vendorForm, Email: e.target.value })} /></FormGroup>
+            <FormGroup><Label>Address *</Label><Input type="textarea" value={vendorForm.Address} onChange={(e) => setVendorForm({ ...vendorForm, Address: e.target.value })} rows="2" /></FormGroup>
+          </Form>
+        </ModalBody>
+        <ModalFooter><Button color="primary" onClick={handleVendorSubmit} disabled={vendorSubmitting}>Save</Button><Button color="secondary" onClick={closeVendorModal}>Cancel</Button></ModalFooter>
+      </Modal>
+
+      <div className="purchase-return-print-layout">
+        <div className="print-header">
+          <div className="firm-name">{state.GlobalOptions[0]?.FirmName || "FIRM NAME"}</div>
+          <div style={{ fontSize: "12px", marginTop: "4px", color: "#555", fontWeight: "normal" }}>
+            {[
+              state.GlobalOptions[0]?.FirmAddress,
+              state.GlobalOptions[0]?.CityName || state.GlobalOptions[0]?.City || state.CityMaster?.find(c => String(c.Id) === String(state.GlobalOptions[0]?.F_CityMaster))?.Name,
+              state.GlobalOptions[0]?.StateName || state.GlobalOptions[0]?.State || state.GlobalOptions[0]?.StateMasterName || state.StateMaster?.find(s => String(s.Id) === String(state.GlobalOptions[0]?.F_StateMaster))?.StateName
+            ].filter(Boolean).join(", ")}
+          </div>
+          <div className="print-title">PURCHASE RETURN INVOICE</div>
+        </div>
+        <div className="print-details">
+          <div className="detail-row">
+            <div><strong>Purchase Return Invoice No.:</strong> {state.formData.PONo || "N/A"}</div>
+            <div><strong>Date:</strong> {state.formData.PODate || "N/A"}</div>
+          </div>
+          <div className="detail-row">
+            <div>
+              <strong>Vendor:</strong>{" "}
+              {(() => {
+                const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
+                return vendor ? (vendor.CompanyName || vendor.Name || vendor.LedgerName) : "N/A";
+              })()}
+            </div>
+          </div>
+          {state.formData.Remarks && <div className="detail-row"><div><strong>Remarks:</strong> {state.formData.Remarks}</div></div>}
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Barcode</th>
+              <th>Category</th>
+              <th>Item Name</th>
+              <th>Varient</th>
+              <th className="text-right">Qty</th>
+              <th className="text-right">Rate</th>
+              <th className="text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {gridRows.map((row, index) => {
+              const qty = parseFloat(row.Qty) || 0;
+              const rate = parseFloat(row.Rate) || 0;
+              
+              const groupObj = state.ItemGroupMaster?.find((g: any) => String(g.Id) === String(row.F_ItemGroupMaster));
+              const groupName = groupObj ? (groupObj.Name || groupObj.GroupName) : "N/A";
+              
+              const itemObj = row.ItemData?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
+              const stateItemObj = state.ItemMaster?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
+              const itemName = itemObj?.ItemName || itemObj?.Name || stateItemObj?.ItemName || stateItemObj?.Name || row.ItemCode || "N/A";
+              
+              const colorName = state.ColorMaster?.find((c: any) => String(c.Id) === String(row.F_ColorMaster))?.Name || "N/A";
+              const warehouseName = state.WarehouseMaster?.find((w: any) => String(w.Id) === String(row.F_WarehouseMaster))?.Name || "N/A";
+              
+              return (
+                <tr key={index}>
+                  <td>{index + 1}</td>
+                  <td>{row.ItemCode || "N/A"}</td>
+                  <td>{groupName}</td>
+                  <td>{itemName}</td>
+                  <td>{row.Variant || "N/A"}</td>
+                  <td className="text-right">{qty}</td>
+                  <td className="text-right">{rate.toFixed(2)}</td>
+                  <td className="text-right">{(qty * rate).toFixed(2)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            {(() => {
+              let totalCGST = 0;
+              let totalSGST = 0;
+              let totalIGST = 0;
+              const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
+              const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+
+              gridRows.forEach((row) => {
+                const qty = parseFloat(row.Qty) || 0;
+                const rate = parseFloat(row.Rate) || 0;
+                const amount = qty * rate;
+                const itemObj = row.ItemData?.find((i: any) => String(i.Id) === String(row.F_ItemMaster)) ||
+                                state.ItemMaster?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
+                const gstGroupId = itemObj?.F_GSTGroupMaster || itemObj?.GSTGroupMasterId || itemObj?.GSTGroupId || row.F_GSTGroupMaster;
+                const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
+                
+                if (gstGroup) {
+                  if (isInState) {
+                    totalCGST += amount * (parseFloat(gstGroup.CGSTPercent) / 100);
+                    totalSGST += amount * (parseFloat(gstGroup.SGSTPercent) / 100);
+                  } else {
+                    totalIGST += amount * (parseFloat(gstGroup.IGSTPercent) / 100);
+                  }
+                }
+              });
+
+              const finalCGST = Math.round(taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST);
+              const finalSGST = Math.round(taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST);
+              const finalIGST = Math.round(taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST);
+
+              const totalTax = finalCGST + finalSGST + finalIGST;
+              const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
+              const grandTotal = subTotal + totalTax;
+
+              return (
+                <>
+                  <tr className="total-row">
+                    <td colSpan={5} className="text-right">Total Qty:</td>
+                    <td className="text-right">{gridRows.reduce((sum, row) => sum + (parseFloat(row.Qty) || 0), 0)}</td>
+                    <td className="text-right">Sub Total:</td>
+                    <td className="text-right">{subTotal.toFixed(2)}</td>
+                  </tr>
+                  {isInState ? (
+                    <>
+                      <tr className="total-row">
+                        <td colSpan={6}></td>
+                        <td className="text-right">Total CGST:</td>
+                        <td className="text-right">{finalCGST.toFixed(2)}</td>
+                      </tr>
+                      <tr className="total-row">
+                        <td colSpan={6}></td>
+                        <td className="text-right">Total SGST:</td>
+                        <td className="text-right">{finalSGST.toFixed(2)}</td>
+                      </tr>
+                    </>
+                  ) : (
+                    <tr className="total-row">
+                      <td colSpan={6}></td>
+                      <td className="text-right">Total IGST:</td>
+                      <td className="text-right">{finalIGST.toFixed(2)}</td>
+                    </tr>
+                  )}
+                  <tr className="total-row">
+                    <td colSpan={6}></td>
+                    <td className="text-right">Total Tax:</td>
+                    <td className="text-right">{totalTax.toFixed(2)}</td>
+                  </tr>
+                  <tr className="total-row" style={{fontSize: '1.2em', fontWeight: 'bold'}}>
+                    <td colSpan={6}></td>
+                    <td className="text-right">Grand Total:</td>
+                    <td className="text-right">{grandTotal.toFixed(2)}</td>
+                  </tr>
+                </>
+              );
+            })()}
+          </tfoot>
+        </table>
+      </div>
     </div>
   );
-};
+}
 
 export default PurchaseReturn;
+

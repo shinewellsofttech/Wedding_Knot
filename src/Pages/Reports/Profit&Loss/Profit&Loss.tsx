@@ -216,113 +216,115 @@ const ProfitAndLoss: React.FC = () => {
                 <h5 className="text-center fw-bold mb-2">Trading And P/L Account</h5>
                 <p className="text-center text-muted mb-3">As On {formatDateForDisplay(toDate)}</p>
 
-                {isLoading ? (
-                  <div className="text-center p-4">
-                    <div className="spinner-border" role="status">
-                      <span className="visually-hidden">Loading...</span>
-                    </div>
-                    <p className="mt-2">Loading Profit & Loss data...</p>
-                  </div>
-                ) : (
-                  <div className="table-responsive">
-                    <Table bordered className="mb-0 profit-loss-table">
-                      <thead className="table-light">
+                <div className="table-responsive">
+                  <Table bordered className="mb-0 profit-loss-table">
+                    <thead className="table-light">
+                      <tr>
+                        <th className="text-center" style={{ width: "60px" }}>SNo</th>
+                        <th>Dr Particular</th>
+                        <th className="text-end" style={{ width: "140px" }}>Dr Amount</th>
+                        <th>Cr Particular</th>
+                        <th className="text-end" style={{ width: "140px" }}>Cr Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {isLoading ? (
                         <tr>
-                          <th className="text-center" style={{ width: "60px" }}>SNo</th>
-                          <th>Dr Particular</th>
-                          <th className="text-end" style={{ width: "140px" }}>Dr Amount</th>
-                          <th>Cr Particular</th>
-                          <th className="text-end" style={{ width: "140px" }}>Cr Amount</th>
+                          <td colSpan={5} className="text-center p-4">
+                            <div className="spinner-border" role="status">
+                              <span className="visually-hidden">Loading...</span>
+                            </div>
+                            <p className="mt-2 mb-0">Loading Profit & Loss data...</p>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
+                      ) : (
                         <>
-                        {tradingRows.length > 0 && (
-                          <>
-                            <tr className="table-light fw-bold">
-                              <td colSpan={5}>Trading Account</td>
+                          {tradingRows.length > 0 && (
+                            <>
+                              <tr className="table-light fw-bold">
+                                <td colSpan={5}>Trading Account</td>
+                              </tr>
+                              {tradingRows.map((row, idx) => {
+                                const drillDr = canDrillGroup(row.drParticular);
+                                const drillCr = canDrillGroup(row.crParticular);
+                                return (
+                                  <tr key={`t-${idx}`}>
+                                    <td className="text-center">{row.sno}</td>
+                                    <td
+                                      onDoubleClick={() => drillDr && navigate(`${process.env.PUBLIC_URL}/groupLedgerSummary`, { state: { ledgerGroupName: (row.drParticular || "").trim(), fromDate, toDate } })}
+                                      style={{ cursor: drillDr ? "pointer" : "default" }}
+                                      title={drillDr ? "Double-click for Group Ledger Summary" : undefined}
+                                    >
+                                      {row.drParticular || ""}
+                                    </td>
+                                    <td className="text-end">{row.drAmount || ""}</td>
+                                    <td
+                                      onDoubleClick={() => drillCr && navigate(`${process.env.PUBLIC_URL}/groupLedgerSummary`, { state: { ledgerGroupName: (row.crParticular || "").trim(), fromDate, toDate } })}
+                                      style={{ cursor: drillCr ? "pointer" : "default" }}
+                                      title={drillCr ? "Double-click for Group Ledger Summary" : undefined}
+                                    >
+                                      {row.crParticular || ""}
+                                    </td>
+                                    <td className="text-end">{row.crAmount || ""}</td>
+                                  </tr>
+                                );
+                              })}
+                              <tr className="table-secondary fw-bold">
+                                <td colSpan={2}>Total (Trading A/c)</td>
+                                <td className="text-end">{formatCurrency(tradingTotalDr)}</td>
+                                <td colSpan={1} />
+                                <td className="text-end">{formatCurrency(tradingTotalCr)}</td>
+                              </tr>
+                            </>
+                          )}
+                          {pnlRows.length > 0 && (
+                            <>
+                              <tr className="table-light fw-bold">
+                                <td colSpan={5}>Profit and Loss Account</td>
+                              </tr>
+                              {pnlRows.map((row, idx) => {
+                                const drillDr = canDrillGroup(row.drParticular);
+                                const drillCr = canDrillGroup(row.crParticular);
+                                return (
+                                  <tr key={`p-${idx}`}>
+                                    <td className="text-center">{row.sno}</td>
+                                    <td
+                                      onDoubleClick={() => drillDr && navigate(`${process.env.PUBLIC_URL}/groupLedgerSummary`, { state: { ledgerGroupName: (row.drParticular || "").trim(), fromDate, toDate } })}
+                                      style={{ cursor: drillDr ? "pointer" : "default" }}
+                                      title={drillDr ? "Double-click for Group Ledger Summary" : undefined}
+                                    >
+                                      {row.drParticular || ""}
+                                    </td>
+                                    <td className="text-end">{row.drAmount || ""}</td>
+                                    <td
+                                      onDoubleClick={() => drillCr && navigate(`${process.env.PUBLIC_URL}/groupLedgerSummary`, { state: { ledgerGroupName: (row.crParticular || "").trim(), fromDate, toDate } })}
+                                      style={{ cursor: drillCr ? "pointer" : "default" }}
+                                      title={drillCr ? "Double-click for Group Ledger Summary" : undefined}
+                                    >
+                                      {row.crParticular || ""}
+                                    </td>
+                                    <td className="text-end">{row.crAmount || ""}</td>
+                                  </tr>
+                                );
+                              })}
+                              <tr className="table-secondary fw-bold">
+                                <td colSpan={2}>Total (P&amp;L A/c)</td>
+                                <td className="text-end">{formatCurrency(pnlTotalDr)}</td>
+                                <td colSpan={1} />
+                                <td className="text-end">{formatCurrency(pnlTotalCr)}</td>
+                              </tr>
+                            </>
+                          )}
+                          {tradingRows.length === 0 && pnlRows.length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="text-center text-muted py-4">No data</td>
                             </tr>
-                            {tradingRows.map((row, idx) => {
-                              const drillDr = canDrillGroup(row.drParticular);
-                              const drillCr = canDrillGroup(row.crParticular);
-                              return (
-                                <tr key={`t-${idx}`}>
-                                  <td className="text-center">{row.sno}</td>
-                                  <td
-                                    onDoubleClick={() => drillDr && navigate(`${process.env.PUBLIC_URL}/groupLedgerSummary`, { state: { ledgerGroupName: (row.drParticular || "").trim(), fromDate, toDate } })}
-                                    style={{ cursor: drillDr ? "pointer" : "default" }}
-                                    title={drillDr ? "Double-click for Group Ledger Summary" : undefined}
-                                  >
-                                    {row.drParticular || ""}
-                                  </td>
-                                  <td className="text-end">{row.drAmount || ""}</td>
-                                  <td
-                                    onDoubleClick={() => drillCr && navigate(`${process.env.PUBLIC_URL}/groupLedgerSummary`, { state: { ledgerGroupName: (row.crParticular || "").trim(), fromDate, toDate } })}
-                                    style={{ cursor: drillCr ? "pointer" : "default" }}
-                                    title={drillCr ? "Double-click for Group Ledger Summary" : undefined}
-                                  >
-                                    {row.crParticular || ""}
-                                  </td>
-                                  <td className="text-end">{row.crAmount || ""}</td>
-                                </tr>
-                              );
-                            })}
-                            <tr className="table-secondary fw-bold">
-                              <td colSpan={2}>Total (Trading A/c)</td>
-                              <td className="text-end">{formatCurrency(tradingTotalDr)}</td>
-                              <td colSpan={1} />
-                              <td className="text-end">{formatCurrency(tradingTotalCr)}</td>
-                            </tr>
-                          </>
-                        )}
-                        {pnlRows.length > 0 && (
-                          <>
-                            <tr className="table-light fw-bold">
-                              <td colSpan={5}>Profit and Loss Account</td>
-                            </tr>
-                            {pnlRows.map((row, idx) => {
-                              const drillDr = canDrillGroup(row.drParticular);
-                              const drillCr = canDrillGroup(row.crParticular);
-                              return (
-                                <tr key={`p-${idx}`}>
-                                  <td className="text-center">{row.sno}</td>
-                                  <td
-                                    onDoubleClick={() => drillDr && navigate(`${process.env.PUBLIC_URL}/groupLedgerSummary`, { state: { ledgerGroupName: (row.drParticular || "").trim(), fromDate, toDate } })}
-                                    style={{ cursor: drillDr ? "pointer" : "default" }}
-                                    title={drillDr ? "Double-click for Group Ledger Summary" : undefined}
-                                  >
-                                    {row.drParticular || ""}
-                                  </td>
-                                  <td className="text-end">{row.drAmount || ""}</td>
-                                  <td
-                                    onDoubleClick={() => drillCr && navigate(`${process.env.PUBLIC_URL}/groupLedgerSummary`, { state: { ledgerGroupName: (row.crParticular || "").trim(), fromDate, toDate } })}
-                                    style={{ cursor: drillCr ? "pointer" : "default" }}
-                                    title={drillCr ? "Double-click for Group Ledger Summary" : undefined}
-                                  >
-                                    {row.crParticular || ""}
-                                  </td>
-                                  <td className="text-end">{row.crAmount || ""}</td>
-                                </tr>
-                              );
-                            })}
-                            <tr className="table-secondary fw-bold">
-                              <td colSpan={2}>Total (P&amp;L A/c)</td>
-                              <td className="text-end">{formatCurrency(pnlTotalDr)}</td>
-                              <td colSpan={1} />
-                              <td className="text-end">{formatCurrency(pnlTotalCr)}</td>
-                            </tr>
-                          </>
-                        )}
-                        {tradingRows.length === 0 && pnlRows.length === 0 && !isLoading && (
-                          <tr>
-                            <td colSpan={5} className="text-center text-muted">No data</td>
-                          </tr>
-                        )}
+                          )}
                         </>
-                      </tbody>
-                    </Table>
-                  </div>
-                )}
+                      )}
+                    </tbody>
+                  </Table>
+                </div>
               </CardBody>
               <CardFooter className="text-end">
                 <Btn color="primary" type="button" className="me-2" onClick={() => navigate(`${process.env.PUBLIC_URL}/profitAndLossDetails`)}>

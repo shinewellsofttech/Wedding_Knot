@@ -13,7 +13,7 @@ const CATEGORY_LIST_URL = `${API_WEB_URLS.MASTER}/0/token/CategoryMaster/Id/0`;
 const ITEM_MASTER_DATA_URL = `${API_WEB_URLS.MASTER}/0/token/ItemMasterData/Id/0`;
 
 /* ───── Types ───── */
-interface ItemPhoto { file: File; preview: string; }
+interface ItemPhoto { file: File | null; preview: string; fullUrl?: string; }
 
 interface ItemRow {
   id: string;
@@ -269,11 +269,11 @@ const AddEdit_ItemMaster = () => {
                     return {
                     id: String(d.Id || uid()),
                     photos: [
-                        d.DesignPhoto ? { file: null, preview: d.DesignPhoto } : null,
-                        d.DesignPhoto2 ? { file: null, preview: d.DesignPhoto2 } : null,
-                        d.DesignPhoto3 ? { file: null, preview: d.DesignPhoto3 } : null,
-                        d.DesignPhoto4 ? { file: null, preview: d.DesignPhoto4 } : null,
-                        d.DesignPhoto5 ? { file: null, preview: d.DesignPhoto5 } : null,
+                        d.DesignPhoto ? { file: null, preview: d.DesignPhoto_Thumb && d.DesignPhoto_Thumb.trim() !== "" ? d.DesignPhoto_Thumb : d.DesignPhoto, fullUrl: d.DesignPhoto } : null,
+                        d.DesignPhoto2 ? { file: null, preview: d.DesignPhoto2_Thumb && d.DesignPhoto2_Thumb.trim() !== "" ? d.DesignPhoto2_Thumb : d.DesignPhoto2, fullUrl: d.DesignPhoto2 } : null,
+                        d.DesignPhoto3 ? { file: null, preview: d.DesignPhoto3_Thumb && d.DesignPhoto3_Thumb.trim() !== "" ? d.DesignPhoto3_Thumb : d.DesignPhoto3, fullUrl: d.DesignPhoto3 } : null,
+                        d.DesignPhoto4 ? { file: null, preview: d.DesignPhoto4_Thumb && d.DesignPhoto4_Thumb.trim() !== "" ? d.DesignPhoto4_Thumb : d.DesignPhoto4, fullUrl: d.DesignPhoto4 } : null,
+                        d.DesignPhoto5 ? { file: null, preview: d.DesignPhoto5_Thumb && d.DesignPhoto5_Thumb.trim() !== "" ? d.DesignPhoto5_Thumb : d.DesignPhoto5, fullUrl: d.DesignPhoto5 } : null,
                     ],
                     videoFile: null,
                     videoName: d.VideoLink || "",
@@ -799,7 +799,9 @@ const AddEdit_ItemMaster = () => {
                                     <div className="im-photo-slot" key={pIdx}>
                                       {photo ? (
                                         <>
-                                          <img src={photo.preview} alt={`ph${pIdx}`} />
+                                          <a href={photo.fullUrl || photo.preview} target="_blank" rel="noopener noreferrer">
+                                            <img src={photo.preview} alt={`ph${pIdx}`} />
+                                          </a>
                                           <button
                                             type="button"
                                             className="im-photo-remove"

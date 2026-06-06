@@ -74,7 +74,7 @@ const LedgerDetailsReport: React.FC = () => {
   const [showVoucherNo, setShowVoucherNo] = useState(true);
   const [showPartyName, setShowPartyName] = useState(true);
   const [showVoucherType, setShowVoucherType] = useState(false);
-  const [showPageNo, setShowPageNo] = useState(true);
+
 
   const [ledgerList, setLedgerList] = useState<LedgerMaster[]>([]);
   const [voucherTypeList, setVoucherTypeList] = useState<VoucherTypeMaster[]>([]);
@@ -616,14 +616,7 @@ const LedgerDetailsReport: React.FC = () => {
                         />
                         <Label check>Voucher Type</Label>
                       </FormGroup>
-                      <FormGroup check inline className="mb-0 me-2">
-                        <Input
-                          type="checkbox"
-                          checked={showPageNo}
-                          onChange={(e) => setShowPageNo(e.target.checked)}
-                        />
-                        <Label check>Page No.</Label>
-                      </FormGroup>
+
                     </div>
                   </Col>
                 </Row>
