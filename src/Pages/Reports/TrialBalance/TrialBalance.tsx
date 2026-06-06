@@ -354,14 +354,6 @@ const TrialBalance: React.FC = () => {
 
                 <Row>
                   <Col md="12">
-                    {isLoading ? (
-                      <div className="text-center p-4">
-                        <div className="spinner-border" role="status">
-                          <span className="visually-hidden">Loading...</span>
-                        </div>
-                        <p className="mt-2">Loading trial balance data...</p>
-                      </div>
-                    ) : (
                       <div className="table-responsive" style={{ maxHeight: "600px", overflowY: "auto" }}>
                         <Table bordered hover className="mb-0">
                           <thead className="table-light" style={{ position: "sticky", top: 0, zIndex: 1 }}>
@@ -374,7 +366,16 @@ const TrialBalance: React.FC = () => {
                             </tr>
                           </thead>
                           <tbody>
-                            {groupedData.length > 0 ? (
+                            {isLoading ? (
+                              <tr>
+                                <td colSpan={5} className="text-center p-4">
+                                  <div className="spinner-border" role="status">
+                                    <span className="visually-hidden">Loading...</span>
+                                  </div>
+                                  <p className="mt-2 mb-0">Loading trial balance data...</p>
+                                </td>
+                              </tr>
+                            ) : groupedData.length > 0 ? (
                               <>
                                 {groupedData.map((group, index) => {
                                   const drAmt = showOnlyOpeningBalance
@@ -402,7 +403,6 @@ const TrialBalance: React.FC = () => {
                                   );
                                 })}
 
-
                                 {/* Grand Total Row (Hide when IsShowOnlyOB = true) */}
                                 {!showOnlyOpeningBalance && (
                                   <tr className="table-secondary fw-bold">
@@ -423,7 +423,6 @@ const TrialBalance: React.FC = () => {
                           </tbody>
                         </Table>
                       </div>
-                    )}
                   </Col>
                 </Row>
               </CardBody>

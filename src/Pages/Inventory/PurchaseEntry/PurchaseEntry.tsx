@@ -24,7 +24,7 @@ interface GridRow {
   Qty: string;
   Rate: string;
   Variant?: string;
-  Photos?: string[];
+  Photos?: any[];
   ItemData: any[] | null;
   AvailableQty?: number;
   F_PurchaseOrderH?: string | number;
@@ -314,12 +314,29 @@ function PurchaseEntry() {
 
     if (lines.length > 0) {
       const mappedRows: GridRow[] = lines.map((l: any) => {
-        let cleanPhoto = l.DesignPhoto || "";
-        if (cleanPhoto.includes("https://") && cleanPhoto.lastIndexOf("https://") > 0) {
-           cleanPhoto = cleanPhoto.substring(cleanPhoto.lastIndexOf("https://"));
-        } else if (cleanPhoto.includes("http://") && cleanPhoto.lastIndexOf("http://") > 0) {
-           cleanPhoto = cleanPhoto.substring(cleanPhoto.lastIndexOf("http://"));
-        }
+        const cleanUrl = (url: string) => {
+          let cleaned = url || "";
+          if (cleaned.includes("https://") && cleaned.lastIndexOf("https://") > 0) {
+            const firstPart = cleaned.substring(0, cleaned.lastIndexOf("https://"));
+            const secondPart = cleaned.substring(cleaned.lastIndexOf("https://"));
+            if (firstPart.includes("Thumbnail")) {
+              const filename = secondPart.substring(secondPart.lastIndexOf("/") + 1);
+              return firstPart + filename;
+            }
+            return secondPart;
+          } else if (cleaned.includes("http://") && cleaned.lastIndexOf("http://") > 0) {
+            const firstPart = cleaned.substring(0, cleaned.lastIndexOf("http://"));
+            const secondPart = cleaned.substring(cleaned.lastIndexOf("http://"));
+            if (firstPart.includes("Thumbnail")) {
+              const filename = secondPart.substring(secondPart.lastIndexOf("/") + 1);
+              return firstPart + filename;
+            }
+            return secondPart;
+          }
+          return cleaned;
+        };
+        let cleanPhoto = cleanUrl(l.DesignPhoto);
+        let cleanThumb = cleanUrl(l.DesignPhoto_Thumb);
 
         return {
           ItemCode: l.Barcode || "",
@@ -332,7 +349,7 @@ function PurchaseEntry() {
           ItemName: l.ItemName || "",
           DesignPhoto: cleanPhoto,
           Variant: l.Variant || l.Varient || "",
-          Photos: cleanPhoto ? [cleanPhoto] : [],
+          Photos: cleanPhoto ? [{ full: cleanPhoto, thumb: cleanThumb || cleanPhoto }] : [],
           Qty: String(l.Qty || ""),
           Rate: l.Rate ? String(l.Rate) : "",
           ItemData: [{ Id: l.F_ItemMaster, ItemName: l.ItemName || "Scanned Item" }],
@@ -414,10 +431,12 @@ function PurchaseEntry() {
       const DELETE_API_URL = `${API_WEB_URLS.MASTER}/0/token/PurchaseEntryH`;
       Fn_DeleteData(dispatch, () => {}, Number(state.formData.F_PurchaseEntryH), DELETE_API_URL)
         .then(() => {
+      
           alert("Purchase Entry deleted successfully.");
           window.location.reload();
         })
         .catch((error: any) => {
+          
           console.error("Failed to delete purchase entry:", error);
           alert("Failed to delete purchase entry. Please try again.");
         });
@@ -581,12 +600,34 @@ function PurchaseEntry() {
         const itemId = item.Id || "";
         const designId = matchedDesign.Id || "";
         
+        const cleanUrl = (url: string) => {
+          let cleaned = url || "";
+          if (cleaned.includes("https://") && cleaned.lastIndexOf("https://") > 0) {
+            const firstPart = cleaned.substring(0, cleaned.lastIndexOf("https://"));
+            const secondPart = cleaned.substring(cleaned.lastIndexOf("https://"));
+            if (firstPart.includes("Thumbnail")) {
+              const filename = secondPart.substring(secondPart.lastIndexOf("/") + 1);
+              return firstPart + filename;
+            }
+            return secondPart;
+          } else if (cleaned.includes("http://") && cleaned.lastIndexOf("http://") > 0) {
+            const firstPart = cleaned.substring(0, cleaned.lastIndexOf("http://"));
+            const secondPart = cleaned.substring(cleaned.lastIndexOf("http://"));
+            if (firstPart.includes("Thumbnail")) {
+              const filename = secondPart.substring(secondPart.lastIndexOf("/") + 1);
+              return firstPart + filename;
+            }
+            return secondPart;
+          }
+          return cleaned;
+        };
+
         const photos = [];
-        if (matchedDesign.DesignPhoto) photos.push(matchedDesign.DesignPhoto);
-        if (matchedDesign.DesignPhoto2) photos.push(matchedDesign.DesignPhoto2);
-        if (matchedDesign.DesignPhoto3) photos.push(matchedDesign.DesignPhoto3);
-        if (matchedDesign.DesignPhoto4) photos.push(matchedDesign.DesignPhoto4);
-        if (matchedDesign.DesignPhoto5) photos.push(matchedDesign.DesignPhoto5);
+        if (matchedDesign.DesignPhoto) photos.push({ full: cleanUrl(matchedDesign.DesignPhoto), thumb: cleanUrl(matchedDesign.DesignPhoto_Thumb) || cleanUrl(matchedDesign.DesignPhoto) });
+        if (matchedDesign.DesignPhoto2) photos.push({ full: cleanUrl(matchedDesign.DesignPhoto2), thumb: cleanUrl(matchedDesign.DesignPhoto2_Thumb) || cleanUrl(matchedDesign.DesignPhoto2) });
+        if (matchedDesign.DesignPhoto3) photos.push({ full: cleanUrl(matchedDesign.DesignPhoto3), thumb: cleanUrl(matchedDesign.DesignPhoto3_Thumb) || cleanUrl(matchedDesign.DesignPhoto3) });
+        if (matchedDesign.DesignPhoto4) photos.push({ full: cleanUrl(matchedDesign.DesignPhoto4), thumb: cleanUrl(matchedDesign.DesignPhoto4_Thumb) || cleanUrl(matchedDesign.DesignPhoto4) });
+        if (matchedDesign.DesignPhoto5) photos.push({ full: cleanUrl(matchedDesign.DesignPhoto5), thumb: cleanUrl(matchedDesign.DesignPhoto5_Thumb) || cleanUrl(matchedDesign.DesignPhoto5) });
         
         let unitVal = parseFloat(matchedDesign.UnitConversion);
         if (isNaN(unitVal) || unitVal === 0) unitVal = 1;

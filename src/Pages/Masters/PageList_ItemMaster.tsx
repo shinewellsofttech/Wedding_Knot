@@ -404,12 +404,12 @@ const PageList_ItemMaster = () => {
                                     ) : (
                                       parsedDesign.map((d: any, dIdx: number) => {
                                       const images = [
-                                        d.DesignPhoto,
-                                        d.DesignPhoto2,
-                                        d.DesignPhoto3,
-                                        d.DesignPhoto4,
-                                        d.DesignPhoto5
-                                      ].filter(img => img && img.trim() !== "");
+                                        { full: d.DesignPhoto, thumb: d.DesignPhoto_Thumb },
+                                        { full: d.DesignPhoto2, thumb: d.DesignPhoto2_Thumb },
+                                        { full: d.DesignPhoto3, thumb: d.DesignPhoto3_Thumb },
+                                        { full: d.DesignPhoto4, thumb: d.DesignPhoto4_Thumb },
+                                        { full: d.DesignPhoto5, thumb: d.DesignPhoto5_Thumb }
+                                      ].filter(img => img.full && img.full.trim() !== "");
 
                                       return (
                                         <tr key={d.Id || dIdx}>
@@ -435,10 +435,10 @@ const PageList_ItemMaster = () => {
                                           <td>{d.OpeningStock || "0"}</td>
                                           <td>
                                             <div className="d-flex flex-wrap gap-2">
-                                              {images.map((img: string, i: number) => (
-                                                <a href={img} target="_blank" rel="noopener noreferrer" key={i}>
+                                              {images.map((img: any, i: number) => (
+                                                <a href={img.full} target="_blank" rel="noopener noreferrer" key={i}>
                                                   <img 
-                                                    src={img} 
+                                                    src={img.thumb && img.thumb.trim() !== "" ? img.thumb : img.full} 
                                                     alt={`img-${i}`} 
                                                     style={{ width: 45, height: 45, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd', cursor: 'pointer' }} 
                                                     title="Click to view full size"

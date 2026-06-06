@@ -63,6 +63,8 @@ import BalanceSheetTraditional from "../Pages/Reports/BalanceSheet/BalanceSheetT
 import BalanceSheetStandard from "../Pages/Reports/BalanceSheet/BalanceSheetStandard";
 import BalanceSheetDetailed from "../Pages/Reports/BalanceSheet/BalanceSheetDetailed";
 import GroupLedgerSummary from "../Pages/Reports/GroupLedgerSummary/GroupLedgerSummary";
+import StockPositionReport from "../Pages/Reports/StockPositionReport/StockPositionReport";
+import CustomerOutstandingReport from "../Pages/Reports/CustomerOutstandingReport/CustomerOutstandingRepprt";
 import UserRights from "../Pages/Tools/UserRights";
 import ChangePassword from "../Pages/Tools/ChangePassword";
 import PurchaseOrderApproval from "../Pages/Inventory/PurchaseOrderApproval/PurchaseOrderApproval";
@@ -76,6 +78,7 @@ import PageList_MaterialMaster from "../Pages/Masters/PageList_MaterialMaster";
 import AddEdit_CategoryMaster from "../Pages/Masters/AddEdit_CategoryMaster";
 import PageList_CategoryMaster from "../Pages/Masters/PageList_CategoryMaster";
 import Dashboard from "../Pages/Dashboard/Dashboard";
+import SalesReturn from "../Pages/Inventory/SalesReturn/SalesReturn";
 
 export const routes = [
   // Default landing route is /voucherEntry (see index.tsx Navigate)
@@ -124,13 +127,21 @@ export const routes = [
 
     { path: `${process.env.PUBLIC_URL}/voucherEntry`, Component: <VoucherEntry /> },
 
-    { path: `${process.env.PUBLIC_URL}/ledgerDetailsReport`, Component: <LedgerDetailsReport /> }
+    { path: `${process.env.PUBLIC_URL}/ledgerDetailsReport`, Component: <LedgerDetailsReport /> },
+    {path : `${process.env.PUBLIC_URL}/salesReturn`, Component : <SalesReturn/>},
+    {path: `${process.env.PUBLIC_URL}/purchaseReturn`, Component : <PurchaseReturn/>},
+    {path :`${process.env.PUBLIC_URL}/profitAndLoss`,Component:<ProfitAndLoss/>},
+      { path: `${process.env.PUBLIC_URL}/trialBalance`, Component: <TrialBalance /> },
+        { path: `${process.env.PUBLIC_URL}/balanceSheet`, Component: <BalanceSheetTraditional /> },
+        { path: `${process.env.PUBLIC_URL}/stockPositionReport`, Component: <StockPositionReport /> },
+        { path: `${process.env.PUBLIC_URL}/customerOutstandingReport`, Component: <CustomerOutstandingReport /> }
   /*
   { path: `${process.env.PUBLIC_URL}/itemMaster`, Component: <PageList_ItemMaster /> },
   { path: `${process.env.PUBLIC_URL}/addEditItemGroup`, Component: <AddEdit_ItemGroup /> },
   { path: `${process.env.PUBLIC_URL}/itemGroup`, Component: <PageList_ItemGroup /> },
   { path: `${process.env.PUBLIC_URL}/addEditItemCompany`, Component: <AddEdit_ItemCompany /> },
-  { path: `${process.env.PUBLIC_URL}/itemCompany`, Component: <PageList_ItemCompany /> },
+  +
+   path: `${process.env.PUBLIC_URL}/itemCompany`, Component: <PageLisf_ItemCompany /> },
   { path: `${process.env.PUBLIC_URL}/addEditItemType`, Component: <AddEdit_ItemType /> },
   { path: `${process.env.PUBLIC_URL}/itemType`, Component: <PageList_ItemType /> },
   { path: `${process.env.PUBLIC_URL}/addEditWarehouse`, Component: <AddEdit_Warehouse /> },

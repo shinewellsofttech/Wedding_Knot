@@ -45,7 +45,7 @@ interface GridRow {
   Qty: string;
   Rate: string;
   Variant?: string;
-  Photos?: string[];
+  Photos?: any[];
   ItemData: any[] | null;
   AvailableQty?: number;
   UnitValue?: number;
@@ -373,8 +373,8 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
                       {row.Photos && row.Photos.length > 0 ? (
                         <div className="d-flex gap-1 flex-wrap align-items-center h-100 py-1">
                           {row.Photos.map((photo, pIdx) => (
-                            <a key={pIdx} href={photo} target="_blank" rel="noreferrer">
-                              <img src={photo} alt="Variant" style={{ width: 30, height: 30, objectFit: 'cover', borderRadius: 4, border: '1px solid #ccc' }} />
+                            <a key={pIdx} href={photo.full || photo} target="_blank" rel="noreferrer">
+                              <img src={photo.thumb || photo.full || photo} alt="Variant" style={{ width: 30, height: 30, objectFit: 'cover', borderRadius: 4, border: '1px solid #ccc' }} />
                             </a>
                           ))}
                         </div>

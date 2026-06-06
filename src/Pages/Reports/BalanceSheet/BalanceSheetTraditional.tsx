@@ -217,14 +217,6 @@ const BalanceSheetTraditional: React.FC = () => {
                 <h5 className="text-center fw-bold mb-1">Balance Sheet</h5>
                 <p className="text-center text-muted mb-3">As On {formatDateForDisplay(toDate)}</p>
 
-                {isLoading ? (
-                  <div className="text-center p-4">
-                    <div className="spinner-border" role="status">
-                      <span className="visually-hidden">Loading...</span>
-                    </div>
-                    <p className="mt-2">Loading Balance Sheet...</p>
-                  </div>
-                ) : (
                   <div className="table-responsive">
                     <Table bordered hover className="mb-0">
                       <thead className="table-light" style={{ position: "sticky", top: 0, zIndex: 1 }}>
@@ -236,40 +228,52 @@ const BalanceSheetTraditional: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {reportRows.map((row, idx) => {
-                          const canDrillLiab = (row.liabilitiesParticular || "").trim() && !/^total\s*(liabilities|assets)?$/i.test((row.liabilitiesParticular || "").trim());
-                          const canDrillAsset = (row.assetsParticular || "").trim() && !/^total\s*(liabilities|assets)?$/i.test((row.assetsParticular || "").trim());
-                          return (
-                            <tr
-                              key={idx}
-                              onDoubleClick={(e) => {
-                                const cell = (e.target as HTMLElement).closest("td");
-                                if (!cell) return;
-                                const colIdx = cell.cellIndex;
-                                if (colIdx === 0 && canDrillLiab) drillDown(row.liabilitiesParticular);
-                                else if (colIdx === 2 && canDrillAsset) drillDown(row.assetsParticular);
-                              }}
-                              style={{ cursor: canDrillLiab || canDrillAsset ? "pointer" : "default" }}
-                              title={canDrillLiab || canDrillAsset ? "Double-click for Group Ledger Summary" : undefined}
-                            >
-                              <td>{row.liabilitiesParticular || ""}</td>
-                              <td className="text-end">{row.liabilitiesAmount || ""}</td>
-                              <td>{row.assetsParticular || ""}</td>
-                              <td className="text-end">{row.assetsAmount || ""}</td>
-                            </tr>
-                          );
-                        })}
-                        {reportRows.length === 0 && !isLoading && (
+                        {isLoading ? (
                           <tr>
-                            <td colSpan={4} className="text-center text-muted py-4">
-                              No data
+                            <td colSpan={4} className="text-center p-4">
+                              <div className="spinner-border" role="status">
+                                <span className="visually-hidden">Loading...</span>
+                              </div>
+                              <p className="mt-2 mb-0">Loading Balance Sheet...</p>
                             </td>
                           </tr>
+                        ) : (
+                          <>
+                            {reportRows.map((row, idx) => {
+                              const canDrillLiab = (row.liabilitiesParticular || "").trim() && !/^total\s*(liabilities|assets)?$/i.test((row.liabilitiesParticular || "").trim());
+                              const canDrillAsset = (row.assetsParticular || "").trim() && !/^total\s*(liabilities|assets)?$/i.test((row.assetsParticular || "").trim());
+                              return (
+                                <tr
+                                  key={idx}
+                                  onDoubleClick={(e) => {
+                                    const cell = (e.target as HTMLElement).closest("td");
+                                    if (!cell) return;
+                                    const colIdx = cell.cellIndex;
+                                    if (colIdx === 0 && canDrillLiab) drillDown(row.liabilitiesParticular);
+                                    else if (colIdx === 2 && canDrillAsset) drillDown(row.assetsParticular);
+                                  }}
+                                  style={{ cursor: canDrillLiab || canDrillAsset ? "pointer" : "default" }}
+                                  title={canDrillLiab || canDrillAsset ? "Double-click for Group Ledger Summary" : undefined}
+                                >
+                                  <td>{row.liabilitiesParticular || ""}</td>
+                                  <td className="text-end">{row.liabilitiesAmount || ""}</td>
+                                  <td>{row.assetsParticular || ""}</td>
+                                  <td className="text-end">{row.assetsAmount || ""}</td>
+                                </tr>
+                              );
+                            })}
+                            {reportRows.length === 0 && (
+                              <tr>
+                                <td colSpan={4} className="text-center text-muted py-4">
+                                  No data
+                                </td>
+                              </tr>
+                            )}
+                          </>
                         )}
                       </tbody>
                     </Table>
                   </div>
-                )}
               </CardBody>
               <CardFooter className="text-end">
                 <Btn color="success" type="button" className="me-2" onClick={handlePrint}>

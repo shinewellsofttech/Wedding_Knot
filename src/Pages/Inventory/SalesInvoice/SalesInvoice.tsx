@@ -25,7 +25,7 @@ interface GridRow {
   Qty: string;
   Rate: string;
   Variant?: string;
-  Photos?: string[];
+  Photos?: any[];
   ItemData: any[] | null;
   AvailableQty?: number;
   F_SalesOrderH?: string | number;
@@ -352,12 +352,29 @@ function SalesInvoice() {
 
     if (lines.length > 0) {
       const mappedRows: GridRow[] = lines.map((l: any) => {
-        let cleanPhoto = l.DesignPhoto || "";
-        if (cleanPhoto.includes("https://") && cleanPhoto.lastIndexOf("https://") > 0) {
-           cleanPhoto = cleanPhoto.substring(cleanPhoto.lastIndexOf("https://"));
-        } else if (cleanPhoto.includes("http://") && cleanPhoto.lastIndexOf("http://") > 0) {
-           cleanPhoto = cleanPhoto.substring(cleanPhoto.lastIndexOf("http://"));
-        }
+        const cleanUrl = (url: string) => {
+          let cleaned = url || "";
+          if (cleaned.includes("https://") && cleaned.lastIndexOf("https://") > 0) {
+            const firstPart = cleaned.substring(0, cleaned.lastIndexOf("https://"));
+            const secondPart = cleaned.substring(cleaned.lastIndexOf("https://"));
+            if (firstPart.includes("Thumbnail")) {
+              const filename = secondPart.substring(secondPart.lastIndexOf("/") + 1);
+              return firstPart + filename;
+            }
+            return secondPart;
+          } else if (cleaned.includes("http://") && cleaned.lastIndexOf("http://") > 0) {
+            const firstPart = cleaned.substring(0, cleaned.lastIndexOf("http://"));
+            const secondPart = cleaned.substring(cleaned.lastIndexOf("http://"));
+            if (firstPart.includes("Thumbnail")) {
+              const filename = secondPart.substring(secondPart.lastIndexOf("/") + 1);
+              return firstPart + filename;
+            }
+            return secondPart;
+          }
+          return cleaned;
+        };
+        let cleanPhoto = cleanUrl(l.DesignPhoto);
+        let cleanThumb = cleanUrl(l.DesignPhoto_Thumb);
 
         return {
           ItemCode: l.Barcode || "",
@@ -370,7 +387,7 @@ function SalesInvoice() {
           ItemName: l.ItemName || "",
           DesignPhoto: cleanPhoto,
           Variant: l.Variant || l.Varient || "",
-          Photos: cleanPhoto ? [cleanPhoto] : [],
+          Photos: cleanPhoto ? [{ full: cleanPhoto, thumb: cleanThumb || cleanPhoto }] : [],
           Qty: String(l.Qty || ""),
           Rate: l.Rate ? String(l.Rate) : "",
           ItemData: [{ Id: l.F_ItemMaster, ItemName: l.ItemName || "Scanned Item" }],
@@ -672,12 +689,34 @@ function SalesInvoice() {
         const itemId = item.F_ItemMaster || item.Id || "";
         const designId = designItem.Id || item.Id || "";
         
+        const cleanUrl = (url: string) => {
+          let cleaned = url || "";
+          if (cleaned.includes("https://") && cleaned.lastIndexOf("https://") > 0) {
+            const firstPart = cleaned.substring(0, cleaned.lastIndexOf("https://"));
+            const secondPart = cleaned.substring(cleaned.lastIndexOf("https://"));
+            if (firstPart.includes("Thumbnail")) {
+              const filename = secondPart.substring(secondPart.lastIndexOf("/") + 1);
+              return firstPart + filename;
+            }
+            return secondPart;
+          } else if (cleaned.includes("http://") && cleaned.lastIndexOf("http://") > 0) {
+            const firstPart = cleaned.substring(0, cleaned.lastIndexOf("http://"));
+            const secondPart = cleaned.substring(cleaned.lastIndexOf("http://"));
+            if (firstPart.includes("Thumbnail")) {
+              const filename = secondPart.substring(secondPart.lastIndexOf("/") + 1);
+              return firstPart + filename;
+            }
+            return secondPart;
+          }
+          return cleaned;
+        };
+
         const photos = [];
-        if (designItem.DesignPhoto) photos.push(designItem.DesignPhoto);
-        if (designItem.DesignPhoto2) photos.push(designItem.DesignPhoto2);
-        if (designItem.DesignPhoto3) photos.push(designItem.DesignPhoto3);
-        if (designItem.DesignPhoto4) photos.push(designItem.DesignPhoto4);
-        if (designItem.DesignPhoto5) photos.push(designItem.DesignPhoto5);
+        if (designItem.DesignPhoto) photos.push({ full: cleanUrl(designItem.DesignPhoto), thumb: cleanUrl(designItem.DesignPhoto_Thumb) || cleanUrl(designItem.DesignPhoto) });
+        if (designItem.DesignPhoto2) photos.push({ full: cleanUrl(designItem.DesignPhoto2), thumb: cleanUrl(designItem.DesignPhoto2_Thumb) || cleanUrl(designItem.DesignPhoto2) });
+        if (designItem.DesignPhoto3) photos.push({ full: cleanUrl(designItem.DesignPhoto3), thumb: cleanUrl(designItem.DesignPhoto3_Thumb) || cleanUrl(designItem.DesignPhoto3) });
+        if (designItem.DesignPhoto4) photos.push({ full: cleanUrl(designItem.DesignPhoto4), thumb: cleanUrl(designItem.DesignPhoto4_Thumb) || cleanUrl(designItem.DesignPhoto4) });
+        if (designItem.DesignPhoto5) photos.push({ full: cleanUrl(designItem.DesignPhoto5), thumb: cleanUrl(designItem.DesignPhoto5_Thumb) || cleanUrl(designItem.DesignPhoto5) });
         
         const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
         const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;

@@ -126,6 +126,21 @@ export const MenuList: MenuItem[] = [
         icon: "Box",
         type: "link",
         bookmark: true
+      },
+       {
+        id: 3,
+        title: "Sales Return",
+        path: `${process.env.PUBLIC_URL}/salesReturn`,
+        icon: "Box",
+        type: "link",
+        bookmark: true
+      }, {
+        id: 4,
+        title: "Purchase Return",
+        path: `${process.env.PUBLIC_URL}/purchaseReturn`,
+        icon: "Box",
+        type: "link",
+        bookmark: true
       }
     ]
   },
@@ -150,6 +165,46 @@ Items:[
         title:"Ledger Details Report",
         path:`${process.env.PUBLIC_URL}/ledgerDetailsReport`,
         icon:"Box",
+        type:"link",
+        bookmark:true
+      },
+        {
+        id:2,
+        title: "Trial Balance",
+        path: `${process.env.PUBLIC_URL}/trialBalance`,
+        icon: "Box",
+        type: "link",
+        bookmark: true
+      },
+      {
+        id: 3,
+        title:"Profit & Loss",
+        path:`${process.env.PUBLIC_URL}/profitAndLoss`,
+        icon:"Box",
+        type:"link",
+        bookmark:true
+      },
+      {
+        id:4,
+        title:"Balance Sheet",
+        path:`${process.env.PUBLIC_URL}/balanceSheet`,
+        icon:"Box",
+        type:"link",
+        bookmark:true
+      },
+      {
+        id:5,
+        title:"Stock Position",
+        path:`${process.env.PUBLIC_URL}/stockPositionReport`,
+        icon:"Box",
+        type:"link",
+        bookmark:true
+      },
+      {
+        id:6,
+        title:"Customer Outstanding",
+        path:`${process.env.PUBLIC_URL}/customerOutstandingReport`,
+        icon:"Users",
         type:"link",
         bookmark:true
       }
