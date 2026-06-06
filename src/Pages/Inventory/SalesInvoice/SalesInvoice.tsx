@@ -1167,6 +1167,9 @@ function SalesInvoice() {
     }
   };
 
+
+
+  
   const handleDownloadPdf = async () => {
     const element = document.querySelector(".sales-print-layout") as HTMLElement;
     if (!element) {
