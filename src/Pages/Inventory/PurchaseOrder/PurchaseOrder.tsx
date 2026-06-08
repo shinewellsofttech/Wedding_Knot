@@ -17,6 +17,7 @@ import {
   Label,
   Input,
   Table,
+  Button,
 } from "reactstrap";
 import { Btn } from "../../../AbstractElements";
 import Breadcrumbs from "../../../CommonElements/Breadcrumbs/Breadcrumbs";
@@ -113,6 +114,9 @@ const PurchaseOrder = () => {
     Address: "",
     Email: "",
   });
+
+  const [showSharePDFModal, setShowSharePDFModal] = useState(false);
+  const [pendingShareFile, setPendingShareFile] = useState<File | null>(null);
 
   // Set initial focus to Select PO field
   useEffect(() => {
@@ -926,6 +930,96 @@ const PurchaseOrder = () => {
     document.title = oldTitle;
   };
 
+  const handleDownloadPdf = async () => {
+    const { generateInvoiceHTML } = require('../../../helpers/PDFTemplate');
+    const htmlString = generateInvoiceHTML("PURCHASE ORDER", { formData }, gridRows);
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlString;
+    tempDiv.style.position = 'absolute';
+    tempDiv.style.top = '-9999px';
+    tempDiv.style.left = '-9999px';
+    document.body.appendChild(tempDiv);
+
+    await new Promise(r => setTimeout(r, 1000));
+
+    const safeInvoiceNo = (formData.PNo || "Draft").replace(/[\\/:*?"<>|]/g, "_");
+
+    const html2pdfModule = require("html2pdf.js");
+    const html2pdf = html2pdfModule.default || html2pdfModule;
+
+    const opt = {
+      margin:       5,
+      filename:     `PurchaseOrder_${safeInvoiceNo}.pdf`,
+      image:        { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, windowWidth: 800, width: 800 },
+      jsPDF:        { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
+    };
+
+    const worker = html2pdf().set(opt).from(tempDiv.firstElementChild);
+    const pdf = await worker.toPdf().get("pdf");
+    const pdfBlob = pdf.output("blob");
+    
+    document.body.removeChild(tempDiv);
+    return pdfBlob;
+  };
+
+  const handleSharePDFClick = async () => {
+    if (!pendingShareFile || !('share' in navigator)) return;
+    try {
+      if (navigator.canShare && !navigator.canShare({ files: [pendingShareFile] })) {
+        alert("Your device doesn't support sharing this PDF file directly. Please download it instead.");
+        setShowSharePDFModal(false);
+        setPendingShareFile(null);
+        return;
+      }
+      
+      await navigator.share({
+        title: 'Purchase Order',
+        text: 'Please find attached the Purchase Order',
+        files: [pendingShareFile]
+      });
+      alert('PDF shared successfully!');
+      setShowSharePDFModal(false);
+      setPendingShareFile(null);
+    } catch (shareError: any) {
+      if (shareError.name === 'AbortError') {
+        console.log('Share cancelled.');
+      } else {
+        console.error('Share error:', shareError);
+        alert('Share failed. Try again.');
+      }
+      setShowSharePDFModal(false);
+      setPendingShareFile(null);
+    }
+  };
+
+  const handlePDFExport = async () => {
+    const safeInvoiceNo = (formData.PNo || "Draft").replace(/[\\/:*?"<>|]/g, "_");
+    try {
+      const pdfBlob = await handleDownloadPdf();
+      const filename = `PurchaseOrder_${safeInvoiceNo}.pdf`;
+      const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+
+      if ('share' in navigator) {
+        setPendingShareFile(file);
+        setShowSharePDFModal(true);
+      } else {
+        const url = window.URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Error generating PDF. Please try again.');
+    }
+  };
+
   const purchaseOrderCompactStyles = `
     .purchase-print-layout { display: none; }
     @media print {
@@ -1119,6 +1213,9 @@ const PurchaseOrder = () => {
                   </button>
                   <Btn type="button" color="success" onClick={handlePrint}>
                     <i className="fa fa-print me-1"></i> Print
+                  </Btn>
+                  <Btn type="button" color="danger" onClick={handlePDFExport}>
+                    <i className="bx bxs-file-pdf me-1"></i> PDF
                   </Btn>
                   <Btn type="button" color="secondary" onClick={resetPurchaseOrderToBlank}>
                     <i className="fa fa-redo me-1"></i> Reset
@@ -1318,6 +1415,30 @@ const PurchaseOrder = () => {
           </tfoot>
         </table>
       </div>
+
+      {/* Share PDF Modal */}
+      <Modal isOpen={showSharePDFModal} toggle={() => setShowSharePDFModal(false)} className="modal-sm" centered>
+        <ModalHeader toggle={() => setShowSharePDFModal(false)} className="bg-primary text-white pb-2 pt-2 border-bottom-0">
+          <span className="text-white">Share PDF</span>
+        </ModalHeader>
+        <ModalBody className="text-center pt-4 pb-4">
+          <div className="mb-3">
+            <i className="bx bxs-file-pdf text-danger" style={{ fontSize: "3rem" }}></i>
+          </div>
+          <h6>Invoice PDF Ready</h6>
+          <p className="text-muted small mb-0">PDF has been generated successfully.</p>
+        </ModalBody>
+        <ModalFooter className="border-top-0 d-flex justify-content-center pb-3">
+          <Button color="secondary" className="btn-sm px-4" onClick={() => setShowSharePDFModal(false)}>
+            Close
+          </Button>
+          <Button color="primary" className="btn-sm px-4 action-btn" onClick={handleSharePDFClick}>
+            <i className="bx bx-share-alt me-1"></i>
+            Share File
+          </Button>
+        </ModalFooter>
+      </Modal>
+
     </div>
   );
 };  

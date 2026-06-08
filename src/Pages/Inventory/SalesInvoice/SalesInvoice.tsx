@@ -1173,18 +1173,19 @@ function SalesInvoice() {
 
   
   const handleDownloadPdf = async () => {
-  main
-    const element = document.querySelector(".sales-print-layout") as HTMLElement;
-    if (!element) {
-      throw new Error("Print layout not found");
-    }
+    const { generateInvoiceHTML } = require('../../../helpers/PDFTemplate');
+    const htmlString = generateInvoiceHTML("SALES INVOICE", state, gridRows, otherChargesRows, taxOverrides);
 
-    console.log("Element Dimensions:");
-    console.log("Width:", element.offsetWidth);
-    console.log("Height:", element.offsetHeight);
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlString;
+    // Append temporarily off-screen but not display:none or zero-height
+    tempDiv.style.position = 'absolute';
+    tempDiv.style.top = '-9999px';
+    tempDiv.style.left = '-9999px';
+    document.body.appendChild(tempDiv);
 
     // Small delay to let browser paint and load images
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise(r => setTimeout(r, 1000));
 
     const safeInvoiceNo = (state.formData.PONo || "Draft").replace(/[\\/:*?"<>|]/g, "_");
 
@@ -1195,14 +1196,16 @@ function SalesInvoice() {
       margin:       5,
       filename:     `Invoice_${safeInvoiceNo}.pdf`,
       image:        { type: 'jpeg' as const, quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true },
+      html2canvas:  { scale: 2, useCORS: true, windowWidth: 800, width: 800 },
       jsPDF:        { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
     };
 
-    const worker = html2pdf().set(opt).from(element);
+    const worker = html2pdf().set(opt).from(tempDiv.firstElementChild);
     const pdf = await worker.toPdf().get("pdf");
     const pdfBlob = pdf.output("blob");
     console.log("Generated PDF Size:", pdfBlob.size, "bytes");
+    
+    document.body.removeChild(tempDiv);
     return pdfBlob;
   };
 
@@ -1239,7 +1242,7 @@ function SalesInvoice() {
   const handlePDFExport = async () => {
     const safeInvoiceNo = (state.formData.PONo || "Draft").replace(/[\\/:*?"<>|]/g, "_");
     try {
-      const pdfBlob = await generateInvoicePDF();
+      const pdfBlob = await handleDownloadPdf();
       const filename = `Invoice_${safeInvoiceNo}.pdf`;
       const file = new File([pdfBlob], filename, { type: 'application/pdf' });
       console.log("File created:", file);
