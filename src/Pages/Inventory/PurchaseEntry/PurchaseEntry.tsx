@@ -71,7 +71,7 @@ function PurchaseEntry() {
   const API_URL_LINES = API_WEB_URLS.MASTER + "/0/token/PurchaseEntryL/Id";
   const API_URL_ITEMGROUP = API_WEB_URLS.MASTER + "/0/token/CategoryMaster/Id/0";
   const API_URL_ITEMS = API_WEB_URLS.MASTER + "/0/token/ItemMaster/Id";
-  const API_URL_VENDOR = API_WEB_URLS.MASTER + "/0/token/PartyLedgerMaster/Id/0";
+  const API_URL_VENDOR = API_WEB_URLS.MASTER + "/0/token/PurchasePartyLedgerMaster/Id/0";
   const API_URL_WAREHOUSE = API_WEB_URLS.MASTER + "/0/token/WarehouseMaster/Id/0";
   const API_URL_COLOR = API_WEB_URLS.MASTER + "/0/token/ColorMaster/Id/0";
   const API_URL_BATCH = API_WEB_URLS.MASTER + "/0/token/BatchMaster/Id/0";
