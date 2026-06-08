@@ -74,7 +74,7 @@ function SalesReturn() {
   const API_URL_LINES = API_WEB_URLS.MASTER + "/0/token/SalesReturnL/Id";
   const API_URL_ITEMGROUP = API_WEB_URLS.MASTER + "/0/token/CategoryMaster/Id/0";
   const API_URL_ITEMS = API_WEB_URLS.MASTER + "/0/token/ItemMaster/Id";
-  const API_URL_VENDOR = API_WEB_URLS.MASTER + "/0/token/PartyLedgerMaster/Id/0";
+  const API_URL_VENDOR = API_WEB_URLS.MASTER + "/0/token/SalesPartyLedgerMaster/Id/0";
   const API_URL_WAREHOUSE = API_WEB_URLS.MASTER + "/0/token/WarehouseMaster/Id/0";
   const API_URL_COLOR = API_WEB_URLS.MASTER + "/0/token/ColorMaster/Id/0";
   const API_URL_BATCH = API_WEB_URLS.MASTER + "/0/token/BatchMaster/Id/0";
@@ -199,7 +199,7 @@ function SalesReturn() {
           await loadSalesReturnRecord(parseInt(recordId));
         } else {
           try {
-            const API_ENTRY_NO = API_WEB_URLS.MASTER + "/0/token/GetVoucherNoByVoucherTypeId/Id/6";
+            const API_ENTRY_NO = API_WEB_URLS.MASTER + "/0/token/GetVoucherNoByVoucherTypeId/Id/14";
             const entryNoData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_ENTRY_NO);
             let newEntryNo = "";
             let dataArray = extractArray(entryNoData);
@@ -923,6 +923,7 @@ function SalesReturn() {
         totalIGST += itemIGST;
 
         return {
+          F_SalesEntryL: Number(row.F_SalesInvoiceL) || 0,
           F_ItemDesignMaster: Number(row.F_ItemDesignMaster) || 0,
           F_CategoryMaster: Number(row.F_ItemGroupMaster) || 0,
           F_ItemMaster: Number(row.F_ItemMaster) || 0,
@@ -931,6 +932,7 @@ function SalesReturn() {
           DesignPhoto: row.DesignPhoto || row.Photos?.[0] || "",
           Qty: qty,
           Rate: rate,
+          F_StatusMaster: 0,
           Amount: amount,
           CGST: Number(itemCGST.toFixed(2)),
           SGST: Number(itemSGST.toFixed(2)),
@@ -942,20 +944,24 @@ function SalesReturn() {
       const finalSGST = Math.round(taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST);
       const finalIGST = Math.round(taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST);
       const finalTotalTax = finalCGST + finalSGST + finalIGST;
+      const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
+      const grandTotal = subTotal + finalTotalTax;
 
       const headerFormData = new FormData();
+      headerFormData.append("F_SalesEntryH", state.formData.F_SalesInvoiceH || "0");
       headerFormData.append("EntryDate", state.formData.PODate);
       headerFormData.append("EntryNo", state.formData.PONo || "");
       headerFormData.append("F_LedgerMaster", state.formData.F_VendorMaster);
-      headerFormData.append("F_StatusMaster", "0");
       headerFormData.append("Remarks", state.formData.Remarks || "");
-      headerFormData.append("UserId", obj?.uid || "0");
       headerFormData.append("TotalCGST", finalCGST.toFixed(2));
       headerFormData.append("TotalSGST", finalSGST.toFixed(2));
       headerFormData.append("TotalIGST", finalIGST.toFixed(2));
       headerFormData.append("TotalTax", finalTotalTax.toFixed(2));
+      headerFormData.append("TotalAmount", grandTotal.toFixed(2));
+      headerFormData.append("UserId", obj?.uid || "0");
+      headerFormData.append("F_CompanyMaster", (() => { try { const a = JSON.parse(localStorage.getItem("authUser")||"{}"); return String(a?.F_CompanyMaster ?? a?.CompanyId ?? a?.F_Company ?? "0"); } catch(e){return "0";} })());
       headerFormData.append("JsonData", JSON.stringify(jsonDataArray));
-      headerFormData.append("F_CompanyMaster", "0");
+      headerFormData.append("OtherChargesJson", "[]");
       await Fn_AddEditData(dispatch, setState, { arguList: { id: state.id, formData: headerFormData } }, API_URL_SAVE, true, "memberid", navigate, "#");
       alert("Sales Return saved successfully");
       window.location.reload();
@@ -1248,154 +1254,171 @@ function SalesReturn() {
         <ModalFooter><Button color="primary" onClick={handleVendorSubmit} disabled={vendorSubmitting}>Save</Button><Button color="secondary" onClick={closeVendorModal}>Cancel</Button></ModalFooter>
       </Modal>
 
+      {/* ── SALES RETURN PRINT LAYOUT ── */}
       <div className="sales-return-print-layout">
-        <div className="print-header">
-          <div className="firm-name">{state.GlobalOptions[0]?.FirmName || "FIRM NAME"}</div>
-          <div style={{ fontSize: "12px", marginTop: "4px", color: "#555", fontWeight: "normal" }}>
-            {[
-              state.GlobalOptions[0]?.FirmAddress,
-              state.GlobalOptions[0]?.CityName || state.GlobalOptions[0]?.City || state.CityMaster?.find(c => String(c.Id) === String(state.GlobalOptions[0]?.F_CityMaster))?.Name,
-              state.GlobalOptions[0]?.StateName || state.GlobalOptions[0]?.State || state.GlobalOptions[0]?.StateMasterName || state.StateMaster?.find(s => String(s.Id) === String(state.GlobalOptions[0]?.F_StateMaster))?.StateName
-            ].filter(Boolean).join(", ")}
+        <div style={{ border: "1px solid #000", minHeight: "1000px", display: "flex", flexDirection: "column" }}>
+          
+          <div style={{ textAlign: "center", borderBottom: "1px solid #000", padding: "10px" }}>
+            <h2 style={{ margin: "0", fontSize: "22px", fontWeight: "bold", textTransform: "uppercase" }}>{state.GlobalOptions[0]?.FirmName || "FIRM NAME"}</h2>
+            <div style={{ fontSize: "12px", marginTop: "4px", color: "#555" }}>
+              {[
+                state.GlobalOptions[0]?.FirmAddress,
+                state.GlobalOptions[0]?.CityName || state.GlobalOptions[0]?.City || state.CityMaster?.find((c: any) => String(c.Id) === String(state.GlobalOptions[0]?.F_CityMaster))?.Name,
+                state.GlobalOptions[0]?.StateName || state.GlobalOptions[0]?.State || state.GlobalOptions[0]?.StateMasterName || state.StateMaster?.find((s: any) => String(s.Id) === String(state.GlobalOptions[0]?.F_StateMaster))?.StateName
+              ].filter(Boolean).join(", ")}
+            </div>
+            <h4 style={{ margin: "5px 0 0 0", fontSize: "16px", textDecoration: "underline" }}>SALES RETURN</h4>
           </div>
-          <div className="print-title">SALES RETURN INVOICE</div>
-        </div>
-        <div className="print-details">
-          <div className="detail-row">
-            <div><strong>Sales Return Invoice No.:</strong> {state.formData.PONo || "N/A"}</div>
-            <div><strong>Date:</strong> {state.formData.PODate || "N/A"}</div>
-          </div>
-          <div className="detail-row">
-            <div>
-              <strong>Vendor:</strong>{" "}
+
+          <div style={{ display: "flex", borderBottom: "1px solid #000" }}>
+            <div style={{ flex: 1, padding: "10px", borderRight: "1px solid #000" }}>
+              <strong>Bill To:</strong><br />
               {(() => {
                 const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
-                return vendor ? (vendor.CompanyName || vendor.Name || vendor.LedgerName) : "N/A";
+                return vendor ? (
+                  <>
+                    <div style={{ fontWeight: "bold", fontSize: "14px", marginTop: "4px" }}>{vendor.CompanyName || vendor.Name || vendor.LedgerName}</div>
+                    {vendor.Address && <div style={{ fontSize: "12px", marginTop: "2px" }}>{vendor.Address}</div>}
+                    {vendor.Phone && <div style={{ fontSize: "12px", marginTop: "2px" }}>Ph: {vendor.Phone}</div>}
+                  </>
+                ) : "N/A";
               })()}
             </div>
+            <div style={{ flex: 1, padding: "10px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
+                <span><strong>Invoice No.:</strong> {state.formData.PONo || "N/A"}</span>
+                <span><strong>Date:</strong> {state.formData.PODate || "N/A"}</span>
+              </div>
+              {state.formData.Remarks && <div style={{ marginTop: "10px", fontSize: "12px" }}><strong>Remarks:</strong> {state.formData.Remarks}</div>}
+            </div>
           </div>
-          {state.formData.Remarks && <div className="detail-row"><div><strong>Remarks:</strong> {state.formData.Remarks}</div></div>}
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Barcode</th>
-              <th>Category</th>
-              <th>Item Name</th>
-              <th>Varient</th>
-              <th className="text-right">Qty</th>
-              <th className="text-right">Rate</th>
-              <th className="text-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {gridRows.map((row, index) => {
-              const qty = parseFloat(row.Qty) || 0;
-              const rate = parseFloat(row.Rate) || 0;
-              
-              const groupObj = state.ItemGroupMaster?.find((g: any) => String(g.Id) === String(row.F_ItemGroupMaster));
-              const groupName = groupObj ? (groupObj.Name || groupObj.GroupName) : "N/A";
-              
-              const itemObj = row.ItemData?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
-              const stateItemObj = state.ItemMaster?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
-              const itemName = itemObj?.ItemName || itemObj?.Name || stateItemObj?.ItemName || stateItemObj?.Name || row.ItemCode || "N/A";
-              
-              const colorName = state.ColorMaster?.find((c: any) => String(c.Id) === String(row.F_ColorMaster))?.Name || "N/A";
-              const warehouseName = state.WarehouseMaster?.find((w: any) => String(w.Id) === String(row.F_WarehouseMaster))?.Name || "N/A";
-              
-              return (
-                <tr key={index}>
-                  <td>{index + 1}</td>
-                  <td>{row.ItemCode || "N/A"}</td>
-                  <td>{groupName}</td>
-                  <td>{itemName}</td>
-                  <td>{row.Variant || "N/A"}</td>
-                  <td className="text-right">{qty}</td>
-                  <td className="text-right">{rate.toFixed(2)}</td>
-                  <td className="text-right">{(qty * rate).toFixed(2)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            {(() => {
-              let totalCGST = 0;
-              let totalSGST = 0;
-              let totalIGST = 0;
-              const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
-              const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
 
-              gridRows.forEach((row) => {
+          <table style={{ width: "100%", borderCollapse: "collapse", flex: 1 }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid #000" }}>
+                <th style={{ padding: "6px", borderRight: "1px solid #000", textAlign: "center", width: "40px" }}>#</th>
+                <th style={{ padding: "6px", borderRight: "1px solid #000", textAlign: "left" }}>Description of Goods</th>
+                <th style={{ padding: "6px", borderRight: "1px solid #000", textAlign: "center", width: "80px" }}>Qty</th>
+                <th style={{ padding: "6px", borderRight: "1px solid #000", textAlign: "right", width: "100px" }}>Rate</th>
+                <th style={{ padding: "6px", textAlign: "right", width: "120px" }}>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {gridRows.map((row, index) => {
                 const qty = parseFloat(row.Qty) || 0;
                 const rate = parseFloat(row.Rate) || 0;
-                const amount = qty * rate;
                 const itemObj = row.ItemData?.find((i: any) => String(i.Id) === String(row.F_ItemMaster)) ||
                                 state.ItemMaster?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
-                const gstGroupId = itemObj?.F_GSTGroupMaster || itemObj?.GSTGroupMasterId || itemObj?.GSTGroupId || row.F_GSTGroupMaster;
-                const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
-                
-                if (gstGroup) {
-                  if (isInState) {
-                    totalCGST += amount * (parseFloat(gstGroup.CGSTPercent) / 100);
-                    totalSGST += amount * (parseFloat(gstGroup.SGSTPercent) / 100);
-                  } else {
-                    totalIGST += amount * (parseFloat(gstGroup.IGSTPercent) / 100);
+                const itemName = itemObj?.ItemName || itemObj?.Name || row.ItemCode || "N/A";
+
+                return (
+                  <tr key={index}>
+                    <td style={{ padding: "4px 6px", borderRight: "1px solid #000", textAlign: "center", verticalAlign: "top" }}>{index + 1}</td>
+                    <td style={{ padding: "4px 6px", borderRight: "1px solid #000", verticalAlign: "top" }}>
+                      <strong>{itemName}</strong>
+                      {(row.Variant || row.ItemCode) && (
+                        <div style={{ fontSize: "11px", color: "#333", marginTop: "2px" }}>
+                          {row.Variant && <span>Variant: {row.Variant}</span>}
+                          {row.Variant && row.ItemCode && <span> | </span>}
+                          {row.ItemCode && <span>Code: {row.ItemCode}</span>}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ padding: "4px 6px", borderRight: "1px solid #000", textAlign: "center", verticalAlign: "top" }}>{qty}</td>
+                    <td style={{ padding: "4px 6px", borderRight: "1px solid #000", textAlign: "right", verticalAlign: "top" }}>{rate.toFixed(2)}</td>
+                    <td style={{ padding: "4px 6px", textAlign: "right", verticalAlign: "top" }}>{(qty * rate).toFixed(2)}</td>
+                  </tr>
+                );
+              })}
+              {/* Filler row to push footer to bottom */}
+              <tr>
+                <td style={{ borderRight: "1px solid #000", height: "100%" }}></td>
+                <td style={{ borderRight: "1px solid #000" }}></td>
+                <td style={{ borderRight: "1px solid #000" }}></td>
+                <td style={{ borderRight: "1px solid #000" }}></td>
+                <td></td>
+              </tr>
+            </tbody>
+            <tfoot style={{ borderTop: "1px solid #000" }}>
+              {(() => {
+                let totalCGST = 0;
+                let totalSGST = 0;
+                let totalIGST = 0;
+                const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
+                const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+
+                gridRows.forEach((row) => {
+                  const qty = parseFloat(row.Qty) || 0;
+                  const rate = parseFloat(row.Rate) || 0;
+                  const amount = qty * rate;
+                  const itemObj = row.ItemData?.find((i: any) => String(i.Id) === String(row.F_ItemMaster)) ||
+                                  state.ItemMaster?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
+                  const gstGroupId = itemObj?.F_GSTGroupMaster || itemObj?.GSTGroupMasterId || itemObj?.GSTGroupId || row.F_GSTGroupMaster;
+                  const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
+                  
+                  if (gstGroup) {
+                    if (isInState) {
+                      totalCGST += amount * (parseFloat(gstGroup.CGSTPercent) / 100);
+                      totalSGST += amount * (parseFloat(gstGroup.SGSTPercent) / 100);
+                    } else {
+                      totalIGST += amount * (parseFloat(gstGroup.IGSTPercent) / 100);
+                    }
                   }
-                }
-              });
+                });
 
-              const finalCGST = Math.round(taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST);
-              const finalSGST = Math.round(taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST);
-              const finalIGST = Math.round(taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST);
+                const finalCGST = Math.round(taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST);
+                const finalSGST = Math.round(taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST);
+                const finalIGST = Math.round(taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST);
 
-              const totalTax = finalCGST + finalSGST + finalIGST;
-              const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
-              const grandTotal = subTotal + totalTax;
+                const totalTax = finalCGST + finalSGST + finalIGST;
+                const totalQty = gridRows.reduce((sum, row) => sum + (parseFloat(row.Qty) || 0), 0);
+                const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
+                const grandTotal = subTotal + totalTax;
 
-              return (
-                <>
-                  <tr className="total-row">
-                    <td colSpan={5} className="text-right">Total Qty:</td>
-                    <td className="text-right">{gridRows.reduce((sum, row) => sum + (parseFloat(row.Qty) || 0), 0)}</td>
-                    <td className="text-right">Sub Total:</td>
-                    <td className="text-right">{subTotal.toFixed(2)}</td>
-                  </tr>
-                  {isInState ? (
-                    <>
-                      <tr className="total-row">
-                        <td colSpan={6}></td>
-                        <td className="text-right">Total CGST:</td>
-                        <td className="text-right">{finalCGST.toFixed(2)}</td>
-                      </tr>
-                      <tr className="total-row">
-                        <td colSpan={6}></td>
-                        <td className="text-right">Total SGST:</td>
-                        <td className="text-right">{finalSGST.toFixed(2)}</td>
-                      </tr>
-                    </>
-                  ) : (
-                    <tr className="total-row">
-                      <td colSpan={6}></td>
-                      <td className="text-right">Total IGST:</td>
-                      <td className="text-right">{finalIGST.toFixed(2)}</td>
+                return (
+                  <>
+                    <tr style={{ borderBottom: "1px solid #eee" }}>
+                      <td colSpan={2} style={{ padding: "6px", borderRight: "1px solid #000", textAlign: "right", fontWeight: "bold" }}>Total:</td>
+                      <td style={{ padding: "6px", borderRight: "1px solid #000", textAlign: "center", fontWeight: "bold" }}>{totalQty}</td>
+                      <td style={{ padding: "6px", borderRight: "1px solid #000", textAlign: "right", fontWeight: "bold" }}>Sub Total:</td>
+                      <td style={{ padding: "6px", textAlign: "right", fontWeight: "bold" }}>{subTotal.toFixed(2)}</td>
                     </tr>
-                  )}
-                  <tr className="total-row">
-                    <td colSpan={6}></td>
-                    <td className="text-right">Total Tax:</td>
-                    <td className="text-right">{totalTax.toFixed(2)}</td>
-                  </tr>
-                  <tr className="total-row" style={{fontSize: '1.2em', fontWeight: 'bold'}}>
-                    <td colSpan={6}></td>
-                    <td className="text-right">Grand Total:</td>
-                    <td className="text-right">{grandTotal.toFixed(2)}</td>
-                  </tr>
-                </>
-              );
-            })()}
-          </tfoot>
-        </table>
+                    {isInState ? (
+                      <>
+                        <tr style={{ borderBottom: "1px solid #eee" }}>
+                          <td colSpan={3} style={{ borderRight: "1px solid #000" }}></td>
+                          <td style={{ padding: "4px 6px", borderRight: "1px solid #000", textAlign: "right" }}>CGST:</td>
+                          <td style={{ padding: "4px 6px", textAlign: "right" }}>{finalCGST.toFixed(2)}</td>
+                        </tr>
+                        <tr style={{ borderBottom: "1px solid #eee" }}>
+                          <td colSpan={3} style={{ borderRight: "1px solid #000" }}></td>
+                          <td style={{ padding: "4px 6px", borderRight: "1px solid #000", textAlign: "right" }}>SGST:</td>
+                          <td style={{ padding: "4px 6px", textAlign: "right" }}>{finalSGST.toFixed(2)}</td>
+                        </tr>
+                      </>
+                    ) : (
+                      <tr style={{ borderBottom: "1px solid #eee" }}>
+                        <td colSpan={3} style={{ borderRight: "1px solid #000" }}></td>
+                        <td style={{ padding: "4px 6px", borderRight: "1px solid #000", textAlign: "right" }}>IGST:</td>
+                        <td style={{ padding: "4px 6px", textAlign: "right" }}>{finalIGST.toFixed(2)}</td>
+                      </tr>
+                    )}
+                    <tr style={{ borderBottom: "1px solid #eee" }}>
+                      <td colSpan={3} style={{ borderRight: "1px solid #000" }}></td>
+                      <td style={{ padding: "4px 6px", borderRight: "1px solid #000", textAlign: "right", fontWeight: "bold" }}>Total Tax:</td>
+                      <td style={{ padding: "4px 6px", textAlign: "right", fontWeight: "bold" }}>{totalTax.toFixed(2)}</td>
+                    </tr>
+                    <tr style={{ fontSize: '1.1em' }}>
+                      <td colSpan={3} style={{ borderRight: "1px solid #000" }}></td>
+                      <td style={{ padding: "6px", borderRight: "1px solid #000", textAlign: "right", fontWeight: "bold" }}>Grand Total:</td>
+                      <td style={{ padding: "6px", textAlign: "right", fontWeight: "bold" }}>{grandTotal.toFixed(2)}</td>
+                    </tr>
+                  </>
+                );
+              })()}
+            </tfoot>
+          </table>
+        </div>
       </div>
     </div>
   );
