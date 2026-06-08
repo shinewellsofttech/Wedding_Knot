@@ -1170,7 +1170,10 @@ function SalesInvoice() {
     }
   };
 
-  const generateInvoicePDF = async (): Promise<Blob> => {
+
+  
+  const handleDownloadPdf = async () => {
+  main
     const element = document.querySelector(".sales-print-layout") as HTMLElement;
     if (!element) {
       throw new Error("Print layout not found");
