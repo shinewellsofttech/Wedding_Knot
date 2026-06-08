@@ -19,10 +19,12 @@ interface FormValues {
   F_UserType: string;
   Email: string;
   F_DepartmentMaster: string;
+  F_RoleMaster: string;
 }
 
 const API_URL = API_WEB_URLS.MASTER + "/0/token/UserTypeMaster";
 const API_URL1 = API_WEB_URLS.MASTER + "/0/token/DepartmentMaster";
+const API_URL2 = API_WEB_URLS.MASTER + "/0/token/UserRole";
 const API_URL_SAVE = "UserMaster/0/token";
 const API_URL_EDIT = API_WEB_URLS.MASTER + "/0/token/UserMaster/Id";
 
@@ -31,6 +33,7 @@ const AddEdit_UserMasterContainer = () => {
     id: 0,
     FillArray: [],
     FillArray1: [],
+    FillArray2: [],
     formData: {} as any,
     OtherDataScore: [],
     isProgress: true,
@@ -43,6 +46,7 @@ const AddEdit_UserMasterContainer = () => {
   useEffect(() => {
     Fn_FillListData(dispatch, setState, "FillArray", API_URL + "/Id/0");
     Fn_FillListData(dispatch, setState, "FillArray1", API_URL1 + "/Id/0");
+    Fn_FillListData(dispatch, setState, "FillArray2", API_URL2 + "/Id/0");
 
     const Id = (location.state && (location.state as any).Id) || 0;
 
@@ -69,6 +73,7 @@ const AddEdit_UserMasterContainer = () => {
       .email("Invalid email format")
       .required("Email is required"),
     F_DepartmentMaster: Yup.string().required("Department is required"),
+    F_RoleMaster: Yup.string().required("User Role is required"),
   });
 
   const handleSubmit = (values: FormValues) => {
@@ -80,6 +85,7 @@ const AddEdit_UserMasterContainer = () => {
     vformData.append("F_UserType", values.F_UserType);
     vformData.append("Email", values.Email);
     vformData.append("F_DepartmentMaster", values.F_DepartmentMaster);
+    vformData.append("F_RoleMaster", values.F_RoleMaster);
     vformData.append("UserId", getCurrentUserId());
     vformData.append("F_CompanyMaster", (() => { try { const a = JSON.parse(localStorage.getItem("authUser")||"{}"); return String(a?.F_CompanyMaster ?? a?.CompanyId ?? a?.F_Company ?? "0"); } catch(e){return "0";} })());
 
@@ -103,6 +109,7 @@ const AddEdit_UserMasterContainer = () => {
     F_UserType: state.formData?.F_UserType || "",
     Email: state.formData?.Email || "",
     F_DepartmentMaster: state.formData?.F_DepartmentMaster || "",
+    F_RoleMaster: state.formData?.F_RoleMaster || "",
   };
 
   return (
@@ -265,6 +272,31 @@ const AddEdit_UserMasterContainer = () => {
                               ))}
                             </Input>
                             <ErrorMessage name="F_DepartmentMaster" component="div" className="text-danger small" />
+                          </FormGroup>
+                        </Col>
+                        <Col md="6">
+                          <FormGroup>
+                            <Label>
+                              User Role <span className="text-danger">*</span>
+                            </Label>
+                            <Input
+                              type="select"
+                              name="F_RoleMaster"
+                              value={values.F_RoleMaster}
+                              onChange={handleChange}
+                              onBlur={handleBlur}
+                              className="btn-square"
+                              style={{ fontFamily: 'inherit' }}
+                              invalid={touched.F_RoleMaster && !!errors.F_RoleMaster}
+                            >
+                              <option value="">Select User Role</option>
+                              {state.FillArray2.map((item: any) => (
+                                <option key={item.Id} value={item.Id}>
+                                  {item.Name || item.RoleName}
+                                </option>
+                              ))}
+                            </Input>
+                            <ErrorMessage name="F_RoleMaster" component="div" className="text-danger small" />
                           </FormGroup>
                         </Col>
                       </Row>

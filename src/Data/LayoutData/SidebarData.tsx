@@ -98,6 +98,22 @@ export const MenuList: MenuItem[] = [
         type: "link",
         bookmark: true
       },
+      {
+        id: 8,
+        title: "User Role Master",
+        path: `${process.env.PUBLIC_URL}/userRoleMaster`,
+        icon: "User",
+        type: "link",
+        bookmark: true
+      },
+      {
+        id: 9,
+        title: "Module Master",
+        path: `${process.env.PUBLIC_URL}/moduleMaster`,
+        icon: "Box",
+        type: "link",
+        bookmark: true
+      },
       // {
       //   id: 5, title: "Tax Group Master",
       //   path: `${process.env.PUBLIC_URL}/taxGroupMaster`,
@@ -215,6 +231,7 @@ Items:[
     Items: [
       // { id: 1, title: "User Rights", path: `${process.env.PUBLIC_URL}/userRights`, icon: "Shield", type: "link", bookmark: true },
       { id: 2, title: "Global Options", path: `${process.env.PUBLIC_URL}/globalOptions`, icon: "Settings", type: "link", bookmark: true },
+      { id: 3, title: "Permission Matrixs", path: `${process.env.PUBLIC_URL}/permissionMetrixs`, icon: "Settings", type: "link", bookmark: true },
     ],
   },
   /*

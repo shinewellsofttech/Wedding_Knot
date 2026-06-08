@@ -26,6 +26,7 @@ interface FormValues {
   F_CityMaster: string;
   FirmsAllowed: boolean;
   ConfirmPassword: string;
+  F_RoleMaster: string;
 }
 
 const initialValues: FormValues = {
@@ -42,6 +43,7 @@ const initialValues: FormValues = {
   F_CityMaster: "",
   FirmsAllowed: false,
   ConfirmPassword: "",
+  F_RoleMaster: "",
 };
 
 interface UserMasterState {
@@ -53,6 +55,7 @@ interface UserMasterState {
 interface DropdownState {
   states: Array<{ Id?: number; Name?: string }>;
   cities: Array<{ Id?: number; Name?: string }>;
+  roles: Array<{ Id?: number; Name?: string; RoleName?: string }>;
   isProgress?: boolean;
 }
 
@@ -60,6 +63,7 @@ const API_URL_SAVE = `UserMaster/0/token`;
 const API_URL_EDIT = API_WEB_URLS.MASTER + `/0/token/UserMaster/Id`;
 const STATE_LIST_URL = `${API_WEB_URLS.MASTER}/0/token/${API_WEB_URLS.StateMaster}/Id/0`;
 const CITY_LIST_URL = `${API_WEB_URLS.MASTER}/0/token/${API_WEB_URLS.CityMaster}/Id/0`;
+const ROLE_LIST_URL = `${API_WEB_URLS.MASTER}/0/token/UserRole/Id/0`;
 
 /**
  * Add/Edit form for User master.
@@ -78,6 +82,7 @@ const AddEdit_UserMaster = () => {
   const [dropdowns, setDropdowns] = useState<DropdownState>({
     states: [],
     cities: [],
+    roles: [],
     isProgress: false,
   });
 
@@ -120,6 +125,7 @@ const AddEdit_UserMaster = () => {
               .trim()
               .oneOf([Yup.ref("Password")], "Passwords must match")
               .required("Confirm password is required"),
+        F_RoleMaster: Yup.string().trim().required("User Role is required"),
       }),
     [isEditMode]
   );
@@ -133,6 +139,9 @@ const AddEdit_UserMaster = () => {
     });
     Fn_FillListData(dispatch, setDropdowns, "cities", CITY_LIST_URL).catch((error) => {
       console.error("Failed to fetch cities:", error);
+    });
+    Fn_FillListData(dispatch, setDropdowns, "roles", ROLE_LIST_URL).catch((error) => {
+      console.error("Failed to fetch user roles:", error);
     });
   }, [dispatch]);
 
@@ -189,6 +198,7 @@ const AddEdit_UserMaster = () => {
     F_CityMaster: toStringOrEmpty(userMasterState.formData.F_CityMaster),
     FirmsAllowed: Boolean(userMasterState.formData.FirmsAllowed),
     ConfirmPassword: "",
+    F_RoleMaster: toStringOrEmpty(userMasterState.formData.F_RoleMaster),
   };
 
   /**
@@ -228,6 +238,7 @@ const AddEdit_UserMaster = () => {
       formData.append("Address2", values.Address2 || "");
       formData.append("F_StateMaster", values.F_StateMaster || "");
       formData.append("F_CityMaster", values.F_CityMaster || "");
+      formData.append("F_RoleMaster", values.F_RoleMaster || "");
       formData.append("FirmsAllowed", values.FirmsAllowed ? "true" : "false");
       formData.append("F_UserType", "2"); // UserMaster always sends 2
       formData.append("UserId", getCurrentUserId());
@@ -474,6 +485,29 @@ const AddEdit_UserMaster = () => {
                                 </Label>
                               </div>
                               <ErrorMessage name="FirmsAllowed" component="div" className="text-danger small mt-1" />
+                            </FormGroup>
+                          </Col>
+                          <Col md="6">
+                            <FormGroup>
+                              <Label>
+                                User Role <span className="text-danger">*</span>
+                              </Label>
+                              <Input
+                                type="select"
+                                name="F_RoleMaster"
+                                value={values.F_RoleMaster}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                invalid={touched.F_RoleMaster && !!errors.F_RoleMaster}
+                              >
+                                <option value="">Select User Role</option>
+                                {dropdowns.roles.map((roleOption) => (
+                                  <option key={roleOption?.Id} value={roleOption?.Id ?? ""}>
+                                    {roleOption?.Name || roleOption?.RoleName || `Role ${roleOption?.Id ?? ""}`}
+                                  </option>
+                                ))}
+                              </Input>
+                              <ErrorMessage name="F_RoleMaster" component="div" className="text-danger small" />
                             </FormGroup>
                           </Col>
                           <Col md="6">
