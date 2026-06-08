@@ -65,7 +65,7 @@ import BalanceSheetDetailed from "../Pages/Reports/BalanceSheet/BalanceSheetDeta
 import GroupLedgerSummary from "../Pages/Reports/GroupLedgerSummary/GroupLedgerSummary";
 import StockPositionReport from "../Pages/Reports/StockPositionReport/StockPositionReport";
 import CustomerOutstandingReport from "../Pages/Reports/CustomerOutstandingReport/CustomerOutstandingRepprt";
-import UserRights from "../Pages/Tools/UserRights";
+import PermissionMetrixs from "../Pages/Tools/PermissionMetrixs";
 import ChangePassword from "../Pages/Tools/ChangePassword";
 import PurchaseOrderApproval from "../Pages/Inventory/PurchaseOrderApproval/PurchaseOrderApproval";
 import GlobalOptions from "../Pages/Tools/GlobalOptions";
@@ -79,7 +79,10 @@ import AddEdit_CategoryMaster from "../Pages/Masters/AddEdit_CategoryMaster";
 import PageList_CategoryMaster from "../Pages/Masters/PageList_CategoryMaster";
 import Dashboard from "../Pages/Dashboard/Dashboard";
 import SalesReturn from "../Pages/Inventory/SalesReturn/SalesReturn";
-
+import AddEdit_UserRoleMaster from "../Pages/Masters/AddEdit_UserRoleMaster";
+import PageList_UserRoleMaster from "../Pages/Masters/PageList_UserRoleMaster";
+import AddEdit_ModuleMaster from "../Pages/Masters/AddEdit_ModuleMaster";
+import PageList_ModuleMaster from "../Pages/Masters/PageList_ModuleMaster";
 export const routes = [
   // Default landing route is /voucherEntry (see index.tsx Navigate)
   /*
@@ -134,7 +137,12 @@ export const routes = [
       { path: `${process.env.PUBLIC_URL}/trialBalance`, Component: <TrialBalance /> },
         { path: `${process.env.PUBLIC_URL}/balanceSheet`, Component: <BalanceSheetTraditional /> },
         { path: `${process.env.PUBLIC_URL}/stockPositionReport`, Component: <StockPositionReport /> },
-        { path: `${process.env.PUBLIC_URL}/customerOutstandingReport`, Component: <CustomerOutstandingReport /> }
+        { path: `${process.env.PUBLIC_URL}/customerOutstandingReport`, Component: <CustomerOutstandingReport /> },
+        { path: `${process.env.PUBLIC_URL}/addEditUserRoleMaster`, Component: <AddEdit_UserRoleMaster /> },
+        { path: `${process.env.PUBLIC_URL}/userRoleMaster`, Component: <PageList_UserRoleMaster /> },
+        { path: `${process.env.PUBLIC_URL}/addEditModuleMaster`, Component: <AddEdit_ModuleMaster /> },
+        { path: `${process.env.PUBLIC_URL}/moduleMaster`, Component: <PageList_ModuleMaster /> },
+        { path: `${process.env.PUBLIC_URL}/permissionMetrixs`, Component: <PermissionMetrixs /> },
   /*
   { path: `${process.env.PUBLIC_URL}/itemMaster`, Component: <PageList_ItemMaster /> },
   { path: `${process.env.PUBLIC_URL}/addEditItemGroup`, Component: <AddEdit_ItemGroup /> },

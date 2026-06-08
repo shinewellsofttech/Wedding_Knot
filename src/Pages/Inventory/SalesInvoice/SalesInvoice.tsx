@@ -163,6 +163,9 @@ function SalesInvoice() {
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [qrData, setQrData] = useState<string | null>(null);
 
+  const [showSharePDFModal, setShowSharePDFModal] = useState(false);
+  const [pendingShareFile, setPendingShareFile] = useState<File | null>(null);
+
   const saveButtonRef = useRef<HTMLButtonElement>(null);
 
   // Fetch master data on component mount
@@ -1168,63 +1171,96 @@ function SalesInvoice() {
   };
 
 
-
   
   const handleDownloadPdf = async () => {
+  main
     const element = document.querySelector(".sales-print-layout") as HTMLElement;
     if (!element) {
-      alert("Print layout not found.");
-      return;
+      throw new Error("Print layout not found");
     }
-    
-    element.style.display = "block";
-    element.style.position = "absolute";
-    element.style.top = "-9999px";
-    
-    setTimeout(async () => {
-      try {
-        const html2pdfModule = require("html2pdf.js");
-        const html2pdf = html2pdfModule.default || html2pdfModule;
-        
-        if (typeof html2pdf !== "function") {
-           alert("PDF Library could not be loaded correctly.");
-           return;
-        }
 
-        const opt = {
-          margin:       5,
-          filename:     `Invoice_${state.formData.PONo || 'Draft'}.pdf`,
-          image:        { type: 'jpeg' as const, quality: 0.98 },
-          html2canvas:  { scale: 2 },
-          jsPDF:        { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
-        };
-        
-        await html2pdf().set(opt).from(element).save();
-      } catch(e) {
-        console.error("Error generating PDF", e);
-        alert("Error generating PDF. Check console.");
-      } finally {
-        element.style.display = "";
-        element.style.position = "";
-        element.style.top = "";
-        setPrintModalOpen(false);
-      }
-    }, 100);
+    console.log("Element Dimensions:");
+    console.log("Width:", element.offsetWidth);
+    console.log("Height:", element.offsetHeight);
+
+    // Small delay to let browser paint and load images
+    await new Promise(r => setTimeout(r, 2000));
+
+    const safeInvoiceNo = (state.formData.PONo || "Draft").replace(/[\\/:*?"<>|]/g, "_");
+
+    const html2pdfModule = require("html2pdf.js");
+    const html2pdf = html2pdfModule.default || html2pdfModule;
+
+    const opt = {
+      margin:       5,
+      filename:     `Invoice_${safeInvoiceNo}.pdf`,
+      image:        { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true },
+      jsPDF:        { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
+    };
+
+    const worker = html2pdf().set(opt).from(element);
+    const pdf = await worker.toPdf().get("pdf");
+    const pdfBlob = pdf.output("blob");
+    console.log("Generated PDF Size:", pdfBlob.size, "bytes");
+    return pdfBlob;
   };
 
-  const handleSharePdf = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: "Sales Invoice",
-          text: `Invoice No: ${state.formData.PONo || "N/A"}`,
-          url: window.location.href,
-        });
-      } catch (err) {
-        console.error("Error sharing:", err);
+  const handleSharePDFClick = async () => {
+    if (!pendingShareFile || !('share' in navigator)) return;
+    try {
+      if (navigator.canShare && !navigator.canShare({ files: [pendingShareFile] })) {
+        alert("Your device doesn't support sharing this PDF file directly. Please download it instead.");
+        setShowSharePDFModal(false);
+        setPendingShareFile(null);
+        return;
       }
-    } else {
-      alert("Sharing is not supported in this browser. Please download the PDF and share manually.");
+      
+      await navigator.share({
+        title: 'Sales Invoice',
+        text: 'Please find attached the Sales Invoice',
+        files: [pendingShareFile]
+      });
+      alert('PDF shared successfully!');
+      setShowSharePDFModal(false);
+      setPendingShareFile(null);
+    } catch (shareError: any) {
+      if (shareError.name === 'AbortError') {
+        console.log('Share cancelled.');
+      } else {
+        console.error('Share error:', shareError);
+        alert('Share failed. Try again.');
+      }
+      setShowSharePDFModal(false);
+      setPendingShareFile(null);
+    }
+  };
+
+  const handlePDFExport = async () => {
+    const safeInvoiceNo = (state.formData.PONo || "Draft").replace(/[\\/:*?"<>|]/g, "_");
+    try {
+      const pdfBlob = await generateInvoicePDF();
+      const filename = `Invoice_${safeInvoiceNo}.pdf`;
+      const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+      console.log("File created:", file);
+      console.log("File Size:", file.size, "bytes");
+
+      if ('share' in navigator) {
+        setPendingShareFile(file);
+        setShowSharePDFModal(true);
+      } else {
+        const url = window.URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Error generating PDF. Please try again.');
     }
   };
 
@@ -1280,7 +1316,15 @@ function SalesInvoice() {
       .sales-entry-page .form-control { font-size: 0.75rem; height: 24px; padding: 0.15rem 0.28rem; }
       .sales-entry-page .btn { font-size: 0.75rem; padding: 0.18rem 0.35rem; }
     }
-    .sales-print-layout { display: none; }
+    .sales-print-layout { 
+      position: absolute; 
+      left: -9999px; 
+      top: 0; 
+      display: block; 
+      width: 210mm;
+      background: white; 
+      color: black; 
+    }
     @media print {
       @page { margin: 0; }
       body { margin: 0.2cm; line-height: 1.1; }
@@ -1606,13 +1650,18 @@ function SalesInvoice() {
                 <button ref={saveButtonRef} type="button" className="btn btn-primary m-0" onClick={handleSave} disabled={!state.isGridEditable}>
                   <i className="bx bx-save me-2"></i>Save
                 </button>
-                <Btn color="success" type="button" className="m-0" onClick={() => setPrintModalOpen(true)}>
+                <Btn color="success" type="button" className="m-0" onClick={executePrint}>
                   <i className="bx bx-printer me-2"></i>Print
+                </Btn>
+                <Btn color="danger" type="button" className="m-0" onClick={handlePDFExport}>
+                  <i className="bx bxs-file-pdf me-2"></i>PDF
                 </Btn>
                 <Btn color="info" type="button" className="m-0" onClick={handleGenerateQR} disabled={!state.isEditMode || state.id === 0}>
                   <i className="bx bx-qr me-2"></i>Generate QR
                 </Btn>
-                <Btn color="secondary" type="button" className="m-0" onClick={() => navigate(-1)}>Cancel</Btn>
+                <Btn color="dark" type="button" className="m-0" onClick={() => navigate("/dashboard")}>
+                  <i className="bx bx-exit me-2"></i>Exit
+                </Btn>
               </CardFooter>
             </Card>
           </Col>
@@ -1670,21 +1719,27 @@ function SalesInvoice() {
         )}
       </Modal>
 
-      <Modal isOpen={printModalOpen} toggle={() => setPrintModalOpen(false)} centered>
-        <ModalHeader toggle={() => setPrintModalOpen(false)}>Print / Share Invoice</ModalHeader>
-        <ModalBody className="text-center py-4">
-          <div className="d-flex flex-column gap-3 align-items-center">
-            <Button color="primary" size="lg" className="w-75 d-flex align-items-center justify-content-center gap-2" onClick={handleDownloadPdf}>
-              <i className="fa fa-download"></i> Download PDF
-            </Button>
-            <Button color="success" size="lg" className="w-75 d-flex align-items-center justify-content-center gap-2" onClick={handleSharePdf}>
-              <i className="fa fa-share-alt"></i> Share PDF
-            </Button>
-            <Button color="secondary" size="lg" className="w-75 d-flex align-items-center justify-content-center gap-2" onClick={executePrint}>
-              <i className="fa fa-print"></i> Print
-            </Button>
+      {/* Share PDF Modal */}
+      <Modal isOpen={showSharePDFModal} toggle={() => setShowSharePDFModal(false)} className="modal-sm" centered>
+        <ModalHeader toggle={() => setShowSharePDFModal(false)} className="bg-primary text-white pb-2 pt-2 border-bottom-0">
+          <span className="text-white">Share PDF</span>
+        </ModalHeader>
+        <ModalBody className="text-center pt-4 pb-4">
+          <div className="mb-3">
+            <i className="bx bxs-file-pdf text-danger" style={{ fontSize: "3rem" }}></i>
           </div>
+          <h6>Invoice PDF Ready</h6>
+          <p className="text-muted small mb-0">PDF has been generated successfully.</p>
         </ModalBody>
+        <ModalFooter className="border-top-0 d-flex justify-content-center pb-3">
+          <Button color="secondary" className="btn-sm px-4" onClick={() => setShowSharePDFModal(false)}>
+            Close
+          </Button>
+          <Button color="primary" className="btn-sm px-4 action-btn" onClick={handleSharePDFClick}>
+            <i className="bx bx-share-alt me-1"></i>
+            Share File
+          </Button>
+        </ModalFooter>
       </Modal>
 
       {/* ── SALES INVOICE PRINT LAYOUT ── */}
