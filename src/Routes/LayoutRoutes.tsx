@@ -1,22 +1,21 @@
 import { Route, Routes } from "react-router-dom";
 import Layout from "../Layout/Layout";
 import { routes } from "./Route";
-import { useUserRights } from "../contexts/UserRightsContext";
+import PermissionRoute from "./PermissionRoute";
 
 const LayoutRoutes = () => {
-  const { hasAccess } = useUserRights();
-
-  const filteredRoutes = routes.filter((r) => {
-    const pathPart = (r.path || "").replace(new RegExp(`^${(process.env.PUBLIC_URL || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), "").replace(/^\//, "").toLowerCase();
-    if (!pathPart) return true;
-    return hasAccess(pathPart);
-  });
-
   return (
     <Routes>
-      {filteredRoutes.map(({ path, Component }, i) => (
+      {routes.map(({ path, Component }, i) => (
         <Route element={<Layout />} key={i}>
-          <Route path={path} element={Component} />
+          <Route 
+            path={path} 
+            element={
+              <PermissionRoute>
+                {Component}
+              </PermissionRoute>
+            } 
+          />
         </Route>
       ))}
       {/* Catch-all: access denied */}
@@ -30,7 +29,7 @@ const LayoutRoutes = () => {
                   <div className="col-12 text-center py-5">
                     <h3>Access Denied</h3>
                     <p className="text-muted">You don&apos;t have permission to access this page.</p>
-                    <a href={`${process.env.PUBLIC_URL || ""}/addEditItemMaster`} className="btn btn-primary">Go to Add/Edit Item Master</a>
+                    <a href={`${process.env.PUBLIC_URL || ""}/dashboard`} className="btn btn-primary">Go to Dashboard</a>
                   </div>
                 </div>
               </div>

@@ -13,6 +13,7 @@ import Profile from "./auth/profile/reducer";
 import LayoutSlice from "../ReduxToolkit/Reducers/LayoutSlice";
 import BookmarkHeaderSlice from "../ReduxToolkit/Reducers/BookmarkHeaderSlice";
 import ThemeCustomizerSlice from "../ReduxToolkit/Reducers/ThemeCustomizerSlice";
+import PermissionsSlice from "../ReduxToolkit/Reducers/PermissionsSlice";
 
 const rootReducer = combineReducers({
   // public
@@ -25,6 +26,7 @@ const rootReducer = combineReducers({
   layout: LayoutSlice,
   bookmarkHeader: BookmarkHeaderSlice,
   themeCustomizer: ThemeCustomizerSlice,
+  permissions: PermissionsSlice,
 });
 
 export default rootReducer;

@@ -1,44 +1,60 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useState, useMemo, useEffect } from 'react'
 import { useAppSelector } from '../../ReduxToolkit/Hooks';
 import { MenuList } from '../../Data/LayoutData/SidebarData';
 import Menulist from './Menulist';
 import { MenuItem } from '../../Types/Layout/SidebarType';
 import { H6, LI, UL } from '../../AbstractElements';
 import { useTranslation } from 'react-i18next';
-import { useUserRights } from '../../contexts/UserRightsContext';
-
-const getRouteName = (path: string | undefined) => {
-  if (!path) return '';
-  const base = (process.env.PUBLIC_URL || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return path.replace(new RegExp(`^${base}`), '').replace(/^\//, '').toLowerCase();
-};
+import { usePermissions, loadPermissionsFromStorage } from '../../helpers/permissionsHelper';
 
 const SidebarMenuList = () => {
-    const [activeMenu, setActiveMenu] = useState<string[]>([]);
-    const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
-    const { pinedMenu } = useAppSelector((state) => state.layout);
-    const { t } = useTranslation();
-    const { hasAccess } = useUserRights();
+  const [activeMenu, setActiveMenu] = useState<string[]>([]);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+  const { pinedMenu } = useAppSelector((state) => state.layout);
+  const { t } = useTranslation();
+  const { permissions, isLoaded } = usePermissions();
 
-    const filteredMenuList = useMemo(() => {
-      return (MenuList || []).map((mainMenu: MenuItem) => ({
-        ...mainMenu,
-        Items: (mainMenu.Items || []).filter((item) => hasAccess(getRouteName(item.path))),
-      })).filter((main) => (main.Items?.length ?? 0) > 0);
-    }, [hasAccess]);
+  useEffect(() => {
+    if (!isLoaded) {
+      loadPermissionsFromStorage();
+    }
+  }, [isLoaded, permissions]);
 
-    const shouldHideMenu = (mainMenu: MenuItem) => {return mainMenu?.Items?.map((data) => data.title).every((titles) =>pinedMenu.includes(titles || ""));};
+  const filteredMenuList = useMemo(() => {
+    if (isLoaded && (!permissions || permissions.length === 0)) return [];
+    if (!isLoaded) return MenuList;
 
-    const toggleSection = (title: string) => {
-      setExpandedSections((prev) => ({ ...prev, [title]: !prev[title] }));
-    };
-  
-    return (
-      <>
-        {filteredMenuList &&
-          filteredMenuList.map((mainMenu: MenuItem, index) => {
-            const isExpanded = expandedSections[mainMenu.title || ""] ?? false;
-            return (
+    const filtered = MenuList.map((mainMenu) => {
+      const filteredItems = mainMenu.Items?.filter((item) => {
+        if (!item.path) return false;
+        let cleanPath = item.path.replace(process.env.PUBLIC_URL || "", "");
+        if (!cleanPath.startsWith("/")) cleanPath = "/" + cleanPath;
+        const permission = permissions.find(p => {
+          let modulePath = p.ModulePath || "";
+          if (!modulePath.startsWith("/")) modulePath = "/" + modulePath;
+          return modulePath.toLowerCase() === cleanPath.toLowerCase();
+        });
+        return permission ? permission.IsView === true : false;
+      });
+      return { ...mainMenu, Items: filteredItems };
+    }).filter((mainMenu) => mainMenu.Items && mainMenu.Items.length > 0);
+    return filtered;
+  }, [permissions, isLoaded]);
+
+  const shouldHideMenu = (mainMenu: MenuItem) => { 
+    return mainMenu?.Items?.map((data) => data.title).every((titles) => pinedMenu.includes(titles || "")); 
+  };
+
+  const toggleSection = (title: string) => {
+    setExpandedSections((prev) => ({ ...prev, [title]: !prev[title] }));
+  };
+
+  return (
+    <>
+      {filteredMenuList &&
+        filteredMenuList.map((mainMenu: MenuItem, index: number) => {
+          const isExpanded = expandedSections[mainMenu.title || ""] ?? false;
+          return (
             <Fragment key={index}>
               <LI className={`sidebar-main-title ${shouldHideMenu(mainMenu) ? "d-none" : ""}`}>
                 <div
@@ -74,13 +90,13 @@ const SidebarMenuList = () => {
                   padding: 0,
                 }}
               >
-                <Menulist menu={mainMenu.Items} activeMenu={activeMenu} setActiveMenu={setActiveMenu} level={0}/>
+                <Menulist menu={mainMenu.Items} activeMenu={activeMenu} setActiveMenu={setActiveMenu} level={0} />
               </UL>
             </Fragment>
           );
-          })}
-      </>
-    );
+        })}
+    </>
+  );
 }
 
-export default SidebarMenuList
+export default SidebarMenuList;
