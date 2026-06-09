@@ -8,6 +8,7 @@ import { toast } from "react-toastify";
 import SocialApp from "./SocialApp";
 import { API_HELPER } from "../../helpers/ApiHelper";
 import { API_WEB_URLS } from "../../constants/constAPI";
+import { fetchUserPermissions } from "../../helpers/permissionsHelper";
 
 const USER_MASTER_LIST_URL = `${API_WEB_URLS.BASE}${API_WEB_URLS.MASTER}/0/token/${API_WEB_URLS.UserMaster}/Id/0`;
 const GET_COMPANIES_BY_USER_URL = (userId: string | number) =>
@@ -114,6 +115,10 @@ const Login = () => {
         const companyName = (typeof fromApi === "string" && fromApi.trim()) ? fromApi.trim() : (typeof fromDropdown === "string" ? fromDropdown.trim() : "");
         localStorage.setItem("authUser", JSON.stringify({ ...userData, CompanyName: companyName || userData?.CompanyName }));
         localStorage.setItem("login", JSON.stringify(true));
+
+        const roleId = userData?.F_UserRole || userData?.RoleId || userData?.F_RoleMaster || "0";
+        await fetchUserPermissions(roleId, 0);
+
         toast.success(loginMessage || "Login Successful");
         navigate(`${process.env.PUBLIC_URL}/dashboard`);
       } else {

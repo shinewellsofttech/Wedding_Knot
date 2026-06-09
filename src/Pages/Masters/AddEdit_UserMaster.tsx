@@ -26,7 +26,7 @@ interface FormValues {
   F_CityMaster: string;
   FirmsAllowed: boolean;
   ConfirmPassword: string;
-  F_RoleMaster: string;
+  F_UserRole: string;
 }
 
 const initialValues: FormValues = {
@@ -43,7 +43,7 @@ const initialValues: FormValues = {
   F_CityMaster: "",
   FirmsAllowed: false,
   ConfirmPassword: "",
-  F_RoleMaster: "",
+  F_UserRole: "",
 };
 
 interface UserMasterState {
@@ -106,14 +106,13 @@ const AddEdit_UserMaster = () => {
               .min(6, "Password must be at least 6 characters")
               .required("Password is required"),
         FullName: Yup.string().trim().required("Full name is required"),
-        ContactPerson: Yup.string().trim().required("Contact Person is required"),
-        ContactEmail: Yup.string().trim().email("Invalid email format").required("Contact Email is required"),
+        ContactPerson: Yup.string().trim(),
+        ContactEmail: Yup.string().trim().email("Invalid email format"),
         ContactMobile: Yup.string()
           .trim()
-          .matches(/^\d{10}$/, "Contact mobile must be 10 digits")
-          .required("Contact mobile is required"),
-        Address1: Yup.string().trim().required("Address 1 is required"),
-        Address2: Yup.string().trim().required("Address 2 is required"),
+          .matches(/^(\d{10})?$/, "Contact mobile must be 10 digits"),
+        Address1: Yup.string().trim(),
+        Address2: Yup.string().trim(),
         F_StateMaster: Yup.string().trim(),
         F_CityMaster: Yup.string().trim(),
         FirmsAllowed: Yup.boolean(),
@@ -125,7 +124,7 @@ const AddEdit_UserMaster = () => {
               .trim()
               .oneOf([Yup.ref("Password")], "Passwords must match")
               .required("Confirm password is required"),
-        F_RoleMaster: Yup.string().trim().required("User Role is required"),
+        F_UserRole: Yup.string().trim().required("User Role is required"),
       }),
     [isEditMode]
   );
@@ -187,7 +186,7 @@ const AddEdit_UserMaster = () => {
     ...initialValues,
     Name: toStringOrEmpty(userMasterState.formData.Name || (userMasterState.formData as any).Username),
     Username: toStringOrEmpty((userMasterState.formData as any).Username || userMasterState.formData.Name),
-    Password: "",
+    Password: toStringOrEmpty(userMasterState.formData.Password),
     FullName: toStringOrEmpty(userMasterState.formData.FullName),
     ContactPerson: toStringOrEmpty(userMasterState.formData.ContactPerson),
     ContactEmail: toStringOrEmpty(userMasterState.formData.ContactEmail),
@@ -197,9 +196,19 @@ const AddEdit_UserMaster = () => {
     F_StateMaster: toStringOrEmpty(userMasterState.formData.F_StateMaster),
     F_CityMaster: toStringOrEmpty(userMasterState.formData.F_CityMaster),
     FirmsAllowed: Boolean(userMasterState.formData.FirmsAllowed),
-    ConfirmPassword: "",
-    F_RoleMaster: toStringOrEmpty(userMasterState.formData.F_RoleMaster),
+    ConfirmPassword: toStringOrEmpty(userMasterState.formData.Password),
+    F_UserRole: toStringOrEmpty((userMasterState.formData as any).F_UserRole || userMasterState.formData.F_UserRole || (userMasterState.formData as any).RoleId || (userMasterState.formData as any).RoleID).trim(),
   };
+
+  // DEBUGGING INFO
+  useEffect(() => {
+    if (isEditMode) {
+      console.log("== DEBUG USER MASTER DATA ==");
+      console.log("Raw Form Data from API:", userMasterState.formData);
+      console.log("Mapped F_UserRole:", initialFormValues.F_UserRole);
+      console.log("Roles dropdown options:", dropdowns.roles);
+    }
+  }, [userMasterState.formData, dropdowns.roles, isEditMode]);
 
   /**
    * Updates form state and optionally reloads cities when the state selection changes.
@@ -238,7 +247,7 @@ const AddEdit_UserMaster = () => {
       formData.append("Address2", values.Address2 || "");
       formData.append("F_StateMaster", values.F_StateMaster || "");
       formData.append("F_CityMaster", values.F_CityMaster || "");
-      formData.append("F_RoleMaster", values.F_RoleMaster || "");
+      formData.append("F_UserRole", values.F_UserRole || "");
       formData.append("FirmsAllowed", values.FirmsAllowed ? "true" : "false");
       formData.append("F_UserType", "2"); // UserMaster always sends 2
       formData.append("UserId", getCurrentUserId());
@@ -337,7 +346,7 @@ const AddEdit_UserMaster = () => {
                           <Col md="6">
                             <FormGroup>
                               <Label>
-                                Contact Person <span className="text-danger">*</span>
+                                Contact Person
                               </Label>
                               <Input
                                 type="text"
@@ -354,7 +363,7 @@ const AddEdit_UserMaster = () => {
                           <Col md="6">
                             <FormGroup>
                               <Label>
-                                Contact Email <span className="text-danger">*</span>
+                                Contact Email
                               </Label>
                               <Input
                                 type="email"
@@ -371,7 +380,7 @@ const AddEdit_UserMaster = () => {
                           <Col md="6">
                             <FormGroup>
                               <Label>
-                                Contact Mobile <span className="text-danger">*</span>
+                                Contact Mobile
                               </Label>
                               <Input
                                 type="tel"
@@ -388,7 +397,7 @@ const AddEdit_UserMaster = () => {
                           <Col md="6">
                             <FormGroup>
                               <Label>
-                                Address 1 <span className="text-danger">*</span>
+                                Address 1
                               </Label>
                               <Input
                                 type="textarea"
@@ -405,7 +414,7 @@ const AddEdit_UserMaster = () => {
                           <Col md="6">
                             <FormGroup>
                               <Label>
-                                Address 2 <span className="text-danger">*</span>
+                                Address 2
                               </Label>
                               <Input
                                 type="text"
@@ -494,20 +503,20 @@ const AddEdit_UserMaster = () => {
                               </Label>
                               <Input
                                 type="select"
-                                name="F_RoleMaster"
-                                value={values.F_RoleMaster}
+                                name="F_UserRole"
+                                value={values.F_UserRole}
                                 onChange={handleChange}
                                 onBlur={handleBlur}
-                                invalid={touched.F_RoleMaster && !!errors.F_RoleMaster}
+                                invalid={touched.F_UserRole && !!errors.F_UserRole}
                               >
                                 <option value="">Select User Role</option>
                                 {dropdowns.roles.map((roleOption) => (
-                                  <option key={roleOption?.Id} value={roleOption?.Id ?? ""}>
-                                    {roleOption?.Name || roleOption?.RoleName || `Role ${roleOption?.Id ?? ""}`}
+                                  <option key={roleOption?.Id} value={String(roleOption?.Id ?? "")}>
+                                    {roleOption?.Name || (roleOption as any)?.RoleName || `Role ${roleOption?.Id ?? ""}`}
                                   </option>
                                 ))}
                               </Input>
-                              <ErrorMessage name="F_RoleMaster" component="div" className="text-danger small" />
+                              <ErrorMessage name="F_UserRole" component="div" className="text-danger small" />
                             </FormGroup>
                           </Col>
                           <Col md="6">

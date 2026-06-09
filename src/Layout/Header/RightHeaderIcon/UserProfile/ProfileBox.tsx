@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { FeatherIcons, LI, UL } from "../../../../AbstractElements";
 import { profilesMessage } from "../../../../Data/LayoutData/HeaderData";
 import { useUserRights } from "../../../../contexts/UserRightsContext";
+import { clearUserPermissions } from "../../../../helpers/permissionsHelper";
 
 const ProfileBox = () => {
   const { hasAccess, loadUserRights } = useUserRights();
@@ -11,6 +12,7 @@ const ProfileBox = () => {
       localStorage.removeItem("login");
       localStorage.removeItem("authUser");
       loadUserRights([]);
+      clearUserPermissions();
     }
   };
 
