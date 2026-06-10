@@ -83,6 +83,7 @@ import AddEdit_UserRoleMaster from "../Pages/Masters/AddEdit_UserRoleMaster";
 import PageList_UserRoleMaster from "../Pages/Masters/PageList_UserRoleMaster";
 import AddEdit_ModuleMaster from "../Pages/Masters/AddEdit_ModuleMaster";
 import PageList_ModuleMaster from "../Pages/Masters/PageList_ModuleMaster";
+import RentManagement from "../Pages/Rent/RentManagement";
 export const routes = [
   // Default landing route is /voucherEntry (see index.tsx Navigate)
   /*
@@ -143,6 +144,7 @@ export const routes = [
         { path: `${process.env.PUBLIC_URL}/addEditModuleMaster`, Component: <AddEdit_ModuleMaster /> },
         { path: `${process.env.PUBLIC_URL}/moduleMaster`, Component: <PageList_ModuleMaster /> },
         { path: `${process.env.PUBLIC_URL}/permissionMetrixs`, Component: <PermissionMetrixs /> },
+        { path: `${process.env.PUBLIC_URL}/rentManagement`, Component: <RentManagement /> },
   /*
   { path: `${process.env.PUBLIC_URL}/itemMaster`, Component: <PageList_ItemMaster /> },
   { path: `${process.env.PUBLIC_URL}/addEditItemGroup`, Component: <AddEdit_ItemGroup /> },

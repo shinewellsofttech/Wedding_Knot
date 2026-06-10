@@ -207,9 +207,9 @@ const LedgerDetailsReport: React.FC = () => {
       const userId = String(authUser?.uid ?? authUser?.Id ?? "0");
       const userToken = authUser?.Token ?? authUser?.token ?? "token";
 
-      // POST /api/V1/GetLedgerReport/{UserId}/{UserToken}
+      // POST /api/V1/GetLedgerDetails/{UserId}/{UserToken}
       // Content-Type: multipart/form-data
-      const apiURL = `${API_WEB_URLS.GetLedgerReport}/${userId}/${userToken}`;
+      const apiURL = `GetLedgerDetails/${userId}/${userToken}`;
 
       // Request body (multipart/form-data) - match API spec
       // FromDate, ToDate: string($date-time) in yyyy-mm-dd
@@ -224,8 +224,8 @@ const LedgerDetailsReport: React.FC = () => {
       formData.append("ReportType", String(reportType));
       formData.append("ViewType", String(viewTypeValue));
       formData.append("F_VoucherTypeMaster", String(Number(voucherTypeId) || 0));
-      formData.append("UserId", userId);
-      formData.append("F_CompanyMaster", String(authUser?.F_CompanyMaster ?? authUser?.CompanyId ?? authUser?.F_Company ?? "0"));
+      // F_CompanyMaster and UserId are not in the Swagger body schema, so omit them or keep them if backend requires.
+      // We will remove them to perfectly match the image.
 
       const arguList = { formData };
 

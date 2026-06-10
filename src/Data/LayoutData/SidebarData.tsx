@@ -161,6 +161,19 @@ export const MenuList: MenuItem[] = [
     ]
   },
   {
+    title:"Rent Management",
+    Items:[
+      {
+        id:1,
+        title:"Rent Management",
+        path:`${process.env.PUBLIC_URL}/rentManagement`,
+        icon:"Box",
+        type:"link",
+        bookmark:true
+      }
+    ]
+  },
+  {
 title:"Accounting",
 Items:[
   {
