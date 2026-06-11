@@ -32,18 +32,11 @@ export const generateInvoiceHTML = (
   taxOverrides: any = {}
 ) => {
   const vendorId = state.formData?.F_VendorMaster || state.formData?.F_PartyMaster || state.formData?.F_LedgerMaster || "";
-  const vendor = state.VendorMaster?.find(
-    (v: any) => String(v.Id) === String(vendorId)
-  ) || state.PartyMaster?.find(
-    (v: any) => String(v.Id) === String(vendorId)
-  );
+  const vendorMasterObj = state.VendorMaster?.find((v: any) => String(v.Id) === String(vendorId)) || state.PartyMaster?.find((v: any) => String(v.Id) === String(vendorId));
+  const vendor = state.SelectedVendor || vendorMasterObj;
 
-  const isInState = vendor
-    ? vendor.IsInState === true ||
-      vendor.IsInState === 1 ||
-      vendor.IsInState === "1" ||
-      vendor.IsInState === "true"
-    : false;
+  const isInState = (vendorMasterObj && (vendorMasterObj.IsInState === true || vendorMasterObj.IsInState === 1 || vendorMasterObj.IsInState === "1" || vendorMasterObj.IsInState === "true")) || 
+    (vendor && (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true")) || false;
 
   const firmName = state.GlobalOptions?.[0]?.FirmName || "FIRM NAME";
   const addressParts = [
@@ -59,6 +52,48 @@ export const generateInvoiceHTML = (
   let highestCGSTPercent = 0;
   let highestSGSTPercent = 0;
   let highestIGSTPercent = 0;
+
+  gridRows.forEach((row) => {
+    const qty = parseFloat(row.Qty) || 0;
+    const rate = parseFloat(row.Rate) || 0;
+    const amount = qty * rate;
+
+    if (qty > 0) {
+      const itemObj = row.ItemData?.find((i: any) => String(i.Id) === String(row.F_ItemMaster)) ||
+                      state.ItemMaster?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
+                      
+      const gstGroupId = row.F_GSTGroupMaster || itemObj?.F_GSTGroupMaster || itemObj?.GSTGroupMasterId || itemObj?.GSTGroupId;
+      const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
+      
+      if (gstGroup) {
+        const cgstP = parseFloat(gstGroup.CGSTPercent) || 0;
+        const sgstP = parseFloat(gstGroup.SGSTPercent) || 0;
+        const igstP = parseFloat(gstGroup.IGSTPercent) || 0;
+        
+        if (cgstP > highestCGSTPercent) highestCGSTPercent = cgstP;
+        if (sgstP > highestSGSTPercent) highestSGSTPercent = sgstP;
+        if (igstP > highestIGSTPercent) highestIGSTPercent = igstP;
+
+        if (isInState) {
+          totalCGST += amount * (cgstP / 100);
+          totalSGST += amount * (sgstP / 100);
+        } else {
+          totalIGST += amount * (igstP / 100);
+        }
+      } else if (row.GSTPercent) {
+        if (isInState) {
+          const half = row.GSTPercent / 2;
+          if (half > highestCGSTPercent) highestCGSTPercent = half;
+          if (half > highestSGSTPercent) highestSGSTPercent = half;
+          totalCGST += amount * (half / 100);
+          totalSGST += amount * (half / 100);
+        } else {
+          if (row.GSTPercent > highestIGSTPercent) highestIGSTPercent = row.GSTPercent;
+          totalIGST += amount * (row.GSTPercent / 100);
+        }
+      }
+    }
+  });
 
 
   const totalOtherCharges = otherChargesRows.reduce(
@@ -91,20 +126,23 @@ export const generateInvoiceHTML = (
   );
   const grandTotal = subTotal + totalTax + totalOtherCharges;
 
+  const dispatchDocNo = state.formData.DispatchDocNo || "N/A";
+  const dispatchedThrough = state.formData.DispatchedThrough || "N/A";
+
   let vendorInfo = "N/A";
   if (vendor) {
-    const vendorState = state.StateMaster?.find((s: any) => String(s.Id) === String(vendor.F_StateMaster));
-    const vendorStateName = vendorState?.StateName || vendorState?.Name || vendor.StateName || "N/A";
-    const vendorStateCode = vendorState?.StateCode || vendor.StateCode || "N/A";
-    const vendorGST = vendor.GSTIN || vendor.GSTNo || "N/A";
+    const vendorStateId = vendor.F_StateMaster || vendor.StateId || vendor.F_State || vendor.F_StateId;
+    const vendorState = state.StateMaster?.find((s: any) => String(s.Id) === String(vendorStateId));
+    const vendorStateName = vendor.StateName || vendor.State || vendorState?.StateName || vendorState?.Name || "N/A";
+    const vendorStateCode = vendor.StateCode || vendorState?.StateCode || "N/A";
+    const vendorGST = vendor.GSTIN || vendor.GstIn || vendor.gstin || vendor.GSTNo || vendor.GstNo || vendor.GST_No || vendor.GST || vendor.TaxNo || vendor.TaxNumber || "N/A";
 
     vendorInfo = `
       <div style="font-weight: bold; font-size: 12px; margin-top: 4px; text-transform: uppercase;">${vendor.CompanyName || vendor.Name || vendor.LedgerName || vendor.PartyName}</div>
       ${vendor.Address ? `<div style="font-size: 11px; margin-top: 2px;">${vendor.Address}</div>` : ""}
       <div style="font-size: 11px; margin-top: 2px;">
         GSTIN/UIN: ${vendorGST}<br/>
-        State Name : ${vendorStateName}, Code : ${vendorStateCode}<br/>
-        Place of Supply : ${vendorStateName}
+        State Name : ${vendorStateName}, Code : ${vendorStateCode}
       </div>
     `;
   }
@@ -119,11 +157,16 @@ export const generateInvoiceHTML = (
   const invoiceNo = state.formData.PONo || state.formData.EntryNo || state.formData.ChallanNo || "N/A";
   const invoiceDate = state.formData.PODate || state.formData.EntryDate || state.formData.ChallanDate || "N/A";
 
+  let firstItemObj = gridRows[0]?.ItemData?.find((i: any) => String(i.Id) === String(gridRows[0]?.F_ItemMaster)) ||
+                     state.ItemMaster?.find((i: any) => String(i.Id) === String(gridRows[0]?.F_ItemMaster));
+  let hsn = firstItemObj?.HSNCode || firstItemObj?.HSN || gridRows[0]?.HSNCode || gridRows[0]?.HSN || "N/A";
+
   // Tax Sub-Table rows
   let taxBreakdownHTML = "";
   if (isInState) {
     taxBreakdownHTML = `
       <tr>
+        <td style="padding: 4px; border: 1px solid #000; text-align: center;">${hsn}</td>
         <td style="padding: 4px; border: 1px solid #000; text-align: right;">${subTotal.toFixed(2)}</td>
         <td style="padding: 4px; border: 1px solid #000; text-align: right;">${(highestCGSTPercent).toFixed(2)}%</td>
         <td style="padding: 4px; border: 1px solid #000; text-align: right;">${finalCGST.toFixed(2)}</td>
@@ -132,7 +175,7 @@ export const generateInvoiceHTML = (
         <td style="padding: 4px; border: 1px solid #000; text-align: right;">${(finalCGST + finalSGST).toFixed(2)}</td>
       </tr>
       <tr>
-        <td style="padding: 4px; border: 1px solid #000; text-align: right; font-weight: bold;">Total</td>
+        <td style="padding: 4px; border: 1px solid #000; text-align: right; font-weight: bold;" colspan="2">Total</td>
         <td style="padding: 4px; border: 1px solid #000; text-align: right;"></td>
         <td style="padding: 4px; border: 1px solid #000; text-align: right; font-weight: bold;">${finalCGST.toFixed(2)}</td>
         <td style="padding: 4px; border: 1px solid #000; text-align: right;"></td>
@@ -143,13 +186,14 @@ export const generateInvoiceHTML = (
   } else {
     taxBreakdownHTML = `
       <tr>
+        <td style="padding: 4px; border: 1px solid #000; text-align: center;">${hsn}</td>
         <td style="padding: 4px; border: 1px solid #000; text-align: right;">${subTotal.toFixed(2)}</td>
         <td style="padding: 4px; border: 1px solid #000; text-align: right;">${(highestIGSTPercent).toFixed(2)}%</td>
         <td style="padding: 4px; border: 1px solid #000; text-align: right;">${finalIGST.toFixed(2)}</td>
         <td style="padding: 4px; border: 1px solid #000; text-align: right;">${finalIGST.toFixed(2)}</td>
       </tr>
       <tr>
-        <td style="padding: 4px; border: 1px solid #000; text-align: right; font-weight: bold;">Total</td>
+        <td style="padding: 4px; border: 1px solid #000; text-align: right; font-weight: bold;" colspan="2">Total</td>
         <td style="padding: 4px; border: 1px solid #000; text-align: right;"></td>
         <td style="padding: 4px; border: 1px solid #000; text-align: right; font-weight: bold;">${finalIGST.toFixed(2)}</td>
         <td style="padding: 4px; border: 1px solid #000; text-align: right; font-weight: bold;">${finalIGST.toFixed(2)}</td>
@@ -161,69 +205,81 @@ export const generateInvoiceHTML = (
   if (isInState) {
     igstOrCgstSgstRows = `
       <tr>
-        <td colspan="4" style="border-right: 1px solid #000; padding: 2px 6px; text-align: right;"><em>OUTPUT CGST</em></td>
-        <td style="border-right: 1px solid #000;"></td>
-        <td style="border-right: 1px solid #000;"></td>
-        <td style="border-right: 1px solid #000;"></td>
-        <td style="padding: 2px 6px; text-align: right; font-weight: bold;">${finalCGST.toFixed(2)}</td>
+        <td colspan="4" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 6px; text-align: right;"><em>OUTPUT CGST</em></td>
+        <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
+        <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
+        <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
+        <td style="padding: 2px 6px; border-bottom: 1px solid #000; text-align: right; font-weight: bold;">${finalCGST.toFixed(2)}</td>
       </tr>
       <tr>
-        <td colspan="4" style="border-right: 1px solid #000; padding: 2px 6px; text-align: right;"><em>OUTPUT SGST</em></td>
-        <td style="border-right: 1px solid #000;"></td>
-        <td style="border-right: 1px solid #000;"></td>
-        <td style="border-right: 1px solid #000;"></td>
-        <td style="padding: 2px 6px; text-align: right; font-weight: bold;">${finalSGST.toFixed(2)}</td>
+        <td colspan="4" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 6px; text-align: right;"><em>OUTPUT SGST</em></td>
+        <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
+        <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
+        <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
+        <td style="padding: 2px 6px; border-bottom: 1px solid #000; text-align: right; font-weight: bold;">${finalSGST.toFixed(2)}</td>
       </tr>
     `;
   } else {
     igstOrCgstSgstRows = `
       <tr>
-        <td colspan="4" style="border-right: 1px solid #000; padding: 2px 6px; text-align: right;"><em>OUTPUT IGST</em></td>
-        <td style="border-right: 1px solid #000;"></td>
-        <td style="border-right: 1px solid #000;"></td>
-        <td style="border-right: 1px solid #000;"></td>
-        <td style="padding: 2px 6px; text-align: right; font-weight: bold;">${finalIGST.toFixed(2)}</td>
+        <td colspan="4" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 6px; text-align: right;"><em>OUTPUT IGST</em></td>
+        <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
+        <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
+        <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
+        <td style="padding: 2px 6px; border-bottom: 1px solid #000; text-align: right; font-weight: bold;">${finalIGST.toFixed(2)}</td>
       </tr>
     `;
   }
 
-  let forwardingRow = "";
-  if (totalOtherCharges > 0) {
-    forwardingRow = `
+  let forwardingRow = otherChargesRows.map((chargeRow) => {
+    const ledger = state.OtherChargesLedgers?.find((l: any) => String(l.Id) === String(chargeRow.F_LedgerMaster));
+    const chargeName = ledger?.LedgerName || ledger?.Name || "OTHER CHARGES";
+    const amount = parseFloat(chargeRow.Amount) || 0;
+    if (amount === 0) return "";
+    return `
       <tr>
-        <td colspan="4" style="border-right: 1px solid #000; padding: 2px 6px; text-align: right;"><em>FORWARDING & PACKING</em></td>
-        <td style="border-right: 1px solid #000;"></td>
-        <td style="border-right: 1px solid #000;"></td>
-        <td style="border-right: 1px solid #000;"></td>
-        <td style="padding: 2px 6px; text-align: right; font-weight: bold;">${totalOtherCharges.toFixed(2)}</td>
+        <td colspan="4" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 6px; text-align: right;"><em>${chargeName}</em></td>
+        <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
+        <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
+        <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
+        <td style="padding: 2px 6px; border-bottom: 1px solid #000; text-align: right; font-weight: bold;">${amount.toFixed(2)}</td>
       </tr>
     `;
-  }
+  }).join("");
 
   return `
     <div style="font-family: Arial, sans-serif; background: white; color: black; padding: 15px; width: 100%; max-width: 800px; box-sizing: border-box; margin: 0 auto; line-height: 1.3;">
       <div style="text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 5px;">GST INVOICE</div>
-      <div style="border: 1px solid #000; display: flex; flex-direction: column;">
+      <div style="border: 1px solid #000; display: block;">
         
         <div style="display: flex; border-bottom: 1px solid #000;">
           <!-- Left side -->
           <div style="flex: 1; border-right: 1px solid #000; display: flex; flex-direction: column;">
             <div style="padding: 5px; border-bottom: 1px solid #000; flex: 1;">
+              ${title.toUpperCase().includes("PURCHASE") ? vendorInfo : `
               <div style="font-weight: bold; font-size: 13px; text-transform: uppercase;">${firmName}</div>
               <div style="font-size: 11px;">${firmAddress}</div>
               <div style="font-size: 11px;">GSTIN/UIN: ${companyGST}</div>
               <div style="font-size: 11px;">State Name : ${companyStateName}, Code : ${companyStateCode}</div>
               <div style="font-size: 11px;">Contact : ${companyPhone}</div>
               <div style="font-size: 11px;">E-Mail : ${companyEmail}</div>
+              `}
             </div>
             <div style="padding: 5px; flex: 1;">
               <div style="font-size: 11px;">Buyer (Bill to)</div>
-              ${vendorInfo}
+              ${title.toUpperCase().includes("PURCHASE") ? `
+              <div style="font-weight: bold; font-size: 13px; text-transform: uppercase;">${firmName}</div>
+              <div style="font-size: 11px;">${firmAddress}</div>
+              <div style="font-size: 11px;">GSTIN/UIN: ${companyGST}</div>
+              <div style="font-size: 11px;">State Name : ${companyStateName}, Code : ${companyStateCode}</div>
+              <div style="font-size: 11px;">Contact : ${companyPhone}</div>
+              <div style="font-size: 11px;">E-Mail : ${companyEmail}</div>
+              ` : vendorInfo}
             </div>
           </div>
           <!-- Right side -->
           <div style="flex: 1; display: flex; flex-direction: column;">
-            <div style="display: flex; border-bottom: 1px solid #000;">
+            <div style="display: flex; border-bottom: 1px solid #000; flex: 1;">
               <div style="flex: 1; padding: 5px; border-right: 1px solid #000;">
                 <div style="font-size: 10px;">Invoice No.</div>
                 <div style="font-weight: bold; font-size: 12px;">${invoiceNo}</div>
@@ -233,59 +289,19 @@ export const generateInvoiceHTML = (
                 <div style="font-weight: bold; font-size: 12px;">${invoiceDate}</div>
               </div>
             </div>
-            <div style="display: flex; border-bottom: 1px solid #000;">
-              <div style="flex: 1; padding: 5px; border-right: 1px solid #000;">
-                <div style="font-size: 10px;">Delivery Note</div>
-                <div style="font-weight: bold; font-size: 12px;"></div>
-              </div>
-              <div style="flex: 1; padding: 5px;">
-                <div style="font-size: 10px;">Mode/Terms of Payment</div>
-                <div style="font-weight: bold; font-size: 12px;"></div>
-              </div>
-            </div>
-            <div style="display: flex; border-bottom: 1px solid #000;">
-              <div style="flex: 1; padding: 5px; border-right: 1px solid #000;">
-                <div style="font-size: 10px;">Reference No. & Date.</div>
-                <div style="font-weight: bold; font-size: 12px;"></div>
-              </div>
-              <div style="flex: 1; padding: 5px;">
-                <div style="font-size: 10px;">Other References</div>
-                <div style="font-weight: bold; font-size: 12px;"></div>
-              </div>
-            </div>
-            <div style="display: flex; border-bottom: 1px solid #000;">
-              <div style="flex: 1; padding: 5px; border-right: 1px solid #000;">
-                <div style="font-size: 10px;">Buyer's Order No.</div>
-                <div style="font-weight: bold; font-size: 12px;"></div>
-              </div>
-              <div style="flex: 1; padding: 5px;">
-                <div style="font-size: 10px;">Dated</div>
-                <div style="font-weight: bold; font-size: 12px;"></div>
-              </div>
-            </div>
-            <div style="display: flex; border-bottom: 1px solid #000;">
+            <div style="display: flex; border-bottom: 1px solid #000; flex: 1;">
               <div style="flex: 1; padding: 5px; border-right: 1px solid #000;">
                 <div style="font-size: 10px;">Dispatch Doc No.</div>
-                <div style="font-weight: bold; font-size: 12px;"></div>
+                <div style="font-weight: bold; font-size: 12px;">${dispatchDocNo}</div>
               </div>
               <div style="flex: 1; padding: 5px;">
-                <div style="font-size: 10px;">Delivery Note Date</div>
-                <div style="font-weight: bold; font-size: 12px;"></div>
-              </div>
-            </div>
-            <div style="display: flex; border-bottom: 1px solid #000;">
-              <div style="flex: 1; padding: 5px; border-right: 1px solid #000;">
                 <div style="font-size: 10px;">Dispatched through</div>
-                <div style="font-weight: bold; font-size: 12px;"></div>
-              </div>
-              <div style="flex: 1; padding: 5px;">
-                <div style="font-size: 10px;">Destination</div>
-                <div style="font-weight: bold; font-size: 12px;"></div>
+                <div style="font-weight: bold; font-size: 12px;">${dispatchedThrough}</div>
               </div>
             </div>
-            <div style="padding: 5px; flex: 1;">
-              <div style="font-size: 10px;">Terms of Delivery</div>
-              <div style="font-weight: bold; font-size: 12px;"></div>
+            <div style="display: flex; flex: 1;">
+              <div style="flex: 1; padding: 5px; border-right: 1px solid #000;"></div>
+              <div style="flex: 1; padding: 5px;"></div>
             </div>
           </div>
         </div>
@@ -311,28 +327,28 @@ export const generateInvoiceHTML = (
               const itemObj = row.ItemData?.find((i: any) => String(i.Id) === String(row.F_ItemMaster)) ||
                               state.ItemMaster?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
               const itemName = itemObj?.ItemName || itemObj?.Name || row.ItemCode || "N/A";
-              const hsnCode = itemObj?.HSNCode || itemObj?.HSN || "";
-              const gstGroupId = itemObj?.F_GSTGroupMaster || itemObj?.GSTGroupMasterId || itemObj?.GSTGroupId || row.F_GSTGroupMaster;
+              const gstGroupId = row.F_GSTGroupMaster || itemObj?.F_GSTGroupMaster || itemObj?.GSTGroupMasterId || itemObj?.GSTGroupId;
               const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
-              let gstPercent = gstGroup ? (isInState ? parseFloat(gstGroup.CGSTPercent || 0) + parseFloat(gstGroup.SGSTPercent || 0) : parseFloat(gstGroup.IGSTPercent || 0)) : (row.GSTPercent || 0);
+              let gstPercent = gstGroup ? parseFloat(gstGroup.GSTPercent) || 0 : (row.GSTPercent || 0);
+              const hsnCode = gstGroup?.HSN_SAC_Code || itemObj?.HSNCode || itemObj?.HSN || row.HSNCode || row.HSN || "";
               const uom = itemObj?.UOMName || itemObj?.UOM || "PCS";
               return `
                 <tr>
-                  <td style="padding: 2px 4px; border-right: 1px solid #000; text-align: center; font-size: 11px; vertical-align: top;">${index + 1}</td>
-                  <td style="padding: 2px 4px; border-right: 1px solid #000; font-size: 11px; vertical-align: top;">
+                  <td style="padding: 2px 4px; border-right: 1px solid #000; border-bottom: 1px solid #000; text-align: center; font-size: 11px; vertical-align: top;">${index + 1}</td>
+                  <td style="padding: 2px 4px; border-right: 1px solid #000; border-bottom: 1px solid #000; font-size: 11px; vertical-align: top;">
                     <strong>${itemName}</strong>
                   </td>
-                  <td style="padding: 2px 4px; border-right: 1px solid #000; text-align: center; font-size: 11px; vertical-align: top;">${hsnCode}</td>
-                  <td style="padding: 2px 4px; border-right: 1px solid #000; text-align: center; font-size: 11px; vertical-align: top;">${gstPercent}%</td>
-                  <td style="padding: 2px 4px; border-right: 1px solid #000; text-align: center; font-size: 11px; vertical-align: top; font-weight: bold;">${qty} ${uom}</td>
-                  <td style="padding: 2px 4px; border-right: 1px solid #000; text-align: right; font-size: 11px; vertical-align: top;">${rate.toFixed(2)}</td>
-                  <td style="padding: 2px 4px; border-right: 1px solid #000; text-align: center; font-size: 11px; vertical-align: top;">${uom}</td>
-                  <td style="padding: 2px 4px; text-align: right; font-size: 11px; vertical-align: top; font-weight: bold;">${amount.toFixed(2)}</td>
+                  <td style="padding: 2px 4px; border-right: 1px solid #000; border-bottom: 1px solid #000; text-align: center; font-size: 11px; vertical-align: top;">${hsnCode}</td>
+                  <td style="padding: 2px 4px; border-right: 1px solid #000; border-bottom: 1px solid #000; text-align: center; font-size: 11px; vertical-align: top;">${gstPercent}%</td>
+                  <td style="padding: 2px 4px; border-right: 1px solid #000; border-bottom: 1px solid #000; text-align: center; font-size: 11px; vertical-align: top; font-weight: bold;">${qty} ${uom}</td>
+                  <td style="padding: 2px 4px; border-right: 1px solid #000; border-bottom: 1px solid #000; text-align: right; font-size: 11px; vertical-align: top;">${rate.toFixed(2)}</td>
+                  <td style="padding: 2px 4px; border-right: 1px solid #000; border-bottom: 1px solid #000; text-align: center; font-size: 11px; vertical-align: top;">${uom}</td>
+                  <td style="padding: 2px 4px; border-bottom: 1px solid #000; text-align: right; font-size: 11px; vertical-align: top; font-weight: bold;">${amount.toFixed(2)}</td>
                 </tr>
               `;
             }).join("")}
-            ${igstOrCgstSgstRows}
             ${forwardingRow}
+            ${igstOrCgstSgstRows}
             <!-- empty space filler -->
             <tr>
               <td style="border-right: 1px solid #000; height: 100px;"></td>

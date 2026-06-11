@@ -170,6 +170,14 @@ export const MenuList: MenuItem[] = [
         icon:"Box",
         type:"link",
         bookmark:true
+      },
+      {
+        id:2,
+        title:"Rent Return",
+        path:`${process.env.PUBLIC_URL}/rentReturn`,
+        icon:"Box",
+        type:"link",
+        bookmark:true
       }
     ]
   },

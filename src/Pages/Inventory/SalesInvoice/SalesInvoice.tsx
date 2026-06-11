@@ -46,6 +46,8 @@ interface StateData {
     Remarks: string;
     F_SalesOrderH?: string;
     F_SalesInvoiceH?: string;
+    DispatchDocNo?: string;
+    DispatchedThrough?: string;
   };
   CreatedSalesOrders?: any[];
   SalesOrderLinesMap?: Record<string, any[]>;
@@ -68,6 +70,7 @@ interface StateData {
   OtherChargesLedgers: any[];
   StateMaster: any[];
   CityMaster: any[];
+  SelectedVendor: any;
 }
 
 function SalesInvoice() {
@@ -96,6 +99,8 @@ function SalesInvoice() {
       PODate: getCurrentDateYYYYMMDD(),
       F_VendorMaster: "",
       Remarks: "",
+      DispatchDocNo: "",
+      DispatchedThrough: "",
     },
     VendorMaster: [],
     ItemGroupMaster: [],
@@ -114,6 +119,7 @@ function SalesInvoice() {
     GlobalOptions: [],
     GSTGroupMaster: [],
     OtherChargesLedgers: [],
+    SelectedVendor: null,
   });
 
   const [gridRows, setGridRows] = useState<GridRow[]>([
@@ -243,7 +249,22 @@ function SalesInvoice() {
     };
 
     fetchMasterData();
-  }, []);
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (state.formData.F_VendorMaster && state.formData.F_VendorMaster !== "0") {
+      const API_URL_VENDOR_DETAILS = API_WEB_URLS.MASTER + "/0/token/LedgerMaster/Id/" + state.formData.F_VendorMaster;
+      Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_VENDOR_DETAILS)
+        .then((res: any) => {
+          let vendor = Array.isArray(res) ? res[0] : (res?.data?.dataList?.[0] || res?.dataList?.[0] || res?.data?.response?.[0] || res?.response?.[0]);
+          if (vendor) {
+            setState(prev => ({ ...prev, SelectedVendor: vendor }));
+          }
+        });
+    } else {
+      setState(prev => ({ ...prev, SelectedVendor: null }));
+    }
+  }, [state.formData.F_VendorMaster, dispatch]);
 
   const fetchPODataAndPopulateGrid = async (poId: string) => {
     if (!poId) return;
@@ -393,10 +414,17 @@ function SalesInvoice() {
           Photos: cleanPhoto ? [{ full: cleanPhoto, thumb: cleanThumb || cleanPhoto }] : [],
           Qty: String(l.Qty || ""),
           Rate: l.Rate ? String(l.Rate) : "",
-          ItemData: [{ Id: l.F_ItemMaster, ItemName: l.ItemName || "Scanned Item" }],
+          ItemData: [{ 
+            Id: l.F_ItemMaster, 
+            ItemName: l.ItemName || "Scanned Item",
+            HSNCode: l.HSNCode || l.HSN || "",
+            F_GSTGroupMaster: l.F_GSTGroupMaster || l.GSTGroupMasterId || ""
+          }],
           AvailableQty: 0,
           F_SalesOrderH: 0,
           F_SalesOrderL: 0,
+          GSTPercent: parseFloat(l.GSTPercent) || 0,
+          F_GSTGroupMaster: l.F_GSTGroupMaster || l.GSTGroupMasterId || "",
         };
       });
       setGridRows(mappedRows);
@@ -431,6 +459,10 @@ function SalesInvoice() {
             lines.map(async (line: any) => {
               const itemData = await Fn_FillListData(dispatch, setState, `itemData_${line.F_ItemGroupMaster}`, API_URL_ITEMS + "/" + line.F_ItemGroupMaster);
               const extractArray = (data: any) => Array.isArray(data) ? data : (data?.data?.dataList || data?.dataList || data?.data?.response || data?.response || []);
+              const gstGroupId = line.F_GSTGroupMaster || "";
+              const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
+              const gstPercent = gstGroup ? parseFloat(gstGroup.GSTPercent) || 0 : 0;
+
               return {
                 ItemCode: line.ItemCode || "",
                 F_ItemGroupMaster: line.F_ItemGroupMaster || "",
@@ -442,6 +474,9 @@ function SalesInvoice() {
                 Photos: [],
                 Qty: line.Qty || "",
                 Rate: line.Rate || "",
+                F_GSTGroupMaster: gstGroupId || line.F_GSTGroupMaster || line.GSTGroupMasterId || "",
+                GSTPercent: gstPercent || parseFloat(line.GSTPercent) || 0,
+                HSNCode: line.HSNCode || line.HSN || "",
                 ItemData: extractArray(itemData) || [],
                 UnitValue: (line.UnitConversion && parseFloat(line.UnitConversion) > 0) ? parseFloat(line.UnitConversion) : 1,
               };
@@ -550,7 +585,11 @@ function SalesInvoice() {
   const updateGridRow = async (index: number, field: string, value: any) => {
     const updatedRows = [...gridRows];
     updatedRows[index] = { ...updatedRows[index], [field]: value };
-    if (field === "F_ItemGroupMaster") {
+    if (field === "ItemCode") {
+      if ((gridRows[index].ItemCode || "").trim() !== (value || "").trim()) {
+        updatedRows[index].F_ItemMaster = "";
+      }
+    } else if (field === "F_ItemGroupMaster") {
       updatedRows[index].F_ItemMaster = "";
       updatedRows[index].ItemCode = "";
       if (value) {
@@ -564,10 +603,17 @@ function SalesInvoice() {
       const selectedItem = updatedRows[index].ItemData?.find((item: any) => String(item.Id) === String(value));
       if (selectedItem) {
         updatedRows[index].ItemCode = selectedItem.ItemCode || selectedItem.Code || "";
+        updatedRows[index].AvailableQty = parseFloat(selectedItem.AvailableQty || 0);
       }
     } else if (field === "Qty") {
       const row = updatedRows[index];
-      const qty = parseFloat(value) || 0;
+      let qty = parseFloat(value) || 0;
+      const available = row.AvailableQty || 0;
+      if (qty > available) {
+        alert(`Warning: Entered Quantity (${qty}) exceeds Available Quantity (${available}). Adjusting to maximum available.`);
+        qty = available;
+        updatedRows[index].Qty = qty > 0 ? String(qty) : "";
+      }
       let newSalePrice = row.OriginalSalePrice || parseFloat(row.Rate) || 0;
       
       if (row.SchemeDetails && Array.isArray(row.SchemeDetails) && row.SchemeDetails.length > 0 && qty > 0) {
@@ -612,14 +658,26 @@ function SalesInvoice() {
   };
 
   const handleBarcodeFetch = async (index: number, barcode: string) => {
+    barcode = (barcode || "").trim();
     if (!barcode) return;
+    if ((window as any).isFetchingBarcode) return;
+    const now = Date.now();
+    if ((window as any).lastScannedBarcode === barcode && now - ((window as any).lastScannedTime || 0) < 500) return;
+    (window as any).lastScannedBarcode = barcode;
+    (window as any).lastScannedTime = now;
+    (window as any).isFetchingBarcode = true;
 
     const duplicateIndex = gridRows.findIndex((row, rIndex) => rIndex !== index && row.ItemCode === barcode);
     if (duplicateIndex !== -1) {
       const updatedRows = [...gridRows];
       const dupRow = updatedRows[duplicateIndex];
-      const newQty = (parseFloat(dupRow.Qty) || 0) + 1;
-      dupRow.Qty = String(newQty);
+      let newQty = (parseFloat(dupRow.Qty) || 0) + 1;
+      const available = dupRow.AvailableQty || 0;
+      if (newQty > available) {
+        alert(`Warning: Quantity (${newQty}) exceeds Available Quantity (${available}). Cannot add more.`);
+        newQty = available;
+      }
+      dupRow.Qty = newQty > 0 ? String(newQty) : "";
       
       let newSalePrice = dupRow.OriginalSalePrice || parseFloat(dupRow.Rate) || 0;
       if (dupRow.SchemeDetails && Array.isArray(dupRow.SchemeDetails) && dupRow.SchemeDetails.length > 0 && newQty > 0) {
@@ -654,6 +712,7 @@ function SalesInvoice() {
           barcodeInput.focus();
         }
       }, 100);
+      (window as any).isFetchingBarcode = false;
       return;
     }
 
@@ -721,18 +780,11 @@ function SalesInvoice() {
         if (designItem.DesignPhoto4) photos.push({ full: cleanUrl(designItem.DesignPhoto4), thumb: cleanUrl(designItem.DesignPhoto4_Thumb) || cleanUrl(designItem.DesignPhoto4) });
         if (designItem.DesignPhoto5) photos.push({ full: cleanUrl(designItem.DesignPhoto5), thumb: cleanUrl(designItem.DesignPhoto5_Thumb) || cleanUrl(designItem.DesignPhoto5) });
         
-        const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
-        const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
-
         let gstPercent = 0;
         const gstGroupId = item.F_GSTGroupMaster || "";
         const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
         if (gstGroup) {
-          if (isInState) {
-            gstPercent = (parseFloat(gstGroup.CGSTPercent) || 0) + (parseFloat(gstGroup.SGSTPercent) || 0);
-          } else {
-            gstPercent = parseFloat(gstGroup.IGSTPercent) || 0;
-          }
+          gstPercent = parseFloat(gstGroup.GSTPercent) || 0;
         }
         
         let salePrice = parseFloat(designItem.SalePrice || designItem.Rate || designItem.Price || item.SalePrice || item.Rate || item.Price || 0);
@@ -747,7 +799,12 @@ function SalesInvoice() {
         } catch(e) {}
 
         const updatedRows = [...gridRows];
-        const qty = 1; // Auto fill qty to 1
+        let qty = 1; // Auto fill qty to 1
+        let availableQty = parseFloat(designItem.AvailableQty || item.AvailableQty || 0);
+        if (qty > availableQty) {
+          alert(`Warning: Scanned item has 0 Available Quantity. Cannot add.`);
+          qty = 0;
+        }
         
         // Auto-apply scheme rate if quantity already exists in the row
         let finalSalePrice = salePrice;
@@ -778,14 +835,15 @@ function SalesInvoice() {
           DesignPhoto: designItem.DesignPhoto || item.DesignPhoto || "",
           Variant: designItem.SizeName || item.SizeName || "",
           Photos: photos,
-          Qty: "1",
+          Qty: qty > 0 ? String(qty) : "",
           Rate: baseRate > 0 ? String(baseRate.toFixed(2)) : "",
           F_GSTGroupMaster: item.F_GSTGroupMaster || "",
           ItemData: [{ Id: itemId, ItemName: item.ItemName || "Scanned Item", F_GSTGroupMaster: item.F_GSTGroupMaster }],
           OriginalSalePrice: salePrice,
           SchemeDetails: parsedSchemes,
           GSTPercent: gstPercent,
-          UnitValue: unitVal
+          UnitValue: unitVal,
+          AvailableQty: availableQty
         };
         
         let nextRowIndex = index;
@@ -820,6 +878,8 @@ function SalesInvoice() {
       }
     } catch (e) {
       console.error("Error fetching barcode details:", e);
+    } finally {
+      (window as any).isFetchingBarcode = false;
     }
   };
 
@@ -1059,6 +1119,8 @@ function SalesInvoice() {
       headerFormData.append("EntryNo", state.formData.PONo || "");
       headerFormData.append("F_LedgerMaster", state.formData.F_VendorMaster);
       headerFormData.append("Remarks", state.formData.Remarks || "");
+      headerFormData.append("DispatchDocNo", state.formData.DispatchDocNo || "");
+      headerFormData.append("DispatchedThrough", state.formData.DispatchedThrough || "");
       headerFormData.append("TotalCGST", finalCGST.toFixed(2));
       headerFormData.append("TotalSGST", finalSGST.toFixed(2));
       headerFormData.append("TotalIGST", finalIGST.toFixed(2));
@@ -1367,7 +1429,7 @@ function SalesInvoice() {
               <CardHeaderCommon title={`${state.isEditMode ? "Edit" : "Add"} Sales Invoice`} tagClass="card-title mb-0" />
               <CardBody className="p-2 p-sm-3">
                 <Row className="g-2 g-sm-3">
-                  <Col md="2">
+                  <Col md>
                     <label className="form-label">Created Sales Invoice</label>
                     <select className="form-control" value={state.formData.F_SalesInvoiceH || ""} onChange={(e) => { 
                       const val = e.target.value;
@@ -1382,15 +1444,15 @@ function SalesInvoice() {
                     </select>
                   </Col>
 
-                  <Col md="2">
+                  <Col md>
                     <label className="form-label">Entry No</label>
                     <Input type="text" value={state.formData.PONo} onChange={(e) => handleFormFieldChange("PONo", e.target.value)} disabled={state.isEditMode} placeholder="Auto-generated" />
                   </Col>
-                  <Col md="2">
+                  <Col md>
                     <label className="form-label">Entry Date</label>
                     <DateInput name="poDate" value={state.formData.PODate} onChange={(val: string) => handleFormFieldChange("PODate", val)} />
                   </Col>
-                  <Col md="2">
+                  <Col md>
                     <div className="d-flex justify-content-between align-items-center">
                       <label className="form-label">Vendor / Party</label>
                       <Button color="link" size="sm" className="p-0 text-decoration-none" onClick={openVendorModal} tabIndex={-1}>+ New</Button>
@@ -1402,9 +1464,17 @@ function SalesInvoice() {
                       ))}
                     </select>
                   </Col>
-                  <Col md="2">
+                  <Col md>
                     <label className="form-label">Remarks</label>
                     <Input type="text" value={state.formData.Remarks} onChange={(e) => handleFormFieldChange("Remarks", e.target.value)} placeholder="Enter remarks" />
+                  </Col>
+                  <Col md>
+                    <label className="form-label">Dispatch Doc No.</label>
+                    <Input type="text" value={state.formData.DispatchDocNo} onChange={(e) => handleFormFieldChange("DispatchDocNo", e.target.value)} placeholder="Enter doc no" />
+                  </Col>
+                  <Col md>
+                    <label className="form-label">Dispatched through</label>
+                    <Input type="text" value={state.formData.DispatchedThrough} onChange={(e) => handleFormFieldChange("DispatchedThrough", e.target.value)} placeholder="Enter dispatched through" />
                   </Col>
                 </Row>
                 <Row className="mt-3">

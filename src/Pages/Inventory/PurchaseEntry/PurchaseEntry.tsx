@@ -42,6 +42,8 @@ interface StateData {
     Remarks: string;
     F_PurchaseOrderH?: string;
     F_PurchaseEntryH?: string;
+    DispatchDocNo?: string;
+    DispatchedThrough?: string;
   };
   CreatedPurchaseOrders?: any[];
   PurchaseOrderLinesMap?: Record<string, any[]>;
@@ -91,6 +93,8 @@ function PurchaseEntry() {
       PODate: getCurrentDateYYYYMMDD(),
       F_VendorMaster: "",
       Remarks: "",
+      DispatchDocNo: "",
+      DispatchedThrough: "",
     },
     VendorMaster: [],
     ItemGroupMaster: [],
@@ -312,6 +316,8 @@ function PurchaseEntry() {
         F_VendorMaster: pe.F_LedgerMaster || "",
         Remarks: pe.Remarks || "",
         F_PurchaseEntryH: pe.Id,
+        DispatchDocNo: pe.DispatchDocNo || "",
+        DispatchedThrough: pe.DispatchedThrough || "",
       }
     }));
 
@@ -385,6 +391,8 @@ function PurchaseEntry() {
             PODate: header.PODate ? parseDateFromAPI(header.PODate) : getCurrentDateYYYYMMDD(),
             F_VendorMaster: header.F_VendorMaster || "",
             Remarks: header.Remarks || "",
+            DispatchDocNo: header.DispatchDocNo || "",
+            DispatchedThrough: header.DispatchedThrough || "",
           },
         }));
 
@@ -891,6 +899,8 @@ function PurchaseEntry() {
       headerFormData.append("F_LedgerMaster", state.formData.F_VendorMaster);
       headerFormData.append("F_StatusMaster", "0");
       headerFormData.append("Remarks", state.formData.Remarks || "");
+      headerFormData.append("DispatchDocNo", state.formData.DispatchDocNo || "");
+      headerFormData.append("DispatchedThrough", state.formData.DispatchedThrough || "");
       headerFormData.append("UserId", obj?.uid || "0");
       headerFormData.append("TotalCGST", finalCGST.toFixed(2));
       headerFormData.append("TotalSGST", finalSGST.toFixed(2));
@@ -1020,7 +1030,15 @@ function PurchaseEntry() {
       .purchase-entry-page .form-control { font-size: 0.75rem; height: 24px; padding: 0.15rem 0.28rem; }
       .purchase-entry-page .btn { font-size: 0.75rem; padding: 0.18rem 0.35rem; }
     }
-    .purchase-print-layout { display: none; }
+    .purchase-print-layout { 
+      position: absolute; 
+      left: -9999px; 
+      top: 0; 
+      display: block; 
+      width: 210mm;
+      background: white; 
+      color: black; 
+    }
     @media print {
       @page { margin: 0; }
       body { margin: 0.2cm; line-height: 1.1; }
@@ -1036,16 +1054,6 @@ function PurchaseEntry() {
         color: black; 
         font-family: Arial, sans-serif; 
       }
-      .purchase-print-layout .print-header { text-align: center; margin-bottom: 5px; border-bottom: 1px solid #000; padding-bottom: 2px; }
-      .purchase-print-layout .firm-name { font-size: 18px; font-weight: bold; text-transform: uppercase; margin-bottom: 0; }
-      .purchase-print-layout .print-title { font-size: 14px; font-weight: bold; margin-top: 0; }
-      .purchase-print-layout .print-details { margin-bottom: 5px; }
-      .purchase-print-layout .detail-row { display: flex; justify-content: space-between; margin-bottom: 1px; font-size: 11px; }
-      .purchase-print-layout table { width: 100%; border-collapse: collapse; margin-top: 2px; }
-      .purchase-print-layout th, .purchase-print-layout td { border: 1px solid #000; padding: 2px 4px; text-align: left; font-size: 11px; }
-      .purchase-print-layout th { background: #eee !important; -webkit-print-color-adjust: exact; }
-      .purchase-print-layout .text-right { text-align: right; }
-      .purchase-print-layout .total-row { font-weight: bold; }
     }
   `;
 
@@ -1060,7 +1068,7 @@ function PurchaseEntry() {
               <CardHeaderCommon title={`${state.isEditMode ? "Edit" : "Add"} Purchase Entry`} tagClass="card-title mb-0" />
               <CardBody className="p-2 p-sm-3">
                 <Row className="g-2 g-sm-3">
-                  <Col md="2">
+                  <Col md>
                     <label className="form-label">Created Purchase Entry</label>
                     <select className="form-control" value={state.formData.F_PurchaseEntryH || ""} onChange={(e) => { 
                       const val = e.target.value;
@@ -1075,15 +1083,15 @@ function PurchaseEntry() {
                     </select>
                   </Col>
 
-                  <Col md="2">
+                  <Col md>
                     <label className="form-label">Entry No</label>
                     <Input type="text" value={state.formData.PONo} onChange={(e) => handleFormFieldChange("PONo", e.target.value)} disabled={state.isEditMode} placeholder="Auto-generated" />
                   </Col>
-                  <Col md="2">
+                  <Col md>
                     <label className="form-label">Entry Date</label>
                     <DateInput name="poDate" value={state.formData.PODate} onChange={(val: string) => handleFormFieldChange("PODate", val)} />
                   </Col>
-                  <Col md="2">
+                  <Col md>
                     <div className="d-flex justify-content-between align-items-center">
                       <label className="form-label">Vendor / Party</label>
                       <Button color="link" size="sm" className="p-0 text-decoration-none" onClick={openVendorModal} tabIndex={-1}>+ New</Button>
@@ -1095,9 +1103,17 @@ function PurchaseEntry() {
                       ))}
                     </select>
                   </Col>
-                  <Col md="2">
+                  <Col md>
                     <label className="form-label">Remarks</label>
                     <Input type="text" value={state.formData.Remarks} onChange={(e) => handleFormFieldChange("Remarks", e.target.value)} placeholder="Enter remarks" />
+                  </Col>
+                  <Col md>
+                    <label className="form-label">Dispatch Doc No.</label>
+                    <Input type="text" value={state.formData.DispatchDocNo} onChange={(e) => handleFormFieldChange("DispatchDocNo", e.target.value)} placeholder="Enter doc no" />
+                  </Col>
+                  <Col md>
+                    <label className="form-label">Dispatched through</label>
+                    <Input type="text" value={state.formData.DispatchedThrough} onChange={(e) => handleFormFieldChange("DispatchedThrough", e.target.value)} placeholder="Enter dispatched through" />
                   </Col>
                 </Row>
                 <Row className="mt-3">
@@ -1283,155 +1299,13 @@ function PurchaseEntry() {
         <ModalFooter><Button color="primary" onClick={handleVendorSubmit} disabled={vendorSubmitting}>Save</Button><Button color="secondary" onClick={closeVendorModal}>Cancel</Button></ModalFooter>
       </Modal>
 
-      <div className="purchase-print-layout">
-        <div className="print-header">
-          <div className="firm-name">{state.GlobalOptions[0]?.FirmName || "FIRM NAME"}</div>
-          <div style={{ fontSize: "12px", marginTop: "4px", color: "#555", fontWeight: "normal" }}>
-            {[
-              state.GlobalOptions[0]?.FirmAddress,
-              state.GlobalOptions[0]?.CityName || state.GlobalOptions[0]?.City || state.CityMaster?.find(c => String(c.Id) === String(state.GlobalOptions[0]?.F_CityMaster))?.Name,
-              state.GlobalOptions[0]?.StateName || state.GlobalOptions[0]?.State || state.GlobalOptions[0]?.StateMasterName || state.StateMaster?.find(s => String(s.Id) === String(state.GlobalOptions[0]?.F_StateMaster))?.StateName
-            ].filter(Boolean).join(", ")}
-          </div>
-          <div className="print-title">PURCHASE INVOICE</div>
-        </div>
-        <div className="print-details">
-          <div className="detail-row">
-            <div><strong>Purchase Invoice No.:</strong> {state.formData.PONo || "N/A"}</div>
-            <div><strong>Date:</strong> {state.formData.PODate || "N/A"}</div>
-          </div>
-          <div className="detail-row">
-            <div>
-              <strong>Vendor:</strong>{" "}
-              {(() => {
-                const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
-                return vendor ? (vendor.CompanyName || vendor.Name || vendor.LedgerName) : "N/A";
-              })()}
-            </div>
-          </div>
-          {state.formData.Remarks && <div className="detail-row"><div><strong>Remarks:</strong> {state.formData.Remarks}</div></div>}
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Barcode</th>
-              <th>Category</th>
-              <th>Item Name</th>
-              <th>Varient</th>
-              <th className="text-right">Qty</th>
-              <th className="text-right">Rate</th>
-              <th className="text-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {gridRows.map((row, index) => {
-              const qty = parseFloat(row.Qty) || 0;
-              const rate = parseFloat(row.Rate) || 0;
-              
-              const groupObj = state.ItemGroupMaster?.find((g: any) => String(g.Id) === String(row.F_ItemGroupMaster));
-              const groupName = groupObj ? (groupObj.Name || groupObj.GroupName) : "N/A";
-              
-              const itemObj = row.ItemData?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
-              const stateItemObj = state.ItemMaster?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
-              const itemName = itemObj?.ItemName || itemObj?.Name || stateItemObj?.ItemName || stateItemObj?.Name || row.ItemCode || "N/A";
-              
-              const colorName = state.ColorMaster?.find((c: any) => String(c.Id) === String(row.F_ColorMaster))?.Name || "N/A";
-              const warehouseName = state.WarehouseMaster?.find((w: any) => String(w.Id) === String(row.F_WarehouseMaster))?.Name || "N/A";
-              
-              return (
-                <tr key={index}>
-                  <td>{index + 1}</td>
-                  <td>{row.ItemCode || "N/A"}</td>
-                  <td>{groupName}</td>
-                  <td>{itemName}</td>
-                  <td>{row.Variant || "N/A"}</td>
-                  <td className="text-right">{qty}</td>
-                  <td className="text-right">{rate.toFixed(2)}</td>
-                  <td className="text-right">{(qty * rate).toFixed(2)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            {(() => {
-              let totalCGST = 0;
-              let totalSGST = 0;
-              let totalIGST = 0;
-              const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
-              const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
-
-              gridRows.forEach((row) => {
-                const qty = parseFloat(row.Qty) || 0;
-                const rate = parseFloat(row.Rate) || 0;
-                const amount = qty * rate;
-                const itemObj = row.ItemData?.find((i: any) => String(i.Id) === String(row.F_ItemMaster)) ||
-                                state.ItemMaster?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
-                const gstGroupId = itemObj?.F_GSTGroupMaster || itemObj?.GSTGroupMasterId || itemObj?.GSTGroupId || row.F_GSTGroupMaster;
-                const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
-                
-                if (gstGroup) {
-                  if (isInState) {
-                    totalCGST += amount * (parseFloat(gstGroup.CGSTPercent) / 100);
-                    totalSGST += amount * (parseFloat(gstGroup.SGSTPercent) / 100);
-                  } else {
-                    totalIGST += amount * (parseFloat(gstGroup.IGSTPercent) / 100);
-                  }
-                }
-              });
-
-              const finalCGST = Math.round(taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST);
-              const finalSGST = Math.round(taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST);
-              const finalIGST = Math.round(taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST);
-
-              const totalTax = finalCGST + finalSGST + finalIGST;
-              const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
-              const grandTotal = subTotal + totalTax;
-
-              return (
-                <>
-                  <tr className="total-row">
-                    <td colSpan={5} className="text-right">Total Qty:</td>
-                    <td className="text-right">{gridRows.reduce((sum, row) => sum + (parseFloat(row.Qty) || 0), 0)}</td>
-                    <td className="text-right">Sub Total:</td>
-                    <td className="text-right">{subTotal.toFixed(2)}</td>
-                  </tr>
-                  {isInState ? (
-                    <>
-                      <tr className="total-row">
-                        <td colSpan={6}></td>
-                        <td className="text-right">Total CGST:</td>
-                        <td className="text-right">{finalCGST.toFixed(2)}</td>
-                      </tr>
-                      <tr className="total-row">
-                        <td colSpan={6}></td>
-                        <td className="text-right">Total SGST:</td>
-                        <td className="text-right">{finalSGST.toFixed(2)}</td>
-                      </tr>
-                    </>
-                  ) : (
-                    <tr className="total-row">
-                      <td colSpan={6}></td>
-                      <td className="text-right">Total IGST:</td>
-                      <td className="text-right">{finalIGST.toFixed(2)}</td>
-                    </tr>
-                  )}
-                  <tr className="total-row">
-                    <td colSpan={6}></td>
-                    <td className="text-right">Total Tax:</td>
-                    <td className="text-right">{totalTax.toFixed(2)}</td>
-                  </tr>
-                  <tr className="total-row" style={{fontSize: '1.2em', fontWeight: 'bold'}}>
-                    <td colSpan={6}></td>
-                    <td className="text-right">Grand Total:</td>
-                    <td className="text-right">{grandTotal.toFixed(2)}</td>
-                  </tr>
-                </>
-              );
-            })()}
-          </tfoot>
-        </table>
-      </div>
+      {/* ── PURCHASE ENTRY PRINT LAYOUT ── */}
+      <div 
+        className="purchase-print-layout" 
+        dangerouslySetInnerHTML={{ 
+          __html: require('../../../helpers/PDFTemplate').generateInvoiceHTML("PURCHASE ENTRY", state, gridRows, [], taxOverrides) 
+        }} 
+      />
       {/* Share PDF Modal */}
       <Modal isOpen={showSharePDFModal} toggle={() => setShowSharePDFModal(false)} className="modal-sm" centered>
         <ModalHeader toggle={() => setShowSharePDFModal(false)} className="bg-primary text-white pb-2 pt-2 border-bottom-0">

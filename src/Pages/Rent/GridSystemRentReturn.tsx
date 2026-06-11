@@ -2,36 +2,36 @@ import React, { useRef } from "react";
 import { Col, Row } from "reactstrap";
 
 const tableStyles = `
-  .sales-invoice-grid-wrap {
+  .rent-grid-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     margin-left: -0.25rem;
     margin-right: -0.25rem;
   }
-  .sales-invoice-grid-wrap .po-table {
-    min-width: 950px;
+  .rent-grid-wrap .po-table {
+    min-width: 1050px;
     margin-bottom: 0;
   }
-  .po-table th:nth-child(1), .po-table td:nth-child(1) { width: 5%; min-width: 40px; text-align: center; }
-  .po-table th:nth-child(2), .po-table td:nth-child(2) { width: 12%; min-width: 90px; }
-  .po-table th:nth-child(3), .po-table td:nth-child(3) { width: 15%; min-width: 100px; }
-  .po-table th:nth-child(4), .po-table td:nth-child(4) { width: 20%; min-width: 140px; }
-  .po-table th:nth-child(5), .po-table td:nth-child(5) { width: 15%; min-width: 100px; }
-  .po-table th:nth-child(6), .po-table td:nth-child(6) { width: 8%; min-width: 80px; text-align: right; }
-  .po-table th:nth-child(7), .po-table td:nth-child(7) { width: 8%; min-width: 80px; text-align: center; }
-  .po-table th:nth-child(8), .po-table td:nth-child(8) { width: 10%; min-width: 90px; text-align: right; }
-  .po-table th:nth-child(9), .po-table td:nth-child(9) { width: 10%; min-width: 90px; text-align: center; }
-  .po-table th:nth-child(10), .po-table td:nth-child(10) { width: 12%; min-width: 90px; text-align: center; }
-  .po-table th:nth-child(11), .po-table td:nth-child(11) { width: 10%; min-width: 90px; text-align: center; }
+  .po-table th:nth-child(1), .po-table td:nth-child(1) { width: 4%; min-width: 40px; text-align: center; }
+  .po-table th:nth-child(2), .po-table td:nth-child(2) { width: 11%; min-width: 90px; }
+  .po-table th:nth-child(3), .po-table td:nth-child(3) { width: 14%; min-width: 100px; }
+  .po-table th:nth-child(4), .po-table td:nth-child(4) { width: 18%; min-width: 140px; }
+  .po-table th:nth-child(5), .po-table td:nth-child(5) { width: 8%; min-width: 70px; text-align: right; }
+  .po-table th:nth-child(6), .po-table td:nth-child(6) { width: 10%; min-width: 80px; }
+  .po-table th:nth-child(7), .po-table td:nth-child(7) { width: 8%; min-width: 70px; text-align: right; }
+  .po-table th:nth-child(8), .po-table td:nth-child(8) { width: 9%; min-width: 80px; text-align: right; }
+  .po-table th:nth-child(9), .po-table td:nth-child(9) { width: 10%; min-width: 90px; text-align: right; }
+  .po-table th:nth-child(10), .po-table td:nth-child(10) { width: 9%; min-width: 80px; text-align: right; }
+  .po-table th:nth-child(11), .po-table td:nth-child(11) { width: 9%; min-width: 80px; text-align: center; }
   
   @media (max-width: 991.98px) {
-    .sales-invoice-grid-wrap .po-table { min-width: 900px; }
+    .rent-grid-wrap .po-table { min-width: 950px; }
     .po-table th, .po-table td { padding: 0.28rem 0.2rem; font-size: 0.8rem; }
     .po-table .form-control { font-size: 0.8rem; padding: 0.22rem 0.3rem; min-height: 26px; height: auto; }
     .po-table .btn-sm { padding: 0.2rem 0.35rem; min-width: 28px; font-size: 0.75rem; }
   }
   @media (max-width: 767.98px) {
-    .sales-invoice-grid-wrap .po-table { min-width: 850px; }
+    .rent-grid-wrap .po-table { min-width: 900px; }
     .po-table th, .po-table td { padding: 0.2rem 0.15rem; font-size: 0.7rem; }
     .po-table .form-control { font-size: 0.7rem; padding: 0.15rem 0.25rem; min-height: 22px; height: auto; }
     .po-table .btn-sm { padding: 0.15rem 0.28rem; min-width: 26px; font-size: 0.7rem; }
@@ -42,57 +42,35 @@ interface GridRow {
   ItemCode: string;
   F_ItemGroupMaster: string;
   F_ItemMaster: string;
-  F_ColorMaster?: string;
   F_WarehouseMaster: string;
-  F_BatchMaster?: string;
   Qty: string;
-  Rate: string;
+  Rate: string; // Rent Price
+  SecurityDeposit: string;
   Variant?: string;
   Photos?: any[];
   ItemData: any[] | null;
-  AvailableQty?: number;
   UnitValue?: number;
 }
 
-interface GridSystemSalesInvoiceProps {
+interface GridSystemRentReturnProps {
   gridRows: GridRow[];
   itemGroupMaster: any[];
-  itemMaster?: any[];
-  colorMaster?: any[];
-  warehouseMaster?: any[];
-  batchMaster?: any[];
-  isBatchAllowed?: boolean;
   onAddRow: () => void;
   onRemoveRow: (index: number) => void;
   onUpdateRow: (index: number, field: string, value: any) => void;
   disabled?: boolean;
-  saveButtonRef?: React.RefObject<HTMLButtonElement> | null;
-  defaultColor?: any | null;
-  getItemColorApply?: ((itemId: string | number) => Promise<boolean>) | null;
-  itemColorApplyMap?: Record<string | number, boolean>;
-  onQuickAddItem?: ((rowIndex: number) => void) | null;
-  onQuickAddItemGroup?: ((rowIndex: number) => void) | null;
+  saveButtonRef?: React.RefObject<HTMLButtonElement | null> | null;
   onBarcodeFetch?: (index: number, barcode: string) => void;
 }
 
-const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
+const GridSystemRentReturn: React.FC<GridSystemRentReturnProps> = ({
   gridRows,
   itemGroupMaster,
-  itemMaster = [],
-  colorMaster = [],
-  warehouseMaster = [],
-  batchMaster = [],
-  isBatchAllowed = false,
   onAddRow,
   onRemoveRow,
   onUpdateRow,
   disabled = false,
   saveButtonRef = null,
-  defaultColor = null,
-  getItemColorApply = null,
-  itemColorApplyMap = {},
-  onQuickAddItem = null,
-  onQuickAddItemGroup = null,
   onBarcodeFetch,
 }) => {
   const inputRefs = useRef<Record<string, HTMLInputElement | HTMLSelectElement | HTMLButtonElement | null>>({});
@@ -105,54 +83,40 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
     if (event.key === 'Enter') {
       event.preventDefault();
 
-      if (fieldName === 'Rate') {
-        // Validate required row fields, then move to + button
+      if (fieldName === 'SecurityDeposit') {
         const row = gridRows[rowIndex] || {};
         const hasItem = !!row.F_ItemMaster;
-        const itemRequiresColor = itemColorApplyMap[row.F_ItemMaster] !== false;
-        const hasColor = itemRequiresColor ? !!row.F_ColorMaster : true;
-        const hasWarehouse = !!row.F_WarehouseMaster;
-        const hasBatch = isBatchAllowed ? !!row.F_BatchMaster : true;
         const qtyVal = parseFloat(row.Qty);
         const hasQty = !isNaN(qtyVal) && qtyVal > 0;
         const rateVal = parseFloat(row.Rate);
         const hasRate = !isNaN(rateVal) && rateVal >= 0;
+        const secDepVal = parseFloat(row.SecurityDeposit);
+        const hasSecDep = !isNaN(secDepVal) && secDepVal >= 0;
 
-        if (!hasItem || !hasQty || !hasRate) {
+        if (!hasItem || !hasQty || !hasRate || !hasSecDep) {
           let message = 'Please fill: ';
           const missing = [];
           if (!hasItem) missing.push('Item');
           if (!hasQty) missing.push('Quantity');
-          if (!hasRate) missing.push('Rate');
+          if (!hasRate) missing.push('Rent Price');
+          if (!hasSecDep) missing.push('Security Deposit');
           message += missing.join(', ');
           alert(message);
-
-          // Focus first missing field
-          if (!hasItem) {
-            const ref = inputRefs.current[`${rowIndex}-F_ItemMaster`];
-            ref?.focus();
-          } else if (!hasQty) {
-            const ref = inputRefs.current[`${rowIndex}-Qty`];
-            ref?.focus();
-          } else if (!hasRate) {
-            const ref = inputRefs.current[`${rowIndex}-Rate`];
-            ref?.focus();
-          }
           return;
         }
 
-        // After Rate validation, focus on + button
         const addButtonRef = buttonRefs.current[`${rowIndex}-AddButton`];
         if (addButtonRef) {
           addButtonRef.focus();
         }
       } else {
-        // For other fields, move to next field in the same row
         const row = gridRows[rowIndex] || {};
-        const itemRequiresColor = itemColorApplyMap[row.F_ItemMaster] !== false;
         let nextFieldName = '';
 
         if (fieldName === 'ItemCode') {
+          if (onBarcodeFetch) {
+            onBarcodeFetch(rowIndex, row.ItemCode);
+          }
           nextFieldName = 'F_ItemGroupMaster';
         } else if (fieldName === 'F_ItemGroupMaster') {
           nextFieldName = 'F_ItemMaster';
@@ -160,9 +124,10 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
           nextFieldName = 'Qty';
         } else if (fieldName === 'Qty') {
           nextFieldName = 'Rate';
+        } else if (fieldName === 'Rate') {
+          nextFieldName = 'SecurityDeposit';
         }
 
-        // Focus on next field in the same row
         const nextRef = inputRefs.current[`${rowIndex}-${nextFieldName}`];
         if (nextRef) {
           nextRef.focus();
@@ -176,31 +141,24 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
       event.preventDefault();
 
       if (buttonType === 'AddButton') {
-        // Tab from + button to - button
         const removeButtonRef = buttonRefs.current[`${rowIndex}-RemoveButton`];
         if (removeButtonRef) {
           removeButtonRef.focus();
         }
       } else if (buttonType === 'RemoveButton') {
-        // Check if this is the last row
         const isLastRow = rowIndex === gridRows.length - 1;
 
         if (isLastRow) {
-          // Tab from last row's - button to save button
           let saveButton: HTMLButtonElement | null = null;
-
           if (saveButtonRef && saveButtonRef.current) {
             saveButton = saveButtonRef.current;
           }
-
           if (!saveButton) {
             saveButton =
               document.querySelector('button[type="submit"]') ||
               document.querySelector('.po-action-btn[type="submit"]') ||
               document.querySelector('button.po-action-btn');
           }
-          
-
           if (saveButton) {
             requestAnimationFrame(() => {
               (saveButton as HTMLButtonElement).focus();
@@ -209,8 +167,6 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
           }
         }
 
-        // For non-last rows OR if save button not found in last row
-        // Focus on next row's ItemCode field
         const nextRowIndex = rowIndex + 1;
         if (nextRowIndex < gridRows.length) {
           const nextItemCodeRef = inputRefs.current[`${nextRowIndex}-ItemCode`];
@@ -218,7 +174,6 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
             nextItemCodeRef.focus();
           }
         } else {
-          // If no more rows, focus on first row's ItemCode field
           const firstItemCodeRef = inputRefs.current[`0-ItemCode`];
           if (firstItemCodeRef) {
             firstItemCodeRef.focus();
@@ -230,8 +185,6 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
 
       if (buttonType === 'AddButton') {
         onAddRow();
-
-        // Focus on the new row's ItemCode field
         setTimeout(() => {
           const newRowIndex = gridRows.length;
           const newItemCodeRef = inputRefs.current[`${newRowIndex}-ItemCode`];
@@ -248,8 +201,6 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
         }, 150);
       } else if (buttonType === 'RemoveButton') {
         onRemoveRow(rowIndex);
-
-        // Focus on the same row's ItemCode field (or previous row if this was the last row)
         setTimeout(() => {
           const targetRowIndex = rowIndex < gridRows.length - 1 ? rowIndex : Math.max(0, rowIndex - 1);
           const targetItemCodeRef = inputRefs.current[`${targetRowIndex}-ItemCode`];
@@ -274,7 +225,7 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
       <style>{tableStyles}</style>
       <Row className="mb-3">
         <Col xs="12">
-          <div className="table-responsive sales-invoice-grid-wrap">
+          <div className="table-responsive rent-grid-wrap">
             <table className="table table-bordered table-striped po-table">
               <thead>
                 <tr>
@@ -284,9 +235,9 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
                   <th>Item</th>
                   <th>Unit Val</th>
                   <th>Varient</th>
-                  <th>Available Qty</th>
                   <th>Quantity</th>
-                  <th>Rate</th>
+                  <th>Rent Price</th>
+                  <th>Secuety Deposite</th>
                   <th>Amount</th>
                   <th>Action</th>
                 </tr> 
@@ -295,8 +246,6 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
                 {gridRows.map((row, index) => (
                   <tr key={index}>
                     <td className="py-0">{index + 1}</td>
-
-
 
                     <td className="py-0">
                       <input
@@ -312,7 +261,7 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
                           }
                         }}
                         onBlur={(e) => {
-                          if (onBarcodeFetch && e.target.value && !row.F_ItemMaster) {
+                          if (onBarcodeFetch && e.target.value) {
                             onBarcodeFetch(index, e.target.value);
                           }
                         }}
@@ -320,7 +269,7 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
                         data-row={index}
                         data-field="ItemCode"
                         disabled={disabled}
-                        placeholder="Enter Item Code"
+                        placeholder="Enter Barcode"
                       />
                     </td>
 
@@ -335,7 +284,7 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
                         data-field="F_ItemGroupMaster"
                         disabled={true}
                       >
-                        <option value="">Select Item Group</option>
+                        <option value="">Select Category</option>
                         {itemGroupMaster &&
                           itemGroupMaster.map((item: any) => (
                             <option key={item.Id} value={item.Id}>
@@ -380,12 +329,8 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
                           ))}
                         </div>
                       ) : (
-                        <span className="text-muted small d-block mt-2">No Images</span>
+                        <span className="text-muted small d-block mt-2">{row.Variant || "No Images"}</span>
                       )}
-                    </td>
-
-                    <td className="py-0" style={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 'bold' }}>
-                      {row.AvailableQty ?? 0}
                     </td>
 
                     <td className="py-0" style={{ textAlign: 'right' }}>
@@ -393,13 +338,13 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
                         ref={(ref) => setInputRef(ref, index, 'Qty')}
                         type="number"
                         className="form-control"
-                        style={{ textAlign: 'right', width: '100%', minWidth: '75px' }}
+                        style={{ textAlign: 'right', width: '100%', minWidth: '70px' }}
                         value={row.Qty}
                         onChange={(e) => onUpdateRow(index, 'Qty', e.target.value)}
                         onKeyDown={(e) => handleKeyDown(e, index, 'Qty')}
                         data-row={index}
                         data-field="Qty"
-                        disabled={disabled || (!!row.ItemCode && (row.AvailableQty === undefined || row.AvailableQty <= 0))}
+                        disabled={disabled}
                         placeholder="Qty"
                         min="1"
                       />
@@ -410,14 +355,32 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
                         ref={(ref) => setInputRef(ref, index, 'Rate')}
                         type="number"
                         className="form-control"
-                        style={{ textAlign: 'right', width: '100%', minWidth: '80px' }}
+                        style={{ textAlign: 'right', width: '100%', minWidth: '70px' }}
                         value={row.Rate}
                         onChange={(e) => onUpdateRow(index, 'Rate', e.target.value)}
                         onKeyDown={(e) => handleKeyDown(e, index, 'Rate')}
                         data-row={index}
                         data-field="Rate"
                         disabled={disabled}
-                        placeholder="Rate"
+                        placeholder="Rent Price"
+                        min="0"
+                        step="0.01"
+                      />
+                    </td>
+
+                    <td className="py-0" style={{ textAlign: 'right' }}>
+                      <input
+                        ref={(ref) => setInputRef(ref, index, 'SecurityDeposit')}
+                        type="number"
+                        className="form-control"
+                        style={{ textAlign: 'right', width: '100%', minWidth: '70px' }}
+                        value={row.SecurityDeposit}
+                        onChange={(e) => onUpdateRow(index, 'SecurityDeposit', e.target.value)}
+                        onKeyDown={(e) => handleKeyDown(e, index, 'SecurityDeposit')}
+                        data-row={index}
+                        data-field="SecurityDeposit"
+                        disabled={disabled}
+                        placeholder="Security Deposit"
                         min="0"
                         step="0.01"
                       />
@@ -446,7 +409,7 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
                           disabled={disabled}
                           title="Add Row (Press Enter to continue)"
                         >
-                               <i className="fa fa-plus"></i>
+                          <i className="fa fa-plus"></i>
                         </button>
                         <button
                           ref={(ref) => setButtonRef(ref, index, 'RemoveButton')}
@@ -472,4 +435,4 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
   );
 };
 
-export default GridSystemSalesInvoice;
+export default GridSystemRentReturn;
