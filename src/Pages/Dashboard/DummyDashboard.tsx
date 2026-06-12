@@ -33,25 +33,28 @@ const Dashboard = () => {
 
   // Dummy Data for Low Stock Alert
   const lowStockItems = [
-    { name: "Bridal Lehenga Red", qty: 2, minQty: 5 },
-    { name: "Mens Sherwani Blue", qty: 1, minQty: 3 },
-    { name: "Kundan Necklace", qty: 0, minQty: 2 },
-    { name: "Designer Safa", qty: 3, minQty: 10 },
-    { name: "Gold Plated Bangle", qty: 1, minQty: 4 },
+    { name: "Bridal Lehenga Red", variantImage: "https://via.placeholder.com/40?text=BLR", qty: 2, minQty: 5 },
+    { name: "Mens Sherwani Blue", variantImage: "https://via.placeholder.com/40?text=MSB", qty: 1, minQty: 3 },
+    { name: "Kundan Necklace", variantImage: "https://via.placeholder.com/40?text=KN", qty: 0, minQty: 2 },
+    { name: "Designer Safa", variantImage: "https://via.placeholder.com/40?text=DS", qty: 3, minQty: 10 },
+    { name: "Gold Plated Bangle", variantImage: "https://via.placeholder.com/40?text=GPB", qty: 1, minQty: 4 },
   ];
 
-  // Dummy Data for Line Chart (Daily Rent Trend)
-  const rentTrendOptions: any = {
+  // Dummy Data for Monthly Revenue Trend
+  const revenueTrendOptions: any = {
     chart: { type: "area", height: 350, toolbar: { show: false } },
     dataLabels: { enabled: false },
     stroke: { curve: "smooth", width: 2 },
-    xaxis: { categories: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] },
-    colors: ["#10b981"],
-    fill: { type: "gradient", gradient: { shadeIntensity: 1, opacityFrom: 0.7, opacityTo: 0.9, stops: [0, 90, 100] } },
+    xaxis: { categories: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"] },
+    colors: ["#6366f1", "#f59e0b"],
+    fill: { type: "gradient", gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.6, stops: [0, 90, 100] } },
+    tooltip: { y: { formatter: (val: number) => "₹ " + val + "k" } }
   };
 
-  const rentTrendSeries = [
-    { name: "Rent Orders", data: [31, 40, 28, 51, 42, 109, 100] }
+
+  const revenueTrendSeries = [
+    { name: "Sales Revenue", data: [120, 150, 180, 130, 160, 210, 240] },
+    { name: "Rent Revenue", data: [40, 60, 55, 70, 80, 110, 120] }
   ];
 
   return (
@@ -63,32 +66,6 @@ const Dashboard = () => {
           min-height: calc(100vh - 80px);
         }
 
-        .welcome-banner {
-          background: linear-gradient(-45deg, #4f46e5, #7c3aed, #2563eb, #db2777);
-          background-size: 400% 400%;
-          animation: gradient 15s ease infinite;
-          border-radius: 15px;
-          padding: 2rem 2rem;
-          color: white;
-          text-align: center;
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-          position: relative;
-          overflow: hidden;
-          margin-bottom: 2rem;
-        }
-
-        @keyframes gradient {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-
-        .welcome-title {
-          font-size: 2.5rem;
-          font-weight: 800;
-          margin-bottom: 0.5rem;
-          letter-spacing: -1px;
-        }
 
         .kpi-card {
           border: none;
@@ -120,15 +97,6 @@ const Dashboard = () => {
       <div className="page-body dashboard-wrapper">
         <Breadcrumbs mainTitle="Dashboard" parent="Home" />
         <Container fluid>
-          {/* Welcome Banner */}
-          <Row>
-            <Col sm="12">
-              <div className="welcome-banner">
-                <h1 className="welcome-title">Welcome to Wedding Knot Dashboard</h1>
-                <p className="mb-0">Here is what's happening with your business today.</p>
-              </div>
-            </Col>
-          </Row>
 
           {/* KPI Cards */}
           <Row>
@@ -177,6 +145,7 @@ const Dashboard = () => {
                       <thead className="table-light">
                         <tr>
                           <th className="px-4 text-muted small fw-bold text-uppercase">Item Name</th>
+                          <th className="text-center text-muted small fw-bold text-uppercase">Variant</th>
                           <th className="text-center text-muted small fw-bold text-uppercase">Stock</th>
                           <th className="text-center px-4 text-muted small fw-bold text-uppercase">Status</th>
                         </tr>
@@ -185,6 +154,9 @@ const Dashboard = () => {
                         {lowStockItems.map((item, index) => (
                           <tr key={index}>
                             <td className="px-4 fw-medium text-dark">{item.name}</td>
+                            <td className="text-center">
+                              <img src={item.variantImage} alt={item.name} style={{ width: '35px', height: '35px', borderRadius: '5px', objectFit: 'cover', border: '1px solid #e2e8f0' }} />
+                            </td>
                             <td className="text-center">
                               <span className="fw-bold text-danger">{item.qty}</span>
                               <span className="text-muted small ms-1">/ {item.minQty}</span>
@@ -211,10 +183,10 @@ const Dashboard = () => {
             <Col xl="12" className="mb-4">
               <Card className="border-0 shadow-sm" style={{ borderRadius: '15px' }}>
                 <CardHeader className="bg-white border-bottom-0 pb-0 pt-4 px-4">
-                  <h5 className="fw-bold mb-0">Weekly Rent Order Trend</h5>
+                  <h5 className="fw-bold mb-0">Monthly Revenue Trend</h5>
                 </CardHeader>
                 <CardBody>
-                  <Chart options={rentTrendOptions} series={rentTrendSeries} type="area" height={350} />
+                  <Chart options={revenueTrendOptions} series={revenueTrendSeries} type="area" height={350} />
                 </CardBody>
               </Card>
             </Col>

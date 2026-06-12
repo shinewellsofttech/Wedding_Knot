@@ -133,6 +133,103 @@ const Sidebar = () => {
           <div className={`right-arrow ${margin === -3500 ? "disabled" : ""}`} onClick={()=>dispatch(scrollToRight())}><ArrowRight /></div>
         </nav>
       </div>
+      <style>{`
+        /* Premium Dark Sidebar Aesthetics */
+        .sidebar-wrapper {
+          background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%) !important;
+          box-shadow: 4px 0 24px rgba(0,0,0,0.15) !important;
+          border-right: 1px solid rgba(255,255,255,0.05) !important;
+          transition: width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+        }
+        
+        .sidebar-wrapper .sidebar-link {
+          transition: all 0.3s ease !important;
+          border-radius: 8px !important;
+          margin: 6px 12px !important;
+          padding: 10px 15px !important;
+          color: rgba(255, 255, 255, 0.75) !important;
+          position: relative;
+          overflow: hidden;
+        }
+
+        /* Set text and icons to white globally inside sidebar */
+        .sidebar-wrapper a, 
+        .sidebar-wrapper span, 
+        .sidebar-wrapper p, 
+        .sidebar-wrapper h6 {
+          color: #ffffff !important;
+        }
+        
+        .sidebar-wrapper svg,
+        .sidebar-wrapper i {
+          color: #ffffff !important;
+          stroke: #ffffff !important;
+          opacity: 0.8;
+          transition: all 0.3s ease !important;
+        }
+
+        /* Hover States */
+        .sidebar-wrapper .sidebar-link:hover {
+          background: rgba(255, 255, 255, 0.1) !important;
+          color: #ffffff !important;
+          transform: translateX(4px) !important;
+          box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .sidebar-wrapper .sidebar-link:hover svg,
+        .sidebar-wrapper .sidebar-link:hover i {
+          stroke: #ffffff !important;
+          opacity: 1 !important;
+          transform: scale(1.1);
+        }
+        
+        /* Active Link Styling (if applicable) */
+        .sidebar-wrapper .sidebar-link.active {
+          background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%) !important;
+          color: #ffffff !important;
+          box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4) !important;
+        }
+
+        /* Titles */
+        .sidebar-wrapper .sidebar-main-title h6 {
+          opacity: 0.5;
+          letter-spacing: 1.5px;
+          font-size: 11px !important;
+          text-transform: uppercase;
+          font-weight: 700;
+          margin-bottom: 5px;
+          color: #94a3b8 !important; /* Slightly dim for titles */
+        }
+        
+        /* Collapsed State Adjustments */
+        .sidebar-wrapper.close_icon .sidebar-link {
+          margin: 6px 8px !important;
+          transform: none !important;
+          text-align: center;
+        }
+        
+        .sidebar-wrapper.close_icon .sidebar-link:hover {
+          transform: translateY(-2px) !important;
+          background: rgba(255, 255, 255, 0.12) !important;
+        }
+
+        /* Logo Area adjustments */
+        .sidebar-wrapper .logo-wrapper,
+        .sidebar-wrapper .logo-icon-wrapper {
+          background: transparent !important;
+          border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+          box-shadow: none !important;
+        }
+        
+        .sidebar-wrapper .logo-wrapper a h6 {
+          color: #ffffff !important;
+          letter-spacing: 1px !important;
+        }
+
+        .sidebar-wrapper .back-btn {
+          background: transparent !important;
+        }
+      `}</style>
     </div>
   )
 }
