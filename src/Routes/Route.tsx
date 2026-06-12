@@ -85,6 +85,7 @@ import AddEdit_ModuleMaster from "../Pages/Masters/AddEdit_ModuleMaster";
 import PageList_ModuleMaster from "../Pages/Masters/PageList_ModuleMaster";
 import RentManagement from "../Pages/Rent/RentManagement";
 import RentReturn from "../Pages/Rent/RentReturn";
+import DummyDashboard from "../Pages/Dashboard/DummyDashboard";
 export const routes = [
   // Default landing route is /voucherEntry (see index.tsx Navigate)
   /*
@@ -147,6 +148,7 @@ export const routes = [
         { path: `${process.env.PUBLIC_URL}/permissionMetrixs`, Component: <PermissionMetrixs /> },
         { path: `${process.env.PUBLIC_URL}/rentManagement`, Component: <RentManagement /> },
         { path: `${process.env.PUBLIC_URL}/rentReturn`, Component: <RentReturn /> },
+        { path: `${process.env.PUBLIC_URL}/dummyDashboard` , Component: <DummyDashboard /> },
   /*
   { path: `${process.env.PUBLIC_URL}/itemMaster`, Component: <PageList_ItemMaster /> },
   { path: `${process.env.PUBLIC_URL}/addEditItemGroup`, Component: <AddEdit_ItemGroup /> },

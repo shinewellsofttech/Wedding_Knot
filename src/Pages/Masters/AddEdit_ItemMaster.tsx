@@ -41,6 +41,7 @@ interface ItemSection {
   unit: string;
   material: string;
   rows: ItemRow[];
+  isMinimized?: boolean;
 }
 
 /* ───── Helpers ───── */
@@ -60,7 +61,8 @@ const makeSection = (): ItemSection => ({
   gstGroup: "",
   unit: "",
   material: "",
-  rows: [makeRow()]
+  rows: [makeRow()],
+  isMinimized: false
 });
 
 const genBarcode = () => String(Date.now());
@@ -312,6 +314,14 @@ const AddEdit_ItemMaster = () => {
     });
   }, []);
 
+  const toggleSection = useCallback((secIdx: number) => {
+    setSections(prev => {
+      const copy = [...prev];
+      copy[secIdx] = { ...copy[secIdx], isMinimized: !copy[secIdx].isMinimized };
+      return copy;
+    });
+  }, []);
+
   const updateRow = useCallback((secIdx: number, rowIdx: number, patch: Partial<ItemRow>) => {
     setSections(prev => {
       const updated = prev.map((s, si) =>
@@ -394,7 +404,7 @@ const AddEdit_ItemMaster = () => {
       const newRowId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemDesignCreate/Id/${newId}`);
       
       setSections(prev => {
-        const copy = [...prev];
+        const copy: ItemSection[] = prev.map(s => ({ ...s, isMinimized: true }));
         const newSec = makeSection();
         newSec.id = newId;
         newSec.rows[0].id = newRowId;
@@ -614,16 +624,6 @@ const AddEdit_ItemMaster = () => {
       <Container fluid>
         <div className="item-master-page">
 
-          {/* ===== Compact Title Bar ===== */}
-          <div className="im-title-bar">
-            <h2>
-              <span className="im-icon">📦</span>
-              Inventory Item Creator
-            </h2>
-            <div className="im-status-badge">
-              <span className="im-status-dot" /> Multi-Item & Variant Sheet Ready
-            </div>
-          </div>
 
           {/* ===== Table ===== */}
           <div className="im-table-wrap" ref={tableRef} onKeyDown={handleTableKeyDown}>
@@ -666,7 +666,7 @@ const AddEdit_ItemMaster = () => {
                         {/* Section Header Row inside the Table */}
                         <tr className="im-section-header-row" id={`item-section-${section.id}`}>
                           <td colSpan={12} className="text-start">
-                            <div className="im-section-info-grid">
+                            <div className="im-section-info-grid" style={{ flexWrap: section.isMinimized ? 'nowrap' : 'wrap' }}>
                               <div className="im-section-info-field">
                                 <label>Item Name <span className="req">*</span></label>
                                 <input
@@ -712,61 +712,75 @@ const AddEdit_ItemMaster = () => {
                                   }}
                                 />
                               </div>
-                              <div className="im-section-info-field">
-                                <label>GST Group</label>
-                                  <select
-                                  className="im-category-select"
-                                  value={section.gstGroup}
-                                  onChange={e => {
-                                    updateSectionField(secIdx, 'gstGroup', e.target.value);
-                                    handleFieldUpdate(section.id, "ItemMaster", "F_GSTGroupMaster", e.target.value, undefined, true);
-                                  }}
-                                >
-                                  <option value="">Select GST Group</option>
-                                  {(state.gstGroups || []).map((g: any, i: number) => (
-                                    <option key={i} value={g.Id}>
-                                      {g.GSTGroupName}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="im-section-info-field">
-                                <label>Unit</label>
-                                <select
-                                  className="im-category-select"
-                                  value={section.unit}
-                                  onChange={e => {
-                                    updateSectionField(secIdx, 'unit', e.target.value);
-                                    handleFieldUpdate(section.id, "ItemMaster", "F_UnitMaster", e.target.value, undefined, true);
-                                  }}
-                                >
-                                  <option value="">Select Unit</option>
-                                  {(state.units || []).map((u: any, i: number) => (
-                                    <option key={i} value={u.Id}>
-                                      {u.UnitName}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="im-section-info-field">
-                                <label>Material Master</label>
-                                <select
-                                  className="im-category-select"
-                                  value={section.material}
-                                  onChange={e => {
-                                    updateSectionField(secIdx, 'material', e.target.value);
-                                    handleFieldUpdate(section.id, "ItemMaster", "F_MaterialMaster", e.target.value, undefined, true);
-                                  }}
-                                >
-                                  <option value="">Select Material</option>
-                                  {(state.materials || []).map((m: any, i: number) => (
-                                    <option key={i} value={m.Id}>
-                                      {m.MaterialName || m.Name || m.GroupName || m.materialName || `Material ${m.Id}`}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
+                              {/* Conditionally hide these when minimized */}
+                              {!section.isMinimized && (
+                                <>
+                                  <div className="im-section-info-field">
+                                    <label>GST Group</label>
+                                      <select
+                                      className="im-category-select"
+                                      value={section.gstGroup}
+                                      onChange={e => {
+                                        updateSectionField(secIdx, 'gstGroup', e.target.value);
+                                        handleFieldUpdate(section.id, "ItemMaster", "F_GSTGroupMaster", e.target.value, undefined, true);
+                                      }}
+                                    >
+                                      <option value="">Select GST Group</option>
+                                      {(state.gstGroups || []).map((g: any, i: number) => (
+                                        <option key={i} value={g.Id}>
+                                          {g.GSTGroupName}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div className="im-section-info-field">
+                                    <label>Unit</label>
+                                    <select
+                                      className="im-category-select"
+                                      value={section.unit}
+                                      onChange={e => {
+                                        updateSectionField(secIdx, 'unit', e.target.value);
+                                        handleFieldUpdate(section.id, "ItemMaster", "F_UnitMaster", e.target.value, undefined, true);
+                                      }}
+                                    >
+                                      <option value="">Select Unit</option>
+                                      {(state.units || []).map((u: any, i: number) => (
+                                        <option key={i} value={u.Id}>
+                                          {u.UnitName}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div className="im-section-info-field">
+                                    <label>Material Master</label>
+                                    <select
+                                      className="im-category-select"
+                                      value={section.material}
+                                      onChange={e => {
+                                        updateSectionField(secIdx, 'material', e.target.value);
+                                        handleFieldUpdate(section.id, "ItemMaster", "F_MaterialMaster", e.target.value, undefined, true);
+                                      }}
+                                    >
+                                      <option value="">Select Material</option>
+                                      {(state.materials || []).map((m: any, i: number) => (
+                                        <option key={i} value={m.Id}>
+                                          {m.MaterialName || m.Name || m.GroupName || m.materialName || `Material ${m.Id}`}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </>
+                              )}
                               <div className="im-section-info-field" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", flex: 1 }}>
+                                <button
+                                  type="button"
+                                  className="im-btn"
+                                  style={{ marginRight: '10px', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}
+                                  title={section.isMinimized ? "Maximize Variants" : "Minimize Variants"}
+                                  onClick={() => toggleSection(secIdx)}
+                                >
+                                  {section.isMinimized ? "🔽 Maximize" : "🔼 Minimize"}
+                                </button>
                                 <button
                                   type="button"
                                   className="im-btn im-btn-delete"
@@ -785,7 +799,7 @@ const AddEdit_ItemMaster = () => {
                         </tr>
 
                         {/* Variants Rows */}
-                        {section.rows.map((row, rowIdx) => {
+                        {!section.isMinimized && section.rows.map((row, rowIdx) => {
                           globalRow++;
                           return (
                             <tr key={row.id}>

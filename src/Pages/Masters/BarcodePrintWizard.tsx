@@ -165,7 +165,7 @@ export default function BarcodePrintWizard() {
       const k = String(d.Id || i);
       initQ[k] = 1;
       initC[k] = "";
-      initS[k] = !!d.Barcode;
+      initS[k] = false;
     });
     setQuantities(initQ); setCodes(initC); setSelected(initS);
     checkAgent();

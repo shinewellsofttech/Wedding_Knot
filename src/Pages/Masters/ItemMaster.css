@@ -19,7 +19,8 @@
 /* ---- Table Container ---- */
 .im-table-wrap {
   background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(30,64,175,.05);
-  border: 1px solid #e5e7eb; overflow-x: auto; margin-bottom: 10px;
+  border: 1px solid #e5e7eb; overflow-x: auto; overflow-y: auto; margin-bottom: 10px;
+  max-height: calc(100vh - 180px);
 }
 .im-table { width: 100%; border-collapse: collapse; min-width: 1050px; }
 .im-table thead th {
@@ -38,9 +39,14 @@
   background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%) !important;
   border-bottom: 2px solid #bfdbfe !important;
   padding: 6px 12px !important;
+  position: sticky;
+  left: 0;
+  top: 33px;
+  z-index: 1;
 }
 .im-section-info-grid {
-  display: flex; align-items: center; gap: 20px; flex-wrap: wrap; width: 100%;
+  display: flex; align-items: center; gap: 20px; flex-wrap: wrap; 
+  width: 100%; max-width: calc(100vw - 300px);
 }
 .im-section-info-field {
   display: flex; align-items: center; gap: 8px;
@@ -62,6 +68,7 @@
 .im-section-info-badge {
   margin-left: auto; background: #2563eb; color: #fff;
   padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700;
+  white-space: nowrap; flex-shrink: 0;
 }
 
 /* ---- Row Number ---- */

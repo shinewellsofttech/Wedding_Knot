@@ -405,6 +405,7 @@ function PurchaseReturn() {
   };
 
   const addRow = () => {
+    setTaxOverrides({});
     setGridRows((prevRows) => [
       ...prevRows,
       { ItemCode: "", F_ItemGroupMaster: "", F_ItemMaster: "", F_ColorMaster: state.DefaultColor?.Id || "", F_WarehouseMaster: state.DefaultWarehouse?.Id || "", F_BatchMaster: "", Variant: "", Photos: [], Qty: "", Rate: "", ItemData: null, AvailableQty: 0, UnitValue: 1 },
@@ -432,6 +433,7 @@ function PurchaseReturn() {
   };
 
   const removeRow = (index: number) => {
+    setTaxOverrides({});
     if (gridRows.length > 1) {
       setGridRows((prevRows) => prevRows.filter((_, i) => i !== index));
     }
@@ -493,6 +495,7 @@ function PurchaseReturn() {
   };
 
   const updateGridRow = async (index: number, field: string, value: any) => {
+    setTaxOverrides({});
     const updatedRows = [...gridRows];
     updatedRows[index] = { ...updatedRows[index], [field]: value };
     if (field === "F_ItemGroupMaster") {
@@ -528,6 +531,7 @@ function PurchaseReturn() {
   };
 
   const handleBarcodeFetch = async (index: number, barcode: string) => {
+    setTaxOverrides({});
     if (!barcode) return;
 
     const duplicateIndex = gridRows.findIndex((row, rIndex) => rIndex !== index && row.ItemCode === barcode);
@@ -966,6 +970,70 @@ function PurchaseReturn() {
       alert('Error generating PDF. Please try again.');
     }
   };
+
+  const latestBarcodeFetch = useRef(handleBarcodeFetch);
+  const latestGridRows = useRef(gridRows);
+  useEffect(() => {
+    latestBarcodeFetch.current = handleBarcodeFetch;
+    latestGridRows.current = gridRows;
+  });
+
+  useEffect(() => {
+    let barcodeBuffer = "";
+    let lastKeyTime = Date.now();
+    let originalInputValue = "";
+    let activeInputRef: HTMLInputElement | HTMLTextAreaElement | null = null;
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const currentTime = Date.now();
+      
+      if (currentTime - lastKeyTime > 50) {
+        barcodeBuffer = "";
+        const activeEl = document.activeElement;
+        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+          activeInputRef = activeEl as HTMLInputElement | HTMLTextAreaElement;
+          originalInputValue = activeInputRef.value;
+        } else {
+          activeInputRef = null;
+        }
+      }
+      
+      if (e.key === "Enter" && barcodeBuffer.length >= 3) {
+        const finalBarcode = barcodeBuffer;
+        barcodeBuffer = "";
+        
+        // Prevent default to avoid form submission or unwanted newlines
+        e.preventDefault();
+
+        // Restore original input value if focus was on an input
+        if (activeInputRef && activeInputRef === document.activeElement) {
+          const proto = activeInputRef.tagName === 'INPUT' ? window.HTMLInputElement.prototype : window.HTMLTextAreaElement.prototype;
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+          if (nativeInputValueSetter) {
+            nativeInputValueSetter.call(activeInputRef, originalInputValue);
+            activeInputRef.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+
+        const currentGridRows = latestGridRows.current;
+        let targetIndex = currentGridRows.findIndex((row: any) => !row.ItemCode);
+        if (targetIndex === -1) {
+          targetIndex = currentGridRows.length - 1;
+        }
+        
+        if (latestBarcodeFetch.current) {
+          latestBarcodeFetch.current(targetIndex, finalBarcode);
+        }
+      } else if (e.key.length === 1) {
+        barcodeBuffer += e.key;
+      }
+      
+      lastKeyTime = currentTime;
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
 
   const PurchaseReturnCompactStyles = `
     @media (max-width: 991.98px) {

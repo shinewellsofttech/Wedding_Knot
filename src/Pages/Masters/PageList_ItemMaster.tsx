@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Barcode from 'react-barcode';
+import Fuse from "fuse.js";
 import { toast } from "react-toastify";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -176,8 +177,12 @@ const PageList_ItemMaster = () => {
   /**
    * Print barcodes for item variants (opens the advanced printer setup dashboard)
    */
-  const handlePrintBarcodes = (item: any) => {
-    sessionStorage.setItem("barcodePrintItem", JSON.stringify(item));
+  const handlePrintBarcodes = (item: any, variant?: any) => {
+    let itemToPrint = item;
+    if (variant) {
+      itemToPrint = { ...item, DesignDetails: [variant] };
+    }
+    sessionStorage.setItem("barcodePrintItem", JSON.stringify(itemToPrint));
     sessionStorage.setItem("barcodePrintFirmName", globalOptions[0]?.FirmName || "FIRM NAME");
     window.open(`${process.env.PUBLIC_URL}/barcodePrintWizard`, "_blank");
   };
@@ -208,15 +213,14 @@ const PageList_ItemMaster = () => {
       result = result.filter(item => String(item?.F_GSTGroupMaster) === String(filterGstGroup));
     }
 
-    const searchText = state.filterText.trim().toLowerCase();
+    const searchText = state.filterText.trim();
     if (searchText) {
-      result = result.filter((item) => {
-        const fields = [
-          item?.ItemName,
-          item?.HSNCode,
-        ];
-        return fields.some((field) => String(field ?? "").toLowerCase().includes(searchText));
+      const fuse = new Fuse(result, {
+        keys: ["ItemName", "HSNCode", "ItemCode", "Code"],
+        threshold: 0.3,
+        ignoreLocation: true,
       });
+      result = fuse.search(searchText).map((res: any) => res.item);
     }
 
     return result;
@@ -241,7 +245,13 @@ const PageList_ItemMaster = () => {
                           placeholder="Search Item..."
                           value={state.filterText}
                           onChange={handleSearchChange}
+                          list="item-search-suggestions"
                         />
+                        <datalist id="item-search-suggestions">
+                          {Array.from(new Set(state.ItemMasterList.map(item => item?.ItemName).filter(Boolean))).map((name, index) => (
+                            <option key={index} value={name as string} />
+                          ))}
+                        </datalist>
                       </Col>
                       <Col md="3">
                         <Label className="mb-1 text-muted fw-bold" style={{ fontSize: "0.85rem" }}>Category</Label>
@@ -381,9 +391,7 @@ const PageList_ItemMaster = () => {
                                       }
                                     </td>
                                     <td>
-                                      <Btn color="info" size="sm" className="me-2" onClick={() => handlePrintBarcodes(item)} title="Print Barcodes">
-                                        <i className="fa fa-print" />
-                                      </Btn>
+
                                       <Btn color="primary" size="sm" className="me-2" onClick={() => handleEdit(item?.Id)} title="Edit Item">
                                         <i className="fa fa-edit" />
                                       </Btn>
@@ -477,7 +485,11 @@ const PageList_ItemMaster = () => {
                                               <span className="text-muted">-</span>
                                             )}
                                           </td>
-                                          <td></td>
+                                          <td>
+                                            <Btn color="info" size="sm" onClick={() => handlePrintBarcodes(item, d)} title="Print Variant Barcode">
+                                              <i className="fa fa-print" />
+                                            </Btn>
+                                          </td>
                                         </tr>
                                       );
                                     })

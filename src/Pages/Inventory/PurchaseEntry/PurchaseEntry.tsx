@@ -361,10 +361,17 @@ function PurchaseEntry() {
           Photos: cleanPhoto ? [{ full: cleanPhoto, thumb: cleanThumb || cleanPhoto }] : [],
           Qty: String(l.Qty || ""),
           Rate: l.Rate ? String(l.Rate) : "",
-          ItemData: [{ Id: l.F_ItemMaster, ItemName: l.ItemName || "Scanned Item" }],
+          ItemData: [{ 
+            Id: l.F_ItemMaster, 
+            ItemName: l.ItemName || "Scanned Item",
+            HSNCode: l.HSNCode || l.HSN || "",
+            F_GSTGroupMaster: l.F_GSTGroupMaster || l.GSTGroupMasterId || ""
+          }],
           AvailableQty: 0,
           F_PurchaseOrderH: 0,
           F_PurchaseOrderL: 0,
+          GSTPercent: parseFloat(l.GSTPercent) || 0,
+          F_GSTGroupMaster: l.F_GSTGroupMaster || l.GSTGroupMasterId || "",
         };
       });
       setGridRows(mappedRows);
@@ -414,6 +421,8 @@ function PurchaseEntry() {
                 Rate: line.Rate || "",
                 ItemData: extractArray(itemData) || [],
                 UnitValue: (line.UnitConversion && parseFloat(line.UnitConversion) > 0) ? parseFloat(line.UnitConversion) : 1,
+                GSTPercent: parseFloat(line.GSTPercent) || 0,
+                F_GSTGroupMaster: line.F_GSTGroupMaster || line.GSTGroupMasterId || "",
               };
             })
           );
@@ -430,6 +439,7 @@ function PurchaseEntry() {
   };
 
   const addRow = () => {
+    setTaxOverrides({});
     setGridRows((prevRows) => [
       ...prevRows,
       { ItemCode: "", F_ItemGroupMaster: "", F_ItemMaster: "", F_ColorMaster: state.DefaultColor?.Id || "", F_WarehouseMaster: state.DefaultWarehouse?.Id || "", F_BatchMaster: "", Variant: "", Photos: [], Qty: "", Rate: "", ItemData: null, AvailableQty: 0, UnitValue: 1 },
@@ -459,6 +469,7 @@ function PurchaseEntry() {
   };
 
   const removeRow = (index: number) => {
+    setTaxOverrides({});
     if (gridRows.length > 1) {
       setGridRows((prevRows) => prevRows.filter((_, i) => i !== index));
     }
@@ -520,6 +531,7 @@ function PurchaseEntry() {
   };
 
   const updateGridRow = async (index: number, field: string, value: any) => {
+    setTaxOverrides({});
     const updatedRows = [...gridRows];
     updatedRows[index] = { ...updatedRows[index], [field]: value };
     if (field === "F_ItemGroupMaster") {
@@ -555,7 +567,8 @@ function PurchaseEntry() {
   };
 
   const handleBarcodeFetch = async (index: number, barcode: string) => {
-    if (!barcode) return;
+    setTaxOverrides({});
+    if (!barcode || barcode.trim() === "") return;
 
     const duplicateIndex = gridRows.findIndex((row, rIndex) => rIndex !== index && row.ItemCode === barcode);
     if (duplicateIndex !== -1) {
@@ -716,6 +729,7 @@ function PurchaseEntry() {
   };
 
   const handleQuickItemSubmit = async (e: React.FormEvent) => {
+    setTaxOverrides({});
     e.preventDefault();
     if (quickItemSubmitting) return;
     const trimmedName = (quickItemForm.ItemName || "").trim();
@@ -1012,6 +1026,70 @@ function PurchaseEntry() {
       alert('Error generating PDF. Please try again.');
     }
   };
+
+  const latestBarcodeFetch = useRef(handleBarcodeFetch);
+  const latestGridRows = useRef(gridRows);
+  useEffect(() => {
+    latestBarcodeFetch.current = handleBarcodeFetch;
+    latestGridRows.current = gridRows;
+  });
+
+  useEffect(() => {
+    let barcodeBuffer = "";
+    let lastKeyTime = Date.now();
+    let originalInputValue = "";
+    let activeInputRef: HTMLInputElement | HTMLTextAreaElement | null = null;
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const currentTime = Date.now();
+      
+      if (currentTime - lastKeyTime > 50) {
+        barcodeBuffer = "";
+        const activeEl = document.activeElement;
+        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+          activeInputRef = activeEl as HTMLInputElement | HTMLTextAreaElement;
+          originalInputValue = activeInputRef.value;
+        } else {
+          activeInputRef = null;
+        }
+      }
+      
+      if (e.key === "Enter" && barcodeBuffer.length >= 3) {
+        const finalBarcode = barcodeBuffer;
+        barcodeBuffer = "";
+        
+        // Prevent default to avoid form submission or unwanted newlines
+        e.preventDefault();
+
+        // Restore original input value if focus was on an input
+        if (activeInputRef && activeInputRef === document.activeElement) {
+          const proto = activeInputRef.tagName === 'INPUT' ? window.HTMLInputElement.prototype : window.HTMLTextAreaElement.prototype;
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+          if (nativeInputValueSetter) {
+            nativeInputValueSetter.call(activeInputRef, originalInputValue);
+            activeInputRef.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+
+        const currentGridRows = latestGridRows.current;
+        let targetIndex = currentGridRows.findIndex((row: any) => !row.ItemCode);
+        if (targetIndex === -1) {
+          targetIndex = currentGridRows.length - 1;
+        }
+        
+        if (latestBarcodeFetch.current) {
+          latestBarcodeFetch.current(targetIndex, finalBarcode);
+        }
+      } else if (e.key.length === 1) {
+        barcodeBuffer += e.key;
+      }
+      
+      lastKeyTime = currentTime;
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
 
   const purchaseEntryCompactStyles = `
     @media (max-width: 991.98px) {

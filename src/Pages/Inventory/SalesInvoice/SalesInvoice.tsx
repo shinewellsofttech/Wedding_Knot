@@ -495,6 +495,7 @@ function SalesInvoice() {
   };
 
   const addRow = () => {
+    setTaxOverrides({});
     setGridRows((prevRows) => [
       ...prevRows,
       { ItemCode: "", F_ItemGroupMaster: "", F_ItemMaster: "", F_ColorMaster: state.DefaultColor?.Id || "", F_WarehouseMaster: state.DefaultWarehouse?.Id || "", F_BatchMaster: "", Variant: "", Photos: [], Qty: "", Rate: "", ItemData: null, AvailableQty: 0, UnitValue: 1 },
@@ -522,6 +523,7 @@ function SalesInvoice() {
   };
 
   const removeRow = (index: number) => {
+    setTaxOverrides({});
     if (gridRows.length > 1) {
       setGridRows((prevRows) => prevRows.filter((_, i) => i !== index));
     }
@@ -583,6 +585,7 @@ function SalesInvoice() {
   };
 
   const updateGridRow = async (index: number, field: string, value: any) => {
+    setTaxOverrides({});
     const updatedRows = [...gridRows];
     updatedRows[index] = { ...updatedRows[index], [field]: value };
     if (field === "ItemCode") {
@@ -658,6 +661,7 @@ function SalesInvoice() {
   };
 
   const handleBarcodeFetch = async (index: number, barcode: string) => {
+    setTaxOverrides({});
     barcode = (barcode || "").trim();
     if (!barcode) return;
     if ((window as any).isFetchingBarcode) return;
@@ -903,6 +907,7 @@ function SalesInvoice() {
   };
 
   const handleQuickItemSubmit = async (e: React.FormEvent) => {
+    setTaxOverrides({});
     e.preventDefault();
     if (quickItemSubmitting) return;
     const trimmedName = (quickItemForm.ItemName || "").trim();
@@ -1364,6 +1369,70 @@ function SalesInvoice() {
     }
   };
 
+  const latestBarcodeFetch = useRef(handleBarcodeFetch);
+  const latestGridRows = useRef(gridRows);
+  useEffect(() => {
+    latestBarcodeFetch.current = handleBarcodeFetch;
+    latestGridRows.current = gridRows;
+  });
+
+  useEffect(() => {
+    let barcodeBuffer = "";
+    let lastKeyTime = Date.now();
+    let originalInputValue = "";
+    let activeInputRef: HTMLInputElement | HTMLTextAreaElement | null = null;
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const currentTime = Date.now();
+      
+      if (currentTime - lastKeyTime > 50) {
+        barcodeBuffer = "";
+        const activeEl = document.activeElement;
+        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+          activeInputRef = activeEl as HTMLInputElement | HTMLTextAreaElement;
+          originalInputValue = activeInputRef.value;
+        } else {
+          activeInputRef = null;
+        }
+      }
+      
+      if (e.key === "Enter" && barcodeBuffer.length >= 3) {
+        const finalBarcode = barcodeBuffer;
+        barcodeBuffer = "";
+        
+        // Prevent default to avoid form submission or unwanted newlines
+        e.preventDefault();
+
+        // Restore original input value if focus was on an input
+        if (activeInputRef && activeInputRef === document.activeElement) {
+          const proto = activeInputRef.tagName === 'INPUT' ? window.HTMLInputElement.prototype : window.HTMLTextAreaElement.prototype;
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+          if (nativeInputValueSetter) {
+            nativeInputValueSetter.call(activeInputRef, originalInputValue);
+            activeInputRef.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+
+        const currentGridRows = latestGridRows.current;
+        let targetIndex = currentGridRows.findIndex((row: any) => !row.ItemCode);
+        if (targetIndex === -1) {
+          targetIndex = currentGridRows.length - 1;
+        }
+        
+        if (latestBarcodeFetch.current) {
+          latestBarcodeFetch.current(targetIndex, finalBarcode);
+        }
+      } else if (e.key.length === 1) {
+        barcodeBuffer += e.key;
+      }
+      
+      lastKeyTime = currentTime;
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
+
   const salesInvoiceCompactStyles = `
     @media (max-width: 991.98px) {
       .sales-entry-page .container-fluid { padding: 0.4rem !important; }
@@ -1518,6 +1587,7 @@ function SalesInvoice() {
                                   className="form-control form-control-sm"
                                   value={row.F_LedgerMaster}
                                   onChange={(e) => {
+                                    setTaxOverrides({});
                                     const newRows = [...otherChargesRows];
                                     newRows[index].F_LedgerMaster = e.target.value;
                                     setOtherChargesRows(newRows);
@@ -1537,6 +1607,7 @@ function SalesInvoice() {
                                   className="text-end m-0"
                                   value={row.Amount}
                                   onChange={(e) => {
+                                    setTaxOverrides({});
                                     const newRows = [...otherChargesRows];
                                     newRows[index].Amount = e.target.value;
                                     setOtherChargesRows(newRows);
@@ -1549,7 +1620,7 @@ function SalesInvoice() {
                                   color="primary" 
                                   size="sm" 
                                   className="me-1 p-1 px-2" 
-                                  onClick={() => setOtherChargesRows([...otherChargesRows, { F_LedgerMaster: "", Amount: "" }])}
+                                  onClick={() => { setTaxOverrides({}); setOtherChargesRows([...otherChargesRows, { F_LedgerMaster: "", Amount: "" }]); }}
                                   disabled={!state.isGridEditable}
                                 >
                                   <i className="fa fa-plus"></i>
@@ -1559,7 +1630,7 @@ function SalesInvoice() {
                                     color="danger" 
                                     size="sm" 
                                     className="p-1 px-2"
-                                    onClick={() => setOtherChargesRows(otherChargesRows.filter((_, i) => i !== index))}
+                                    onClick={() => { setTaxOverrides({}); setOtherChargesRows(otherChargesRows.filter((_, i) => i !== index)); }}
                                     disabled={!state.isGridEditable}
                                   >
                                     <i className="fa fa-minus"></i>

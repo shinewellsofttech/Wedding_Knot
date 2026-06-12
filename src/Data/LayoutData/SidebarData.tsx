@@ -160,27 +160,27 @@ export const MenuList: MenuItem[] = [
       }
     ]
   },
-  {
-    title:"Rent Management",
-    Items:[
-      {
-        id:1,
-        title:"Rent Management",
-        path:`${process.env.PUBLIC_URL}/rentManagement`,
-        icon:"Box",
-        type:"link",
-        bookmark:true
-      },
-      {
-        id:2,
-        title:"Rent Return",
-        path:`${process.env.PUBLIC_URL}/rentReturn`,
-        icon:"Box",
-        type:"link",
-        bookmark:true
-      }
-    ]
-  },
+  // {
+  //   title:"Rent Management",
+  //   Items:[
+  //     {
+  //       id:1,
+  //       title:"Rent Management",
+  //       path:`${process.env.PUBLIC_URL}/rentManagement`,
+  //       icon:"Box",
+  //       type:"link",
+  //       bookmark:true
+  //     },
+  //     {
+  //       id:2,
+  //       title:"Rent Return",
+  //       path:`${process.env.PUBLIC_URL}/rentReturn`,
+  //       icon:"Box",
+  //       type:"link",
+  //       bookmark:true
+  //     }
+  //   ]
+  // },
   {
 title:"Accounting",
 Items:[
@@ -205,46 +205,46 @@ Items:[
         type:"link",
         bookmark:true
       },
-        {
-        id:2,
-        title: "Trial Balance",
-        path: `${process.env.PUBLIC_URL}/trialBalance`,
-        icon: "Box",
-        type: "link",
-        bookmark: true
-      },
-      {
-        id: 3,
-        title:"Profit & Loss",
-        path:`${process.env.PUBLIC_URL}/profitAndLoss`,
-        icon:"Box",
-        type:"link",
-        bookmark:true
-      },
-      {
-        id:4,
-        title:"Balance Sheet",
-        path:`${process.env.PUBLIC_URL}/balanceSheet`,
-        icon:"Box",
-        type:"link",
-        bookmark:true
-      },
-      {
-        id:5,
-        title:"Stock Position",
-        path:`${process.env.PUBLIC_URL}/stockPositionReport`,
-        icon:"Box",
-        type:"link",
-        bookmark:true
-      },
-      {
-        id:6,
-        title:"Customer Outstanding",
-        path:`${process.env.PUBLIC_URL}/customerOutstandingReport`,
-        icon:"Users",
-        type:"link",
-        bookmark:true
-      }
+      //   {
+      //   id:2,
+      //   title: "Trial Balance",
+      //   path: `${process.env.PUBLIC_URL}/trialBalance`,
+      //   icon: "Box",
+      //   type: "link",
+      //   bookmark: true
+      // },
+      // {
+      //   id: 3,
+      //   title:"Profit & Loss",
+      //   path:`${process.env.PUBLIC_URL}/profitAndLoss`,
+      //   icon:"Box",
+      //   type:"link",
+      //   bookmark:true
+      // },
+      // {
+      //   id:4,
+      //   title:"Balance Sheet",
+      //   path:`${process.env.PUBLIC_URL}/balanceSheet`,
+      //   icon:"Box",
+      //   type:"link",
+      //   bookmark:true
+      // },
+      // {
+      //   id:5,
+      //   title:"Stock Position",
+      //   path:`${process.env.PUBLIC_URL}/stockPositionReport`,
+      //   icon:"Box",
+      //   type:"link",
+      //   bookmark:true
+      // },
+      // {
+      //   id:6,
+      //   title:"Customer Outstanding",
+      //   path:`${process.env.PUBLIC_URL}/customerOutstandingReport`,
+      //   icon:"Users",
+      //   type:"link",
+      //   bookmark:true
+      // }
     ]
   },
    {
