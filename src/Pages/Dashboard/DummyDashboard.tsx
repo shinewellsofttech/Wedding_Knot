@@ -40,6 +40,7 @@ const Dashboard = () => {
     { name: "Gold Plated Bangle", variantImage: "https://via.placeholder.com/40?text=GPB", qty: 1, minQty: 4 },
   ];
 
+
   // Dummy Data for Monthly Revenue Trend
   const revenueTrendOptions: any = {
     chart: { type: "area", height: 350, toolbar: { show: false } },
@@ -53,7 +54,7 @@ const Dashboard = () => {
 
 
   const revenueTrendSeries = [
-    { name: "Sales Revenue", data: [120, 150, 180, 130, 160, 210, 240] },
+    { name: "Sales Revenue", data: [120, 10, 180, 130, 160, 210, 40,] },
     { name: "Rent Revenue", data: [40, 60, 55, 70, 80, 110, 120] }
   ];
 

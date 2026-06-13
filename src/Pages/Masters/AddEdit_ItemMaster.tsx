@@ -26,6 +26,7 @@ interface ItemRow {
   weight: string;
   unitConversion: string;
   price: string;
+  purchaseRate: string;
   barcode: string;
   stock: string;
   schemes?: any[];
@@ -49,7 +50,7 @@ const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const makeRow = (): ItemRow => ({
   id: uid(), photos: [null, null, null, null, null],
-  videoFile: null, videoName: "", length: "", width: "", height: "", weight: "", unitConversion: "", price: "", barcode: "", stock: "0", schemes: [],
+  videoFile: null, videoName: "", length: "", width: "", height: "", weight: "", unitConversion: "", price: "", purchaseRate: "", barcode: "", stock: "0", schemes: [],
 });
 
 const makeSection = (): ItemSection => ({
@@ -285,6 +286,7 @@ const AddEdit_ItemMaster = () => {
                     weight: d.Weight || "",
                     unitConversion: d.UnitConversion ? String(d.UnitConversion) : "",
                     price: d.SalePrice ? String(d.SalePrice) : "",
+                    purchaseRate: d.PurchaseRate ? String(d.PurchaseRate) : "",
                     barcode: d.Barcode || "",
                     stock: d.OpeningStock ? String(d.OpeningStock) : "0",
                     schemes: rowSchemes
@@ -638,6 +640,7 @@ const AddEdit_ItemMaster = () => {
                   <th style={{ width: 80 }}>Height</th>
                   <th style={{ width: 80 }}>Weight</th>
                   <th style={{ width: 80 }}>Unit Val</th>
+                  <th style={{ width: 110 }}>P. Rate</th>
                   <th style={{ width: 110 }}>Price</th>
                   <th style={{ width: 200 }}>Barcode</th>
                   <th style={{ width: 110 }}>Stock</th>
@@ -647,7 +650,7 @@ const AddEdit_ItemMaster = () => {
               <tbody>
                 {sections.length === 0 ? (
                   <tr>
-                    <td colSpan={12}>
+                    <td colSpan={13}>
                       <div className="im-empty">
                         <div className="im-empty-icon">📋</div>
                         <h4>No items yet</h4>
@@ -665,7 +668,7 @@ const AddEdit_ItemMaster = () => {
                       <React.Fragment key={section.id}>
                         {/* Section Header Row inside the Table */}
                         <tr className="im-section-header-row" id={`item-section-${section.id}`}>
-                          <td colSpan={12} className="text-start">
+                          <td colSpan={13} className="text-start">
                             <div className="im-section-info-grid" style={{ flexWrap: section.isMinimized ? 'nowrap' : 'wrap' }}>
                               <div className="im-section-info-field">
                                 <label>Item Name <span className="req">*</span></label>
@@ -913,6 +916,25 @@ const AddEdit_ItemMaster = () => {
                                   onChange={e => {
                                     updateRow(secIdx, rowIdx, { unitConversion: e.target.value });
                                     handleFieldUpdate(row.id, "ItemDesignMaster", "UnitConversion", e.target.value);
+                                  }}
+                                />
+                              </td>
+
+                              {/* Purchase Rate */}
+                              <td>
+                                <input
+                                  className="im-cell-input im-price"
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  value={row.purchaseRate}
+                                  onChange={e => {
+                                    const v = e.target.value;
+                                    if (v === "" || Number(v) >= 0) {
+                                      updateRow(secIdx, rowIdx, { purchaseRate: v });
+                                      handleFieldUpdate(row.id, "ItemDesignMaster", "PurchaseRate", v);
+                                    }
                                   }}
                                 />
                               </td>

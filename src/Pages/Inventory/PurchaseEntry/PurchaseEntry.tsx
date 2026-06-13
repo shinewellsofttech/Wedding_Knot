@@ -668,7 +668,7 @@ function PurchaseEntry() {
           Variant: matchedDesign.SizeName || "",
           Photos: photos,
           Qty: "1",
-          Rate: "",
+          Rate: matchedDesign.PurchaseRate ? String(matchedDesign.PurchaseRate) : "",
           F_GSTGroupMaster: item.F_GSTGroupMaster || "",
           ItemData: [{ Id: itemId, ItemName: item.ItemName || "Scanned Item", F_GSTGroupMaster: item.F_GSTGroupMaster }],
           UnitValue: unitVal

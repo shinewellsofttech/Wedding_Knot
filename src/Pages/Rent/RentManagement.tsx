@@ -34,9 +34,11 @@ interface StateData {
     TillDate: string;
     Remarks: string;
     F_RentEntryH?: string;
+    F_TaxLedger?: string;
   };
   CreatedRentEntries?: any[];
   VendorMaster: any[];
+  TaxLedgers: any[];
   ItemGroupMaster: any[];
   ItemMaster: any[];
   WarehouseMaster: any[];
@@ -66,8 +68,10 @@ function RentManagement() {
       F_VendorMaster: "",
       TillDate: getCurrentDateYYYYMMDD(),
       Remarks: "",
+      F_TaxLedger: "",
     },
     VendorMaster: [],
+    TaxLedgers: [],
     ItemGroupMaster: [],
     ItemMaster: [],
     WarehouseMaster: [],
@@ -101,6 +105,9 @@ function RentManagement() {
         const API_URL_RE_LIST = API_WEB_URLS.MASTER + "/0/token/Rententrydata/Id/0";
         const reData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_RE_LIST);
         
+        const API_URL_TAX = API_WEB_URLS.MASTER + "/0/token/LedgerMaster/Id/0";
+        const taxLedgers = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_TAX);
+        
         let reDataArray: any[] = [];
         if (Array.isArray(reData)) reDataArray = reData;
         else if (reData?.data?.dataList && Array.isArray(reData.data.dataList)) reDataArray = reData.data.dataList;
@@ -114,6 +121,7 @@ function RentManagement() {
           ItemGroupMaster: extractArray(itemGroups),
           VendorMaster: extractArray(vendors),
           CreatedRentEntries: reDataArray,
+          TaxLedgers: extractArray(taxLedgers),
         }));
 
         const params = new URLSearchParams(location.search);
@@ -177,6 +185,7 @@ function RentManagement() {
         TillDate: re.TillDate ? re.TillDate.split('T')[0] : "",
         F_VendorMaster: re.F_LedgerMaster || "",
         Remarks: re.Remarks || "",
+        F_TaxLedger: re.F_TaxLedger || re.F_LedgerMasterTax || "",
         F_RentEntryH: re.Id,
       }
     }));
@@ -237,6 +246,7 @@ function RentManagement() {
             TillDate: header.TillDate ? parseDateFromAPI(header.TillDate) : getCurrentDateYYYYMMDD(),
             F_VendorMaster: header.F_LedgerMaster || "",
             Remarks: header.Remarks || "",
+            F_TaxLedger: header.F_TaxLedger || header.F_LedgerMasterTax || "",
           },
         }));
 
@@ -471,6 +481,7 @@ function RentManagement() {
       headerFormData.append("EntryNo", state.formData.PONo || "");
       headerFormData.append("F_LedgerMaster", state.formData.F_VendorMaster);
       headerFormData.append("Remarks", state.formData.Remarks || "");
+      headerFormData.append("F_TaxLedger", state.formData.F_TaxLedger || "0");
       headerFormData.append("UserId", obj?.uid || "0");
       headerFormData.append("F_CompanyMaster", "0");
       headerFormData.append("JsonData", JSON.stringify(jsonDataArray));
@@ -613,6 +624,15 @@ function RentManagement() {
                   <Col md="2">
                     <label className="form-label">Till Date</label>
                     <DateInput name="tillDate" value={state.formData.TillDate} onChange={(val: string) => handleFormFieldChange("TillDate", val)} />
+                  </Col>
+                  <Col md="2">
+                    <label className="form-label">Tax Ledger</label>
+                    <select className="form-control" value={state.formData.F_TaxLedger || ""} onChange={(e) => handleFormFieldChange("F_TaxLedger", e.target.value)} disabled={!state.isGridEditable}>
+                      <option value="">Select Tax Ledger</option>
+                      {state.TaxLedgers?.map((v: any) => (
+                        <option key={v.Id} value={v.Id}>{v.CompanyName || v.Name || v.LedgerName}</option>
+                      ))}
+                    </select>
                   </Col>
                   <Col md="2">
                     <label className="form-label">Remarks</label>

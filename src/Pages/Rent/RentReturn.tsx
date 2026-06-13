@@ -619,7 +619,7 @@ function RentReturn() {
   return (
     <div className="page-body rent-entry-page" style={{ maxWidth: "100%", overflowX: "hidden" }}>
       <style>{rentCompactStyles}</style>
-      <Breadcrumbs mainTitle="Rent Management" parent="Rent" />
+      <Breadcrumbs mainTitle="Rent Return" parent="Rent" />
       <Container fluid className="px-2 px-sm-3">
         <Row>
           <Col xs="12">
