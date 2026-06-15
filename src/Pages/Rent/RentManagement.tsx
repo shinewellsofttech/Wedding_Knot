@@ -23,6 +23,10 @@ interface GridRow {
   Photos?: any[];
   ItemData: any[] | null;
   UnitValue?: number;
+  F_ItemDesignMaster?: number | string;
+  DesignPhoto?: string;
+  ItemName?: string;
+  GSTPercent?: number;
 }
 
 interface StateData {
@@ -35,6 +39,7 @@ interface StateData {
     Remarks: string;
     F_RentEntryH?: string;
     F_TaxLedger?: string;
+    TotalTax?: number;
   };
   CreatedRentEntries?: any[];
   VendorMaster: any[];
@@ -43,12 +48,14 @@ interface StateData {
   ItemMaster: any[];
   WarehouseMaster: any[];
   DefaultWarehouse: any | null;
+  GlobalOptions?: any[];
+  GSTGroupMaster?: any[];
   isEditMode: boolean;
   isGridEditable: boolean;
 }
 
 function RentManagement() {
-  const API_URL_SAVE = "RentEntry/0/token";
+  const API_URL_SAVE = "RentManagement/0/token";
   const API_URL_EDIT = API_WEB_URLS.MASTER + "/0/token/RentEntryH/Id";
   const API_URL_LINES = API_WEB_URLS.MASTER + "/0/token/RentEntryL/Id";
   const API_URL_ITEMGROUP = API_WEB_URLS.MASTER + "/0/token/CategoryMaster/Id/0";
@@ -69,6 +76,7 @@ function RentManagement() {
       TillDate: getCurrentDateYYYYMMDD(),
       Remarks: "",
       F_TaxLedger: "",
+      TotalTax: 0,
     },
     VendorMaster: [],
     TaxLedgers: [],
@@ -76,6 +84,8 @@ function RentManagement() {
     ItemMaster: [],
     WarehouseMaster: [],
     DefaultWarehouse: null,
+    GlobalOptions: [],
+    GSTGroupMaster: [],
     isEditMode: false,
     isGridEditable: true,
   });
@@ -102,11 +112,14 @@ function RentManagement() {
       try {
         const itemGroups = await Fn_FillListData(dispatch, setState, "ItemGroupMaster", API_URL_ITEMGROUP);
         const vendors = await Fn_FillListData(dispatch, setState, "VendorMaster", API_URL_VENDOR);
-        const API_URL_RE_LIST = API_WEB_URLS.MASTER + "/0/token/Rententrydata/Id/0";
+        const API_URL_RE_LIST = API_WEB_URLS.MASTER + "/0/token/RentManagementData/Id/0";
         const reData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_RE_LIST);
         
         const API_URL_TAX = API_WEB_URLS.MASTER + "/0/token/LedgerMaster/Id/0";
         const taxLedgers = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_TAX);
+        
+        const globalOptions = await Fn_FillListData(dispatch, () => ({}), "ignored", `${API_WEB_URLS.MASTER}/0/token/GlobalOptions/Id/0`);
+        const gstGroups = await Fn_FillListData(dispatch, () => ({}), "ignored", `${API_WEB_URLS.MASTER}/0/token/GSTGroupMaster/Id/0`);
         
         let reDataArray: any[] = [];
         if (Array.isArray(reData)) reDataArray = reData;
@@ -122,6 +135,8 @@ function RentManagement() {
           VendorMaster: extractArray(vendors),
           CreatedRentEntries: reDataArray,
           TaxLedgers: extractArray(taxLedgers),
+          GlobalOptions: extractArray(globalOptions),
+          GSTGroupMaster: extractArray(gstGroups),
         }));
 
         const params = new URLSearchParams(location.search);
@@ -130,7 +145,7 @@ function RentManagement() {
           await loadRentEntryRecord(parseInt(recordId));
         } else {
           try {
-            const API_ENTRY_NO = API_WEB_URLS.MASTER + "/0/token/GetVoucherNoByVoucherTypeId/Id/9"; // Assuming 9 for Rent Entry, adjust if needed
+            const API_ENTRY_NO = API_WEB_URLS.MASTER + "/0/token/GetVoucherNoByVoucherTypeId/Id/15"; // Assuming 9 for Rent Entry, adjust if needed
             const entryNoData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_ENTRY_NO);
             let newEntryNo = "";
             let dataArray = extractArray(entryNoData);
@@ -165,12 +180,15 @@ function RentManagement() {
 
     let lines: any[] = [];
     try {
-      if (re.RentLDetails) {
+      if (re.RentDetails) {
+        const parsed = typeof re.RentDetails === "string" ? JSON.parse(re.RentDetails) : re.RentDetails;
+        lines = Array.isArray(parsed) ? parsed : [];
+      } else if (re.RentLDetails) {
         const parsed = typeof re.RentLDetails === "string" ? JSON.parse(re.RentLDetails) : re.RentLDetails;
         lines = Array.isArray(parsed) ? parsed : [];
       }
     } catch (e) {
-      console.error("Error parsing RentLDetails", e);
+      console.error("Error parsing RentDetails", e);
     }
 
     setState((prev) => ({
@@ -187,6 +205,7 @@ function RentManagement() {
         Remarks: re.Remarks || "",
         F_TaxLedger: re.F_TaxLedger || re.F_LedgerMasterTax || "",
         F_RentEntryH: re.Id,
+        TotalTax: re.TotalTax || 0,
       }
     }));
 
@@ -216,9 +235,12 @@ function RentManagement() {
           Variant: l.Variant || l.Varient || "",
           Photos: cleanPhoto ? [{ full: cleanPhoto, thumb: cleanThumb || cleanPhoto }] : [],
           Qty: String(l.Qty || ""),
-          Rate: l.Rate ? String(l.Rate) : "",
+          Rate: l.Rate || l.RentPrice ? String(l.Rate || l.RentPrice) : "",
           SecurityDeposit: l.SecurityDeposit ? String(l.SecurityDeposit) : "",
           ItemData: [{ Id: l.F_ItemMaster, ItemName: l.ItemName || "Scanned Item" }],
+          F_ItemDesignMaster: l.F_ItemDesignMaster || 0,
+          DesignPhoto: l.DesignPhoto || "",
+          ItemName: l.ItemName || "",
         };
       });
       setGridRows(mappedRows);
@@ -247,6 +269,7 @@ function RentManagement() {
             F_VendorMaster: header.F_LedgerMaster || "",
             Remarks: header.Remarks || "",
             F_TaxLedger: header.F_TaxLedger || header.F_LedgerMasterTax || "",
+            TotalTax: header.TotalTax || 0,
           },
         }));
 
@@ -263,10 +286,13 @@ function RentManagement() {
                 Variant: line.Variant || line.Varient || "",
                 Photos: [],
                 Qty: line.Qty || "",
-                Rate: line.Rate || "",
+                Rate: line.Rate || line.RentPrice || "",
                 SecurityDeposit: line.SecurityDeposit || "",
                 ItemData: extractArray(itemData) || [],
                 UnitValue: (line.UnitConversion && parseFloat(line.UnitConversion) > 0) ? parseFloat(line.UnitConversion) : 1,
+                F_ItemDesignMaster: line.F_ItemDesignMaster || 0,
+                DesignPhoto: line.DesignPhoto || "",
+                ItemName: line.ItemName || "",
               };
             })
           );
@@ -292,7 +318,7 @@ function RentManagement() {
   const handleDeleteRE = () => {
     if (!state.formData.F_RentEntryH) return;
     if (window.confirm("Are you sure you want to delete this Rent Entry?")) {
-      const DELETE_API_URL = `${API_WEB_URLS.MASTER}/0/token/RentEntryH`;
+      const DELETE_API_URL = `${API_WEB_URLS.MASTER}/0/token/RentManagementH`;
       Fn_DeleteData(dispatch, () => {}, Number(state.formData.F_RentEntryH), DELETE_API_URL)
         .then(() => {
           alert("Rent Entry deleted successfully.");
@@ -338,7 +364,14 @@ function RentManagement() {
   };
 
   const handleBarcodeFetch = async (index: number, barcode: string) => {
+    barcode = (barcode || "").trim();
     if (!barcode) return;
+    if ((window as any).isFetchingBarcode) return;
+    const now = Date.now();
+    if ((window as any).lastScannedBarcode === barcode && now - ((window as any).lastScannedTime || 0) < 500) return;
+    (window as any).lastScannedBarcode = barcode;
+    (window as any).lastScannedTime = now;
+    (window as any).isFetchingBarcode = true;
 
     const duplicateIndex = gridRows.findIndex((row, rIndex) => rIndex !== index && row.ItemCode === barcode);
     if (duplicateIndex !== -1) {
@@ -357,6 +390,7 @@ function RentManagement() {
           barcodeInput.focus();
         }
       }, 100);
+      (window as any).isFetchingBarcode = false;
       return;
     }
 
@@ -397,6 +431,16 @@ function RentManagement() {
         let unitVal = parseFloat(designItem.UnitConversion);
         if (isNaN(unitVal) || unitVal === 0) unitVal = 1;
 
+        let gstPercent = 0;
+        const gstGroupId = item.F_GSTGroupMaster || "";
+        const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
+        if (gstGroup) {
+          gstPercent = parseFloat(gstGroup.GSTPercent) || parseFloat(gstGroup.IGSTPercent) || 0;
+        }
+
+        let baseSecDep = parseFloat(designItem.SalePrice || item.SalePrice || designItem.SecurityDeposit || item.SecurityDeposit || 0);
+        let secDepWithGST = baseSecDep + (baseSecDep * gstPercent / 100);
+
         const updatedRows = [...gridRows];
         
         updatedRows[index] = {
@@ -407,9 +451,13 @@ function RentManagement() {
           Variant: designItem.SizeName || item.SizeName || "",
           Qty: "1",
           Rate: designItem.RentPrice || item.RentPrice || designItem.Rate || item.Rate || "",
-          SecurityDeposit: designItem.SecurityDeposit || item.SecurityDeposit || "",
-          ItemData: [{ Id: itemId, ItemName: item.ItemName || "Scanned Item" }],
-          UnitValue: unitVal
+          SecurityDeposit: String(secDepWithGST.toFixed(2)),
+          ItemData: [{ Id: itemId, ItemName: item.ItemName || "Scanned Item", F_GSTGroupMaster: gstGroupId }],
+          GSTPercent: gstPercent,
+          UnitValue: unitVal,
+          F_ItemDesignMaster: designItem.Id || item.Id || 0,
+          DesignPhoto: designItem.DesignPhoto || item.DesignPhoto || "",
+          ItemName: item.ItemName || designItem.ItemName || "Scanned Item"
         };
         
         let nextRowIndex = index;
@@ -439,9 +487,13 @@ function RentManagement() {
             barcodeInput.focus();
           }
         }, 100);
+        (window as any).isFetchingBarcode = false;
+      } else {
+        (window as any).isFetchingBarcode = false;
       }
     } catch (e) {
       console.error("Error fetching barcode details:", e);
+      (window as any).isFetchingBarcode = false;
     }
   };
 
@@ -459,32 +511,83 @@ function RentManagement() {
     try {
       const obj = JSON.parse(localStorage.getItem("user") || "{}");
       
+      const subTotal = validGridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
+      const totalSecDep = validGridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.SecurityDeposit) || 0)), 0);
+
+      let taxAmount = 0;
+      let cgstAmount = 0;
+      let sgstAmount = 0;
+      let igstAmount = 0;
+      const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
+      const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+
+      if (state.GlobalOptions && state.GlobalOptions.length > 0 && state.GSTGroupMaster && state.GSTGroupMaster.length > 0) {
+        const globalOpt = state.GlobalOptions[0];
+        const serviceTaxGroupId = globalOpt.F_GSTGroupMaster || globalOpt.F_GSTGroupMaster_ServiceTax || globalOpt.F_ServiceTaxGroup;
+        if (serviceTaxGroupId) {
+          const gstGroup = state.GSTGroupMaster.find((g: any) => String(g.Id) === String(serviceTaxGroupId));
+          if (gstGroup) {
+            const cgstP = parseFloat(gstGroup.CGSTPercent) || 0;
+            const sgstP = parseFloat(gstGroup.SGSTPercent) || 0;
+            const igstP = parseFloat(gstGroup.IGSTPercent) || 0;
+
+            if (isInState) {
+              const totalPercent = cgstP + sgstP;
+              if (totalPercent > 0) {
+                taxAmount = subTotal * (totalPercent / 100);
+                cgstAmount = taxAmount * (cgstP / totalPercent) || 0;
+                sgstAmount = taxAmount * (sgstP / totalPercent) || 0;
+              }
+            } else {
+              const totalPercent = igstP;
+              if (totalPercent > 0) {
+                taxAmount = subTotal * (totalPercent / 100);
+                igstAmount = taxAmount;
+              }
+            }
+          }
+        }
+      }
+
       const jsonDataArray = validGridRows.map((row) => {
         const qty = Number(row.Qty) || 0;
         const rate = Number(row.Rate) || 0;
         const amount = qty * rate;
 
         return {
+          F_ItemDesignMaster: Number(row.F_ItemDesignMaster) || 0,
           F_CategoryMaster: Number(row.F_ItemGroupMaster) || 0,
           F_ItemMaster: Number(row.F_ItemMaster) || 0,
           Barcode: row.ItemCode || "",
+          ItemName: row.ItemName || row.ItemData?.[0]?.ItemName || "",
+          DesignPhoto: row.DesignPhoto || "",
           Qty: qty,
-          Rate: rate,
+          RentPrice: rate,
           SecurityDeposit: Number(row.SecurityDeposit) || 0,
           Amount: amount,
+          F_StatusMaster: 0
         };
       });
 
       const headerFormData = new FormData();
+      headerFormData.append("EntryNo", state.formData.PONo || "");
       headerFormData.append("EntryDate", state.formData.PODate);
       headerFormData.append("TillDate", state.formData.TillDate);
-      headerFormData.append("EntryNo", state.formData.PONo || "");
       headerFormData.append("F_LedgerMaster", state.formData.F_VendorMaster);
+      headerFormData.append("F_LedgerMaster_Tax", state.formData.F_TaxLedger || "0");
       headerFormData.append("Remarks", state.formData.Remarks || "");
-      headerFormData.append("F_TaxLedger", state.formData.F_TaxLedger || "0");
-      headerFormData.append("UserId", obj?.uid || "0");
+      headerFormData.append("TotalRentAmount", subTotal.toString());
+      headerFormData.append("TotalSecurityDeposit", totalSecDep.toString());
+      headerFormData.append("TaxAmount", taxAmount.toFixed(2));
+      headerFormData.append("TotalTaxAmount", taxAmount.toFixed(2));
+      headerFormData.append("TotalTax", taxAmount.toFixed(2));
+      headerFormData.append("TotalCGST", cgstAmount.toFixed(2));
+      headerFormData.append("TotalSGST", sgstAmount.toFixed(2));
+      headerFormData.append("TotalIGST", igstAmount.toFixed(2));
       headerFormData.append("F_CompanyMaster", "0");
+      headerFormData.append("UserId", obj?.uid || "0");
       headerFormData.append("JsonData", JSON.stringify(jsonDataArray));
+      headerFormData.append("F_RentManagementH", state.formData.F_RentEntryH || "0");
       await Fn_AddEditData(dispatch, setState, { arguList: { id: state.id, formData: headerFormData } }, API_URL_SAVE, true, "memberid", navigate, "#");
       alert("Rent Entry saved successfully");
       window.location.reload();
@@ -608,7 +711,7 @@ function RentManagement() {
                   </Col>
                   <Col md="2">
                     <label className="form-label">Entry Date</label>
-                    <DateInput name="poDate" value={state.formData.PODate} onChange={(val: string) => handleFormFieldChange("PODate", val)} />
+                    <DateInput name="poDate" value={state.formData.PODate} onChange={(e: any) => handleFormFieldChange("PODate", e.target.value)} />
                   </Col>
                   <Col md="2">
                     <div className="d-flex justify-content-between align-items-center">
@@ -623,17 +726,9 @@ function RentManagement() {
                   </Col>
                   <Col md="2">
                     <label className="form-label">Till Date</label>
-                    <DateInput name="tillDate" value={state.formData.TillDate} onChange={(val: string) => handleFormFieldChange("TillDate", val)} />
+                    <DateInput name="tillDate" value={state.formData.TillDate} onChange={(e: any) => handleFormFieldChange("TillDate", e.target.value)} />
                   </Col>
-                  <Col md="2">
-                    <label className="form-label">Tax Ledger</label>
-                    <select className="form-control" value={state.formData.F_TaxLedger || ""} onChange={(e) => handleFormFieldChange("F_TaxLedger", e.target.value)} disabled={!state.isGridEditable}>
-                      <option value="">Select Tax Ledger</option>
-                      {state.TaxLedgers?.map((v: any) => (
-                        <option key={v.Id} value={v.Id}>{v.CompanyName || v.Name || v.LedgerName}</option>
-                      ))}
-                    </select>
-                  </Col>
+
                   <Col md="2">
                     <label className="form-label">Remarks</label>
                     <Input type="text" value={state.formData.Remarks} onChange={(e) => handleFormFieldChange("Remarks", e.target.value)} placeholder="Enter remarks" />
@@ -656,34 +751,93 @@ function RentManagement() {
 
                 {/* Summary Section */}
                 <Row className="mt-4">
-                  <Col md={{ size: 4, offset: 8 }}>
-                    {(() => {
-                      const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
-                      const totalSecDep = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.SecurityDeposit) || 0)), 0);
-                      const grandTotal = subTotal + totalSecDep;
+                  {(() => {
+                    const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
+                    const totalSecDep = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.SecurityDeposit) || 0)), 0);
+                    
+                    let taxAmount = 0;
+                    let cgstAmount = 0;
+                    let sgstAmount = 0;
+                    let igstAmount = 0;
 
-                      return (
-                        <div className="table-responsive">
-                          <table className="table table-bordered table-sm mb-0 align-middle">
-                            <tbody>
-                              <tr>
-                                <th className="text-end w-50">Total Rent Amount:</th>
-                                <td className="text-end fw-bold">{subTotal.toFixed(2)}</td>
-                              </tr>
-                              <tr>
-                                <th className="text-end w-50">Total Security Deposit:</th>
-                                <td className="text-end fw-bold">{totalSecDep.toFixed(2)}</td>
-                              </tr>
-                              <tr>
-                                <th className="text-end text-success fs-5">Grand Total:</th>
-                                <td className="text-end text-success fw-bold fs-5">{grandTotal.toFixed(2)}</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      );
-                    })()}
-                  </Col>
+                    const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
+                    const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+
+                    if (state.GlobalOptions && state.GlobalOptions.length > 0 && state.GSTGroupMaster && state.GSTGroupMaster.length > 0) {
+                      const globalOpt = state.GlobalOptions[0];
+                      const serviceTaxGroupId = globalOpt.F_GSTGroupMaster || globalOpt.F_GSTGroupMaster_ServiceTax || globalOpt.F_ServiceTaxGroup;
+                      if (serviceTaxGroupId) {
+                        const gstGroup = state.GSTGroupMaster.find((g: any) => String(g.Id) === String(serviceTaxGroupId));
+                        if (gstGroup) {
+                          const cgstP = parseFloat(gstGroup.CGSTPercent) || 0;
+                          const sgstP = parseFloat(gstGroup.SGSTPercent) || 0;
+                          const igstP = parseFloat(gstGroup.IGSTPercent) || 0;
+
+                          if (isInState) {
+                            const totalPercent = cgstP + sgstP;
+                            if (totalPercent > 0) {
+                              taxAmount = subTotal * (totalPercent / 100);
+                              cgstAmount = taxAmount * (cgstP / totalPercent) || 0;
+                              sgstAmount = taxAmount * (sgstP / totalPercent) || 0;
+                            }
+                          } else {
+                            const totalPercent = igstP;
+                            if (totalPercent > 0) {
+                              taxAmount = subTotal * (totalPercent / 100);
+                              igstAmount = taxAmount;
+                            }
+                          }
+                        }
+                      }
+                    }
+                    
+                    const grandTotal = totalSecDep;
+
+                    return (
+                      <>
+                        <Col md="8">
+                          <div className="d-flex flex-wrap gap-3">
+                            <div className="p-3 bg-light border rounded flex-grow-1" style={{ minWidth: "250px", maxWidth: "350px" }}>
+                              <h6 className="mb-1 text-muted fw-bold">Total Rent Amount</h6>
+                              <h4 className="mb-2 text-primary">₹ {subTotal.toFixed(2)}</h4>
+                              
+                              {cgstAmount > 0 && <div className="d-flex justify-content-between small text-muted mt-1"><span>Total CGST:</span> <span>₹ {cgstAmount.toFixed(2)}</span></div>}
+                              {sgstAmount > 0 && <div className="d-flex justify-content-between small text-muted"><span>Total SGST:</span> <span>₹ {sgstAmount.toFixed(2)}</span></div>}
+                              {igstAmount > 0 && <div className="d-flex justify-content-between small text-muted mt-1"><span>Total IGST:</span> <span>₹ {igstAmount.toFixed(2)}</span></div>}
+                              {taxAmount > 0 && cgstAmount === 0 && sgstAmount === 0 && igstAmount === 0 && (
+                                <div className="d-flex justify-content-between small text-muted mt-1"><span>Tax Amount:</span> <span>₹ {taxAmount.toFixed(2)}</span></div>
+                              )}
+
+                              <div className="text-muted mt-2 fw-normal" style={{ fontSize: "0.75rem", borderTop: "1px dashed #ccc", paddingTop: "0.5rem" }}>
+                                (Receipt entry will be done at Rent Return)
+                              </div>
+                            </div>
+                            
+                            <div className="p-3 bg-light border rounded flex-grow-1" style={{ minWidth: "250px", maxWidth: "350px" }}>
+                              <h6 className="mb-1 text-muted fw-bold">Total Security Deposit</h6>
+                              <h4 className="mb-2 text-info">₹ {totalSecDep.toFixed(2)}</h4>
+                              
+                              <div className="text-muted mt-2 fw-normal" style={{ fontSize: "0.75rem", borderTop: "1px dashed #ccc", paddingTop: "0.5rem" }}>
+                                (Receipt entry will be done at Rent Return)
+                              </div>
+                            </div>
+                          </div>
+                        </Col>
+                        <Col md="4">
+                          <div className="table-responsive h-100 d-flex flex-column justify-content-end">
+                            <table className="table table-bordered table-sm mb-0 align-middle shadow-sm">
+                              <tbody>
+                                <tr>
+                                  <th className="text-end text-success fs-5 py-3">Grand Total:</th>
+                                  <td className="text-end text-success fw-bold fs-5 py-3">₹ {grandTotal.toFixed(2)}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </Col>
+                      </>
+                    );
+                  })()}
                 </Row>
               </CardBody>
               <CardFooter className="d-flex flex-row flex-nowrap gap-2 justify-content-end p-2 p-sm-3">

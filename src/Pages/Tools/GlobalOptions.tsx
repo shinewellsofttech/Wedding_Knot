@@ -29,6 +29,7 @@ interface FormValues {
   F_CityMaster: string;
   FirmAddress: string;
   GSTNo: string;
+  F_GSTGroupMaster_ServiceTax: string;
 }
 
 const initialValues: FormValues = {
@@ -47,6 +48,7 @@ const initialValues: FormValues = {
   F_CityMaster: "",
   FirmAddress: "",
   GSTNo: "",
+  F_GSTGroupMaster_ServiceTax: "",
 };
 
 interface DropdownState {
@@ -57,6 +59,7 @@ interface DropdownState {
   ledgerList: any[];
   stateList: any[];
   cityList: any[];
+  gstGroupList: any[];
 }
 
 interface GlobalOptionsState {
@@ -89,6 +92,7 @@ const GlobalOptions: React.FC = () => {
     ledgerList: [],
     stateList: [],
     cityList: [],
+    gstGroupList: [],
   });
 
   // Helper function to convert values to string or empty
@@ -110,6 +114,7 @@ const GlobalOptions: React.FC = () => {
     F_CityMaster: toStringOrEmpty(globalOptionsState.formData.F_CityMaster),
     FirmAddress: toStringOrEmpty(globalOptionsState.formData.FirmAddress),
     GSTNo: toStringOrEmpty(globalOptionsState.formData.GSTNo),
+    F_GSTGroupMaster_ServiceTax: toStringOrEmpty(globalOptionsState.formData.F_GSTGroupMaster_ServiceTax),
   };
 
   // Load dropdown data on component mount
@@ -143,6 +148,15 @@ const GlobalOptions: React.FC = () => {
       () => {},
       () => {}
     ).catch((error) => console.error("Failed to fetch cities:", error));
+
+    Fn_FillListData(
+      dispatch,
+      setDropdowns,
+      "gstGroupList",
+      `${API_WEB_URLS.MASTER}/0/token/GSTGroupMaster/Id/0`,
+      () => {},
+      () => {}
+    ).catch((error) => console.error("Failed to fetch GST groups:", error));
 
     // Load Warehouses (Godowns)
     Fn_FillListData(
@@ -228,6 +242,7 @@ const GlobalOptions: React.FC = () => {
               F_CityMaster: String(globalOptionsRecord.F_CityMaster || ""),
               FirmAddress: globalOptionsRecord.FirmAddress || "",
               GSTNo: globalOptionsRecord.GSTNo || "",
+              F_GSTGroupMaster_ServiceTax: String(globalOptionsRecord.F_GSTGroupMaster || globalOptionsRecord.F_GSTGroupMaster_ServiceTax || globalOptionsRecord.F_ServiceTaxGroup || ""),
             },
             isProgress: false,
           }));
@@ -252,6 +267,7 @@ const GlobalOptions: React.FC = () => {
       formData.append("F_CityMaster", values.F_CityMaster || "");
       formData.append("FirmAddress", values.FirmAddress || "");
       formData.append("GSTNo", values.GSTNo || "");
+      formData.append("F_GSTGroupMaster", values.F_GSTGroupMaster_ServiceTax || "");
       formData.append("PANNo", values.PANNo || "");
       formData.append("MobileNo", values.MobileNo || "");
       formData.append("EmailId", values.EmailId || "");
@@ -422,6 +438,26 @@ const GlobalOptions: React.FC = () => {
                                 onChange={handleChange}
                                 onBlur={handleBlur}
                               />
+                            </FormGroup>
+                          </Col>
+
+                          <Col md="6">
+                            <FormGroup>
+                              <Label>Service Tax Group</Label>
+                              <Input
+                                name="F_GSTGroupMaster_ServiceTax"
+                                type="select"
+                                value={values.F_GSTGroupMaster_ServiceTax}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                              >
+                                <option value="">Select Service Tax</option>
+                                {dropdowns.gstGroupList.map((item: any) => (
+                                  <option key={item.Id} value={item.Id}>
+                                    {item.GSTGroupName || item.Name}
+                                  </option>
+                                ))}
+                              </Input>
                             </FormGroup>
                           </Col>
 

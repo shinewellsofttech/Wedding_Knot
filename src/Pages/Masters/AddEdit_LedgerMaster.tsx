@@ -122,7 +122,7 @@ const LEDGER_GROUP_LIST_URL = `${API_WEB_URLS.MASTER}/0/token/LedgerGroupMaster/
 const COUNTRY_LIST_URL = `${API_WEB_URLS.MASTER}/0/token/${API_WEB_URLS.CountryMaster}/Id/0`;
 const STATE_LIST_URL = `${API_WEB_URLS.MASTER}/0/token/${API_WEB_URLS.StateMaster}/Id/0`;
 const CITY_LIST_URL = `${API_WEB_URLS.MASTER}/0/token/${API_WEB_URLS.CityMaster}/Id/0`;
-const GST_GROUP_LIST_URL = `${API_WEB_URLS.MASTER}/0/token/TaxGroup/Id/0`;
+const GST_GROUP_LIST_URL = `${API_WEB_URLS.MASTER}/0/token/GSTGroupMaster/Id/0`;
 const PURCHASE_LEDGER_LIST_URL = `${API_WEB_URLS.MASTER}/0/token/${API_WEB_URLS.LedgerMaster}/TBL.F_LedgerGroupMaster/27`;
 const SALES_LEDGER_LIST_URL = `${API_WEB_URLS.MASTER}/0/token/${API_WEB_URLS.LedgerMaster}/TBL.F_LedgerGroupMaster/31`;
 const TAX_PAYER_TYPE_MASTER_URL = `${API_WEB_URLS.MASTER}/0/token/${API_WEB_URLS.TaxPayerTypeMaster}/Id/0`;
@@ -169,21 +169,7 @@ const AddEdit_LedgerMaster = () => {
       Yup.object({
         Name: Yup.string().trim().required("Name is required"),
         F_LedgerGroupMaster: Yup.string().trim().required("Ledger Group is required"),
-        F_Type: Yup.string().when("F_LedgerGroupMaster", {
-          is: (value: string) => value === "12",
-          then: (schema) => schema.required("Type is required when Ledger Group is 12"),
-          otherwise: (schema) => schema.notRequired(),
-        }),
-        F_LedgerMasterSales: Yup.string().when(["F_LedgerGroupMaster", "F_Type"], {
-          is: (ledgerGroup: string, type: string) => ledgerGroup === "12" && type === "1",
-          then: (schema) => schema.required("Ledger Master Sales is required when Type is 1"),
-          otherwise: (schema) => schema.notRequired(),
-        }),
-        F_LedgerMasterPurchase: Yup.string().when(["F_LedgerGroupMaster", "F_Type"], {
-          is: (ledgerGroup: string, type: string) => ledgerGroup === "12" && type === "1",
-          then: (schema) => schema.required("Ledger Master Purchase is required when Type is 1"),
-          otherwise: (schema) => schema.notRequired(),
-        }),
+        // Validation for hidden fields (Type, LedgerMasterSales, LedgerMasterPurchase) removed
         Email: Yup.string()
           .nullable()
           .notRequired(),
@@ -857,7 +843,7 @@ const AddEdit_LedgerMaster = () => {
                                     />
                                   </FormGroup>
                                 </Col>
-                                <Col md="6">
+                                {/* <Col md="6">
                                   <FormGroup>
                                     <Label>
                                       Type <span className="text-danger">*</span>
@@ -917,7 +903,7 @@ const AddEdit_LedgerMaster = () => {
                                       ))}
                                     </Input>
                                   </FormGroup>
-                                </Col>
+                                </Col> */}
                                 <Col md="6">
                                   <FormGroup>
                                     <div className="form-check form-switch">
@@ -949,13 +935,13 @@ const AddEdit_LedgerMaster = () => {
                                       <option value="">Select Tax group</option>
                                       {dropdowns.gstGroups.map((group) => (
                                         <option key={group?.Id} value={group?.Id ?? ""}>
-                                          {(group as any)?.groupName ?? group?.Name ?? `Tax Group ${group?.Id ?? ""}`}
+                                          {(group as any)?.GSTGroupName ?? (group as any)?.groupName ?? group?.Name ?? `Tax Group ${group?.Id ?? ""}`}
                                         </option>
                                       ))}
                                     </Input>
                                   </FormGroup>
                                 </Col>
-                                <Col md="6">
+                                {/* <Col md="6">
                                   <FormGroup>
                                     <Label>Tax Payer Type</Label>
                                     <Input
@@ -1025,7 +1011,7 @@ const AddEdit_LedgerMaster = () => {
                                     </Input>
                                     <ErrorMessage name="F_LedgerMasterPurchase" component="div" className="text-danger small" />
                                   </FormGroup>
-                                </Col>
+                                </Col> */}
                               </>
                             )}
                           </Row>

@@ -23,6 +23,9 @@ interface GridRow {
   Photos?: any[];
   ItemData: any[] | null;
   UnitValue?: number;
+  F_ItemDesignMaster?: number | string;
+  DesignPhoto?: string;
+  ItemName?: string;
 }
 
 interface StateData {
@@ -35,6 +38,10 @@ interface StateData {
     Remarks: string;
     F_RentEntryH?: string;
     F_RentReturnH?: string;
+    TotalTax?: number;
+    TotalCGST?: number;
+    TotalSGST?: number;
+    TotalIGST?: number;
   };
   CreatedRentEntries?: any[];
   CreatedRentReturns?: any[];
@@ -101,7 +108,7 @@ function RentReturn() {
         const itemGroups = await Fn_FillListData(dispatch, setState, "ItemGroupMaster", API_URL_ITEMGROUP);
         const vendors = await Fn_FillListData(dispatch, setState, "VendorMaster", API_URL_VENDOR);
         
-        const API_URL_RE_LIST = API_WEB_URLS.MASTER + "/0/token/Rententrydata/Id/0";
+        const API_URL_RE_LIST = API_WEB_URLS.MASTER + "/0/token/RentManagementData/Id/0";
         const reData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_RE_LIST);
         
         const API_URL_RR_LIST = API_WEB_URLS.MASTER + "/0/token/RentReturnData/Id/0";
@@ -161,7 +168,10 @@ function RentReturn() {
 
     let lines: any[] = [];
     try {
-      if (rr.RentReturnLDetails) {
+      if (rr.RentReturnDetails) {
+        const parsed = typeof rr.RentReturnDetails === "string" ? JSON.parse(rr.RentReturnDetails) : rr.RentReturnDetails;
+        lines = Array.isArray(parsed) ? parsed : [];
+      } else if (rr.RentReturnLDetails) {
         const parsed = typeof rr.RentReturnLDetails === "string" ? JSON.parse(rr.RentReturnLDetails) : rr.RentReturnLDetails;
         lines = Array.isArray(parsed) ? parsed : [];
       }
@@ -182,6 +192,11 @@ function RentReturn() {
         F_VendorMaster: rr.F_LedgerMaster || "",
         Remarks: rr.Remarks || "",
         F_RentReturnH: rr.Id,
+        F_RentEntryH: rr.F_RentEntryH || "",
+        TotalTax: Number(rr.TotalTax || rr.TaxAmount || rr.TotalTaxAmount || 0),
+        TotalCGST: Number(rr.TotalCGST || 0),
+        TotalSGST: Number(rr.TotalSGST || 0),
+        TotalIGST: Number(rr.TotalIGST || 0),
       }
     }));
 
@@ -231,12 +246,15 @@ function RentReturn() {
 
     let lines: any[] = [];
     try {
-      if (re.RentLDetails) {
+      if (re.RentDetails) {
+        const parsed = typeof re.RentDetails === "string" ? JSON.parse(re.RentDetails) : re.RentDetails;
+        lines = Array.isArray(parsed) ? parsed : [];
+      } else if (re.RentLDetails) {
         const parsed = typeof re.RentLDetails === "string" ? JSON.parse(re.RentLDetails) : re.RentLDetails;
         lines = Array.isArray(parsed) ? parsed : [];
       }
     } catch (e) {
-      console.error("Error parsing RentLDetails", e);
+      console.error("Error parsing RentDetails", e);
     }
 
     setState((prev) => ({
@@ -245,6 +263,11 @@ function RentReturn() {
         ...prev.formData,
         F_VendorMaster: re.F_LedgerMaster || "",
         F_RentEntryH: re.Id,
+        TillDate: re.TillDate ? re.TillDate.split('T')[0] : prev.formData.TillDate,
+        TotalTax: Number(re.TotalTax || re.TaxAmount || re.TotalTaxAmount || 0),
+        TotalCGST: Number(re.TotalCGST || 0),
+        TotalSGST: Number(re.TotalSGST || 0),
+        TotalIGST: Number(re.TotalIGST || 0),
       }
     }));
 
@@ -258,9 +281,12 @@ function RentReturn() {
           Variant: l.Variant || l.Varient || "",
           Photos: [],
           Qty: String(l.Qty || ""),
-          Rate: l.Rate ? String(l.Rate) : "",
+          Rate: l.RentPrice || l.Rate ? String(l.RentPrice || l.Rate) : "",
           SecurityDeposit: l.SecurityDeposit ? String(l.SecurityDeposit) : "",
           ItemData: [{ Id: l.F_ItemMaster, ItemName: l.ItemName || "Scanned Item" }],
+          F_ItemDesignMaster: l.F_ItemDesignMaster || 0,
+          DesignPhoto: l.DesignPhoto || "",
+          ItemName: l.ItemName || "",
         };
       });
       setGridRows(mappedRows);
@@ -345,7 +371,7 @@ function RentReturn() {
     }
   };
 
-  const handleEditRE = () => {
+  const handleEditRR = () => {
     setState((prev) => ({ ...prev, isGridEditable: true }));
   };
 
@@ -486,32 +512,34 @@ function RentReturn() {
   };
 
   const handleSave = async () => {
+    if (!state.formData.F_RentEntryH) { alert("Please select a Rent Entry. It is mandatory for Rent Return."); return; }
     if (!state.formData.F_VendorMaster) { alert("Please select a Party"); return; }
     const validGridRows = gridRows.filter(row => row.ItemCode || row.F_ItemMaster);
     if (validGridRows.length === 0) { alert("Please add at least one valid item"); return; }
-    for (let i = 0; i < validGridRows.length; i++) {
-      const row = validGridRows[i];
-      if (!row.F_ItemMaster || !row.Qty || parseFloat(row.Qty) <= 0 || !row.Rate || parseFloat(row.Rate) < 0 || !row.SecurityDeposit || parseFloat(row.SecurityDeposit) < 0) {
-        alert(`Row ${i + 1}: Please fill all required fields correctly (Item, Quantity, Rent Price, Security Deposit)`);
-        return;
-      }
-    }
+    
     try {
       const obj = JSON.parse(localStorage.getItem("user") || "{}");
       
+      const subTotal = validGridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
+      const totalSecDep = validGridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.SecurityDeposit) || 0)), 0);
+
       const jsonDataArray = validGridRows.map((row) => {
         const qty = Number(row.Qty) || 0;
         const rate = Number(row.Rate) || 0;
         const amount = qty * rate;
 
         return {
+          F_ItemDesignMaster: Number(row.F_ItemDesignMaster) || 0,
           F_CategoryMaster: Number(row.F_ItemGroupMaster) || 0,
           F_ItemMaster: Number(row.F_ItemMaster) || 0,
           Barcode: row.ItemCode || "",
+          ItemName: row.ItemName || row.ItemData?.[0]?.ItemName || "",
+          DesignPhoto: row.DesignPhoto || "",
           Qty: qty,
-          Rate: rate,
+          RentPrice: rate,
           SecurityDeposit: Number(row.SecurityDeposit) || 0,
           Amount: amount,
+          F_StatusMaster: 0
         };
       });
 
@@ -521,6 +549,8 @@ function RentReturn() {
       headerFormData.append("EntryNo", state.formData.PONo || "");
       headerFormData.append("F_LedgerMaster", state.formData.F_VendorMaster);
       headerFormData.append("Remarks", state.formData.Remarks || "");
+      headerFormData.append("TotalRentAmount", subTotal.toString());
+      headerFormData.append("TotalSecurityDeposit", totalSecDep.toString());
       headerFormData.append("UserId", obj?.uid || "0");
       headerFormData.append("F_CompanyMaster", "0");
       headerFormData.append("JsonData", JSON.stringify(jsonDataArray));
@@ -569,8 +599,8 @@ function RentReturn() {
 
         // Restore original input value if focus was on an input
         if (activeInputRef && activeInputRef === document.activeElement) {
-          const proto = activeInputRef.tagName === 'INPUT' ? window.HTMLInputElement.prototype : window.HTMLTextAreaElement.prototype;
-          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+                      const proto = activeInputRef.tagName === 'INPUT' ? window.HTMLInputElement.prototype : window.HTMLTextAreaElement.prototype;
+                      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
           if (nativeInputValueSetter) {
             nativeInputValueSetter.call(activeInputRef, originalInputValue);
             activeInputRef.dispatchEvent(new Event('input', { bubbles: true }));
@@ -643,12 +673,12 @@ function RentReturn() {
                   </Col>
 
                   <Col md="2">
-                    <label className="form-label">Rent Entry</label>
+                    <label className="form-label text-danger">Rent Entry *</label>
                     <select className="form-control" value={state.formData.F_RentEntryH || ""} onChange={(e) => { 
                       const val = e.target.value;
                       handleFormFieldChange("F_RentEntryH", val); 
                       fetchRentEntryAndPopulateGrid(val); 
-                    }}>
+                    }} disabled={state.isEditMode}>
                       <option value="">Select Rent Entry</option>
                       {state.CreatedRentEntries?.map((re: any) => (
                         <option key={re.Id} value={re.Id}>{re.EntryNo || re.Id}</option>
@@ -662,7 +692,7 @@ function RentReturn() {
                   </Col>
                   <Col md="2">
                     <label className="form-label">Entry Date</label>
-                    <DateInput name="poDate" value={state.formData.PODate} onChange={(val: string) => handleFormFieldChange("PODate", val)} />
+                    <DateInput name="poDate" value={state.formData.PODate} onChange={(e: any) => handleFormFieldChange("PODate", e.target.value)} disabled={state.isEditMode} />
                   </Col>
                   <Col md="2">
                     <div className="d-flex justify-content-between align-items-center">
@@ -677,7 +707,7 @@ function RentReturn() {
                   </Col>
                   <Col md="2">
                     <label className="form-label">Till Date</label>
-                    <DateInput name="tillDate" value={state.formData.TillDate} onChange={(val: string) => handleFormFieldChange("TillDate", val)} />
+                    <DateInput name="tillDate" value={state.formData.TillDate} onChange={(e: any) => handleFormFieldChange("TillDate", e.target.value)} disabled={!state.isGridEditable} />
                   </Col>
                   <Col md="2">
                     <label className="form-label">Remarks</label>
@@ -701,34 +731,71 @@ function RentReturn() {
 
                 {/* Summary Section */}
                 <Row className="mt-4">
-                  <Col md={{ size: 4, offset: 8 }}>
-                    {(() => {
-                      const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
-                      const totalSecDep = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.SecurityDeposit) || 0)), 0);
-                      const grandTotal = subTotal + totalSecDep;
+                  {(() => {
+                    const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
+                    const totalSecDep = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.SecurityDeposit) || 0)), 0);
+                    
+                    const taxAmount = state.formData.TotalTax || 0;
+                    const cgstAmount = state.formData.TotalCGST || 0;
+                    const sgstAmount = state.formData.TotalSGST || 0;
+                    const igstAmount = state.formData.TotalIGST || 0;
 
-                      return (
-                        <div className="table-responsive">
-                          <table className="table table-bordered table-sm mb-0 align-middle">
-                            <tbody>
-                              <tr>
-                                <th className="text-end w-50">Total Rent Amount:</th>
-                                <td className="text-end fw-bold">{subTotal.toFixed(2)}</td>
-                              </tr>
-                              <tr>
-                                <th className="text-end w-50">Total Security Deposit:</th>
-                                <td className="text-end fw-bold">{totalSecDep.toFixed(2)}</td>
-                              </tr>
-                              <tr>
-                                <th className="text-end text-success fs-5">Grand Total:</th>
-                                <td className="text-end text-success fw-bold fs-5">{grandTotal.toFixed(2)}</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      );
-                    })()}
-                  </Col>
+                    const rentWithGST = subTotal + taxAmount;
+                    const grandTotal = rentWithGST;
+
+                    return (
+                      <>
+                        <Col md="8">
+                          <div className="d-flex flex-wrap gap-3">
+                            <div className="p-3 bg-light border rounded flex-grow-1" style={{ minWidth: "250px", maxWidth: "350px" }}>
+                              <h6 className="mb-1 text-muted fw-bold">Total Security Deposit</h6>
+                              <h4 className="mb-0 text-info">₹ {totalSecDep.toFixed(2)}</h4>
+                            </div>
+                          </div>
+                        </Col>
+                        <Col md="4">
+                          <div className="table-responsive h-100 d-flex flex-column justify-content-end">
+                            <table className="table table-bordered table-sm mb-0 align-middle shadow-sm">
+                              <tbody>
+                                <tr>
+                                  <th className="text-end w-50">Rent Amount:</th>
+                                  <td className="text-end fw-bold">₹ {subTotal.toFixed(2)}</td>
+                                </tr>
+                                {cgstAmount > 0 && (
+                                  <tr>
+                                    <th className="text-end" style={{ width: "60%" }}>Total CGST:</th>
+                                    <td className="text-end fw-bold">₹ {cgstAmount.toFixed(2)}</td>
+                                  </tr>
+                                )}
+                                {sgstAmount > 0 && (
+                                  <tr>
+                                    <th className="text-end">Total SGST:</th>
+                                    <td className="text-end fw-bold">₹ {sgstAmount.toFixed(2)}</td>
+                                  </tr>
+                                )}
+                                {igstAmount > 0 && (
+                                  <tr>
+                                    <th className="text-end">Total IGST:</th>
+                                    <td className="text-end fw-bold">₹ {igstAmount.toFixed(2)}</td>
+                                  </tr>
+                                )}
+                                {taxAmount > 0 && cgstAmount === 0 && sgstAmount === 0 && igstAmount === 0 && (
+                                  <tr>
+                                    <th className="text-end">Tax Amount:</th>
+                                    <td className="text-end fw-bold">₹ {taxAmount.toFixed(2)}</td>
+                                  </tr>
+                                )}
+                                <tr>
+                                  <th className="text-end text-success fs-5 py-3">Grand Total:</th>
+                                  <td className="text-end text-success fw-bold fs-5 py-3">₹ {grandTotal.toFixed(2)}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </Col>
+                      </>
+                    );
+                  })()}
                 </Row>
               </CardBody>
               <CardFooter className="d-flex flex-row flex-nowrap gap-2 justify-content-end p-2 p-sm-3">
@@ -736,7 +803,7 @@ function RentReturn() {
                   <Btn
                     type="button"
                     color="warning"
-                    onClick={handleEditRE}
+                    onClick={handleEditRR}
                   >
                     <i className="fa fa-edit me-1"></i> Edit
                   </Btn>

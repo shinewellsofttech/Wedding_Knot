@@ -215,12 +215,36 @@ const PageList_ItemMaster = () => {
 
     const searchText = state.filterText.trim();
     if (searchText) {
+      const lowerSearch = searchText.toLowerCase();
+      
+      // Custom search to include Barcode from DesignDetails
+      const exactBarcodeMatches = result.filter(item => {
+        let parsedDesign: any[] = [];
+        try {
+          if (typeof item.DesignDetails === "string") {
+            parsedDesign = JSON.parse(item.DesignDetails || "[]");
+          } else if (Array.isArray(item.DesignDetails)) {
+            parsedDesign = item.DesignDetails;
+          }
+        } catch (e) { }
+        return parsedDesign.some(d => d.Barcode && d.Barcode.toLowerCase().includes(lowerSearch));
+      });
+
       const fuse = new Fuse(result, {
         keys: ["ItemName", "HSNCode", "ItemCode", "Code"],
         threshold: 0.3,
         ignoreLocation: true,
       });
-      result = fuse.search(searchText).map((res: any) => res.item);
+      const fuseResults = fuse.search(searchText).map((res: any) => res.item);
+      
+      // Combine barcode matches with fuzzy text matches, avoiding duplicates
+      const combined = [...exactBarcodeMatches];
+      fuseResults.forEach(item => {
+        if (!combined.some(c => c.Id === item.Id)) {
+          combined.push(item);
+        }
+      });
+      result = combined;
     }
 
     return result;
@@ -348,6 +372,18 @@ const PageList_ItemMaster = () => {
                               } catch (e) {
                                 // ignore parse errors
                               }
+
+                              let filteredDesign = parsedDesign;
+                              const currentSearchText = state.filterText.trim().toLowerCase();
+                              if (currentSearchText) {
+                                const matchingVariants = parsedDesign.filter((d: any) => d.Barcode && d.Barcode.toLowerCase().includes(currentSearchText));
+                                if (matchingVariants.length > 0) {
+                                  filteredDesign = matchingVariants;
+                                }
+                              }
+
+                              const isAutoExpanded = currentSearchText !== "" && filteredDesign !== parsedDesign;
+                              const isRowExpanded = expandedRows[String(item?.Id ?? index)] || isAutoExpanded;
                               
                               return (
                                 <React.Fragment key={item?.Id ?? index}>
@@ -361,9 +397,9 @@ const PageList_ItemMaster = () => {
                                         className="me-2 px-2 py-0 rounded-circle" 
                                         style={{ width: '28px', height: '28px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                                         onClick={() => toggleRow(String(item?.Id ?? index))}
-                                        title={expandedRows[String(item?.Id ?? index)] ? "Collapse" : "Expand"}
+                                        title={isRowExpanded ? "Collapse" : "Expand"}
                                       >
-                                        <i className={`fa ${expandedRows[String(item?.Id ?? index)] ? "fa-chevron-down" : "fa-chevron-right"}`} />
+                                        <i className={`fa ${isRowExpanded ? "fa-chevron-down" : "fa-chevron-right"}`} />
                                       </Btn>
                                       <strong>#{absoluteIndex + 1} - {item?.ItemName || "-"}</strong>
                                       <span className="mx-2">|</span>
@@ -402,15 +438,15 @@ const PageList_ItemMaster = () => {
                                   </tr>
                                   
                                   {/* Item Design Master Variant Rows */}
-                                  {expandedRows[String(item?.Id ?? index)] && (
-                                    parsedDesign.length === 0 ? (
+                                  {isRowExpanded && (
+                                    filteredDesign.length === 0 ? (
                                       <tr>
                                         <td colSpan={12} className="text-center text-muted py-2">
                                           No variants available for this item.
                                         </td>
                                       </tr>
                                     ) : (
-                                      parsedDesign.map((d: any, dIdx: number) => {
+                                      filteredDesign.map((d: any, dIdx: number) => {
                                       const images = [
                                         { full: d.DesignPhoto, thumb: d.DesignPhoto_Thumb },
                                         { full: d.DesignPhoto2, thumb: d.DesignPhoto2_Thumb },

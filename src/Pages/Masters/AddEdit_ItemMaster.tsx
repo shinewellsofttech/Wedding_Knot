@@ -118,7 +118,7 @@ const AddEdit_ItemMaster = () => {
       dispatch,
       setState,
       "gstGroups",
-      "Masters/0/token/GSTGroupMaster/Id/0"
+      `${API_WEB_URLS.MASTER}/0/token/GSTGroupMaster/Id/0`
     ).catch((error) => {
       console.error("Failed to load GST groups:", error);
     });
@@ -127,7 +127,7 @@ const AddEdit_ItemMaster = () => {
       dispatch,
       setState,
       "units",
-      "Masters/0/token/UnitMaster/Id/0"
+      `${API_WEB_URLS.MASTER}/0/token/UnitMaster/Id/0`
     ).catch((error) => {
       console.error("Failed to load Units:", error);
     });
@@ -136,7 +136,7 @@ const AddEdit_ItemMaster = () => {
       dispatch,
       setState,
       "materials",
-      "Masters/0/token/MaterialMaster/Id/0"
+      `${API_WEB_URLS.MASTER}/0/token/MaterialMaster/Id/0`
     ).catch((error) => {
       console.error("Failed to load Materials:", error);
     });
