@@ -584,6 +584,9 @@ function RentManagement() {
       headerFormData.append("TotalCGST", cgstAmount.toFixed(2));
       headerFormData.append("TotalSGST", sgstAmount.toFixed(2));
       headerFormData.append("TotalIGST", igstAmount.toFixed(2));
+      headerFormData.append("F_LedgerMaster_CGST", "18");
+      headerFormData.append("F_LedgerMaster_SGST", "19");
+      headerFormData.append("F_LedgerMaster_IGST", "17");
       headerFormData.append("F_CompanyMaster", "0");
       headerFormData.append("UserId", obj?.uid || "0");
       headerFormData.append("JsonData", JSON.stringify(jsonDataArray));

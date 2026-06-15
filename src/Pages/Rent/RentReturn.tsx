@@ -551,6 +551,20 @@ function RentReturn() {
       headerFormData.append("Remarks", state.formData.Remarks || "");
       headerFormData.append("TotalRentAmount", subTotal.toString());
       headerFormData.append("TotalSecurityDeposit", totalSecDep.toString());
+      
+      const taxAmount = state.formData.TotalTax || 0;
+      const cgstAmount = state.formData.TotalCGST || 0;
+      const sgstAmount = state.formData.TotalSGST || 0;
+      const igstAmount = state.formData.TotalIGST || 0;
+
+      headerFormData.append("TotalTax", taxAmount.toFixed(2));
+      headerFormData.append("TotalCGST", cgstAmount.toFixed(2));
+      headerFormData.append("TotalSGST", sgstAmount.toFixed(2));
+      headerFormData.append("TotalIGST", igstAmount.toFixed(2));
+      headerFormData.append("F_LedgerMaster_CGST", "18");
+      headerFormData.append("F_LedgerMaster_SGST", "19");
+      headerFormData.append("F_LedgerMaster_IGST", "17");
+
       headerFormData.append("UserId", obj?.uid || "0");
       headerFormData.append("F_CompanyMaster", "0");
       headerFormData.append("JsonData", JSON.stringify(jsonDataArray));
