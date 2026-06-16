@@ -36,6 +36,8 @@ interface StateData {
     F_VendorMaster: string;
     TillDate: string;
     Remarks: string;
+    CustomerName?: string;
+    MobileNo?: string;
     F_RentEntryH?: string;
     F_RentReturnH?: string;
     TotalTax?: number;
@@ -75,6 +77,8 @@ function RentReturn() {
       F_VendorMaster: "",
       TillDate: getCurrentDateYYYYMMDD(),
       Remarks: "",
+      CustomerName: "",
+      MobileNo: "",
     },
     VendorMaster: [],
     ItemGroupMaster: [],
@@ -133,7 +137,7 @@ function RentReturn() {
           await loadRentReturnRecord(parseInt(recordId));
         } else {
           try {
-            const API_ENTRY_NO = API_WEB_URLS.MASTER + "/0/token/GetVoucherNoByVoucherTypeId/Id/10"; 
+            const API_ENTRY_NO = API_WEB_URLS.MASTER + "/0/token/GetVoucherNoByVoucherTypeId/Id/16"; 
             const entryNoData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_ENTRY_NO);
             let newEntryNo = "";
             let dataArray = extractArray(entryNoData);
@@ -191,6 +195,8 @@ function RentReturn() {
         TillDate: rr.TillDate ? rr.TillDate.split('T')[0] : "",
         F_VendorMaster: rr.F_LedgerMaster || "",
         Remarks: rr.Remarks || "",
+        CustomerName: rr.CustomerName || "",
+        MobileNo: rr.MobileNo || "",
         F_RentReturnH: rr.Id,
         F_RentEntryH: rr.F_RentEntryH || "",
         TotalTax: Number(rr.TotalTax || rr.TaxAmount || rr.TotalTaxAmount || 0),
@@ -226,9 +232,12 @@ function RentReturn() {
           Variant: l.Variant || l.Varient || "",
           Photos: cleanPhoto ? [{ full: cleanPhoto, thumb: cleanThumb || cleanPhoto }] : [],
           Qty: String(l.Qty || ""),
-          Rate: l.Rate ? String(l.Rate) : "",
+          Rate: l.RentPrice || l.Rate ? String(l.RentPrice || l.Rate) : "",
           SecurityDeposit: l.SecurityDeposit ? String(l.SecurityDeposit) : "",
           ItemData: [{ Id: l.F_ItemMaster, ItemName: l.ItemName || "Scanned Item" }],
+          F_ItemDesignMaster: l.F_ItemDesignMaster || 0,
+          DesignPhoto: cleanPhoto || l.DesignPhoto || "",
+          ItemName: l.ItemName || "",
         };
       });
       setGridRows(mappedRows);
@@ -264,6 +273,8 @@ function RentReturn() {
         F_VendorMaster: re.F_LedgerMaster || "",
         F_RentEntryH: re.Id,
         TillDate: re.TillDate ? re.TillDate.split('T')[0] : prev.formData.TillDate,
+        CustomerName: re.CustomerName || prev.formData.CustomerName,
+        MobileNo: re.MobileNo || prev.formData.MobileNo,
         TotalTax: Number(re.TotalTax || re.TaxAmount || re.TotalTaxAmount || 0),
         TotalCGST: Number(re.TotalCGST || 0),
         TotalSGST: Number(re.TotalSGST || 0),
@@ -273,19 +284,35 @@ function RentReturn() {
 
     if (lines.length > 0) {
       const mappedRows: GridRow[] = lines.map((l: any) => {
+        const cleanUrl = (url: string) => {
+          let cleaned = url || "";
+          if (cleaned.includes("https://") && cleaned.lastIndexOf("https://") > 0) {
+            const firstPart = cleaned.substring(0, cleaned.lastIndexOf("https://"));
+            const secondPart = cleaned.substring(cleaned.lastIndexOf("https://"));
+            if (firstPart.includes("Thumbnail")) {
+              const filename = secondPart.substring(secondPart.lastIndexOf("/") + 1);
+              return firstPart + filename;
+            }
+            return secondPart;
+          }
+          return cleaned;
+        };
+        let cleanPhoto = cleanUrl(l.DesignPhoto);
+        let cleanThumb = cleanUrl(l.DesignPhoto_Thumb);
+
         return {
           ItemCode: l.Barcode || "",
           F_ItemGroupMaster: String(l.F_CategoryMaster || ""),
           F_ItemMaster: String(l.F_ItemMaster || ""),
           F_WarehouseMaster: state.DefaultWarehouse?.Id || "",
           Variant: l.Variant || l.Varient || "",
-          Photos: [],
+          Photos: cleanPhoto ? [{ full: cleanPhoto, thumb: cleanThumb || cleanPhoto }] : [],
           Qty: String(l.Qty || ""),
           Rate: l.RentPrice || l.Rate ? String(l.RentPrice || l.Rate) : "",
           SecurityDeposit: l.SecurityDeposit ? String(l.SecurityDeposit) : "",
           ItemData: [{ Id: l.F_ItemMaster, ItemName: l.ItemName || "Scanned Item" }],
           F_ItemDesignMaster: l.F_ItemDesignMaster || 0,
-          DesignPhoto: l.DesignPhoto || "",
+          DesignPhoto: cleanPhoto || l.DesignPhoto || "",
           ItemName: l.ItemName || "",
         };
       });
@@ -313,6 +340,8 @@ function RentReturn() {
             TillDate: header.TillDate ? parseDateFromAPI(header.TillDate) : getCurrentDateYYYYMMDD(),
             F_VendorMaster: header.F_LedgerMaster || "",
             Remarks: header.Remarks || "",
+            CustomerName: header.CustomerName || "",
+            MobileNo: header.MobileNo || "",
           },
         }));
 
@@ -327,12 +356,15 @@ function RentReturn() {
                 F_ItemMaster: line.F_ItemMaster || "",
                 F_WarehouseMaster: line.F_WarehouseMaster || "",
                 Variant: line.Variant || line.Varient || "",
-                Photos: [],
+                Photos: line.DesignPhoto ? [{ full: line.DesignPhoto, thumb: line.DesignPhoto_Thumb || line.DesignPhoto }] : [],
                 Qty: line.Qty || "",
-                Rate: line.Rate || "",
+                Rate: line.RentPrice || line.Rate || "",
                 SecurityDeposit: line.SecurityDeposit || "",
                 ItemData: extractArray(itemData) || [],
                 UnitValue: (line.UnitConversion && parseFloat(line.UnitConversion) > 0) ? parseFloat(line.UnitConversion) : 1,
+                F_ItemDesignMaster: line.F_ItemDesignMaster || 0,
+                DesignPhoto: line.DesignPhoto || "",
+                ItemName: line.ItemName || "",
               };
             })
           );
@@ -549,6 +581,8 @@ function RentReturn() {
       headerFormData.append("EntryNo", state.formData.PONo || "");
       headerFormData.append("F_LedgerMaster", state.formData.F_VendorMaster);
       headerFormData.append("Remarks", state.formData.Remarks || "");
+      headerFormData.append("CustomerName", state.formData.CustomerName || "");
+      headerFormData.append("MobileNo", state.formData.MobileNo || "");
       headerFormData.append("TotalRentAmount", subTotal.toString());
       headerFormData.append("TotalSecurityDeposit", totalSecDep.toString());
       
@@ -561,9 +595,9 @@ function RentReturn() {
       headerFormData.append("TotalCGST", cgstAmount.toFixed(2));
       headerFormData.append("TotalSGST", sgstAmount.toFixed(2));
       headerFormData.append("TotalIGST", igstAmount.toFixed(2));
-      headerFormData.append("F_LedgerMaster_CGST", "18");
-      headerFormData.append("F_LedgerMaster_SGST", "19");
-      headerFormData.append("F_LedgerMaster_IGST", "17");
+      headerFormData.append("F_LedgerMaster_CGST", cgstAmount > 0 ? "18" : "0");
+      headerFormData.append("F_LedgerMaster_SGST", sgstAmount > 0 ? "19" : "0");
+      headerFormData.append("F_LedgerMaster_IGST", igstAmount > 0 ? "17" : "0");
 
       headerFormData.append("UserId", obj?.uid || "0");
       headerFormData.append("F_CompanyMaster", "0");
@@ -668,7 +702,6 @@ function RentReturn() {
         <Row>
           <Col xs="12">
             <Card>
-              <CardHeaderCommon title="Created Rent Return" tagClass="card-title mb-0" />
               <CardBody className="p-2 p-sm-3">
                 <Row className="g-2 g-sm-3">
                   <Col md="2">
@@ -724,8 +757,16 @@ function RentReturn() {
                     <DateInput name="tillDate" value={state.formData.TillDate} onChange={(e: any) => handleFormFieldChange("TillDate", e.target.value)} disabled={!state.isGridEditable} />
                   </Col>
                   <Col md="2">
+                    <label className="form-label">Customer Name</label>
+                    <Input type="text" value={state.formData.CustomerName || ""} onChange={(e) => handleFormFieldChange("CustomerName", e.target.value)} placeholder="Customer Name" disabled={!state.isGridEditable} />
+                  </Col>
+                  <Col md="2">
+                    <label className="form-label">Mobile No</label>
+                    <Input type="text" value={state.formData.MobileNo || ""} onChange={(e) => handleFormFieldChange("MobileNo", e.target.value)} placeholder="Mobile No" disabled={!state.isGridEditable} />
+                  </Col>
+                  <Col md="2">
                     <label className="form-label">Remarks</label>
-                    <Input type="text" value={state.formData.Remarks} onChange={(e) => handleFormFieldChange("Remarks", e.target.value)} placeholder="Enter remarks" />
+                    <Input type="text" value={state.formData.Remarks} onChange={(e) => handleFormFieldChange("Remarks", e.target.value)} placeholder="Enter remarks" disabled={!state.isGridEditable} />
                   </Col>
                 </Row>
                 <Row className="mt-3">

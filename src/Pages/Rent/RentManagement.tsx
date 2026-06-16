@@ -37,6 +37,8 @@ interface StateData {
     F_VendorMaster: string;
     TillDate: string;
     Remarks: string;
+    CustomerName?: string;
+    MobileNo?: string;
     F_RentEntryH?: string;
     F_TaxLedger?: string;
     TotalTax?: number;
@@ -75,6 +77,8 @@ function RentManagement() {
       F_VendorMaster: "",
       TillDate: getCurrentDateYYYYMMDD(),
       Remarks: "",
+      CustomerName: "",
+      MobileNo: "",
       F_TaxLedger: "",
       TotalTax: 0,
     },
@@ -203,6 +207,8 @@ function RentManagement() {
         TillDate: re.TillDate ? re.TillDate.split('T')[0] : "",
         F_VendorMaster: re.F_LedgerMaster || "",
         Remarks: re.Remarks || "",
+        CustomerName: re.CustomerName || "",
+        MobileNo: re.MobileNo || "",
         F_TaxLedger: re.F_TaxLedger || re.F_LedgerMasterTax || "",
         F_RentEntryH: re.Id,
         TotalTax: re.TotalTax || 0,
@@ -268,6 +274,8 @@ function RentManagement() {
             TillDate: header.TillDate ? parseDateFromAPI(header.TillDate) : getCurrentDateYYYYMMDD(),
             F_VendorMaster: header.F_LedgerMaster || "",
             Remarks: header.Remarks || "",
+            CustomerName: header.CustomerName || "",
+            MobileNo: header.MobileNo || "",
             F_TaxLedger: header.F_TaxLedger || header.F_LedgerMasterTax || "",
             TotalTax: header.TotalTax || 0,
           },
@@ -576,6 +584,8 @@ function RentManagement() {
       headerFormData.append("F_LedgerMaster", state.formData.F_VendorMaster);
       headerFormData.append("F_LedgerMaster_Tax", state.formData.F_TaxLedger || "0");
       headerFormData.append("Remarks", state.formData.Remarks || "");
+      headerFormData.append("CustomerName", state.formData.CustomerName || "");
+      headerFormData.append("MobileNo", state.formData.MobileNo || "");
       headerFormData.append("TotalRentAmount", subTotal.toString());
       headerFormData.append("TotalSecurityDeposit", totalSecDep.toString());
       headerFormData.append("TaxAmount", taxAmount.toFixed(2));
@@ -584,9 +594,9 @@ function RentManagement() {
       headerFormData.append("TotalCGST", cgstAmount.toFixed(2));
       headerFormData.append("TotalSGST", sgstAmount.toFixed(2));
       headerFormData.append("TotalIGST", igstAmount.toFixed(2));
-      headerFormData.append("F_LedgerMaster_CGST", "18");
-      headerFormData.append("F_LedgerMaster_SGST", "19");
-      headerFormData.append("F_LedgerMaster_IGST", "17");
+      headerFormData.append("F_LedgerMaster_CGST", cgstAmount > 0 ? "18" : "0");
+      headerFormData.append("F_LedgerMaster_SGST", sgstAmount > 0 ? "19" : "0");
+      headerFormData.append("F_LedgerMaster_IGST", igstAmount > 0 ? "17" : "0");
       headerFormData.append("F_CompanyMaster", "0");
       headerFormData.append("UserId", obj?.uid || "0");
       headerFormData.append("JsonData", JSON.stringify(jsonDataArray));
@@ -690,7 +700,6 @@ function RentManagement() {
         <Row>
           <Col xs="12">
             <Card>
-              <CardHeaderCommon title="Created Rent" tagClass="card-title mb-0" />
               <CardBody className="p-2 p-sm-3">
                 <Row className="g-2 g-sm-3">
                   <Col md="2">
@@ -733,8 +742,17 @@ function RentManagement() {
                   </Col>
 
                   <Col md="2">
+                    <label className="form-label">Customer Name</label>
+                    <Input type="text" value={state.formData.CustomerName || ""} onChange={(e) => handleFormFieldChange("CustomerName", e.target.value)} placeholder="Customer Name" disabled={!state.isGridEditable} />
+                  </Col>
+                  <Col md="2">
+                    <label className="form-label">Mobile No</label>
+                    <Input type="text" value={state.formData.MobileNo || ""} onChange={(e) => handleFormFieldChange("MobileNo", e.target.value)} placeholder="Mobile No" disabled={!state.isGridEditable} />
+                  </Col>
+
+                  <Col md="2">
                     <label className="form-label">Remarks</label>
-                    <Input type="text" value={state.formData.Remarks} onChange={(e) => handleFormFieldChange("Remarks", e.target.value)} placeholder="Enter remarks" />
+                    <Input type="text" value={state.formData.Remarks} onChange={(e) => handleFormFieldChange("Remarks", e.target.value)} placeholder="Enter remarks" disabled={!state.isGridEditable} />
                   </Col>
                 </Row>
                 <Row className="mt-3">
@@ -802,14 +820,13 @@ function RentManagement() {
                           <div className="d-flex flex-wrap gap-3">
                             <div className="p-3 bg-light border rounded flex-grow-1" style={{ minWidth: "250px", maxWidth: "350px" }}>
                               <h6 className="mb-1 text-muted fw-bold">Total Rent Amount</h6>
-                              <h4 className="mb-2 text-primary">₹ {subTotal.toFixed(2)}</h4>
+                              <h4 className="mb-2 text-primary">₹ {(subTotal + taxAmount).toFixed(2)}</h4>
                               
-                              {cgstAmount > 0 && <div className="d-flex justify-content-between small text-muted mt-1"><span>Total CGST:</span> <span>₹ {cgstAmount.toFixed(2)}</span></div>}
-                              {sgstAmount > 0 && <div className="d-flex justify-content-between small text-muted"><span>Total SGST:</span> <span>₹ {sgstAmount.toFixed(2)}</span></div>}
-                              {igstAmount > 0 && <div className="d-flex justify-content-between small text-muted mt-1"><span>Total IGST:</span> <span>₹ {igstAmount.toFixed(2)}</span></div>}
-                              {taxAmount > 0 && cgstAmount === 0 && sgstAmount === 0 && igstAmount === 0 && (
-                                <div className="d-flex justify-content-between small text-muted mt-1"><span>Tax Amount:</span> <span>₹ {taxAmount.toFixed(2)}</span></div>
-                              )}
+                              <div className="d-flex justify-content-between small text-muted mt-2"><span>Rent Subtotal:</span> <span>₹ {subTotal.toFixed(2)}</span></div>
+                              {taxAmount > 0 && <div className="d-flex justify-content-between small text-muted mt-1 fw-bold"><span>Total GST:</span> <span>₹ {taxAmount.toFixed(2)}</span></div>}
+                              {cgstAmount > 0 && <div className="d-flex justify-content-between small text-muted mt-1"><span className="ms-2">- CGST:</span> <span>₹ {cgstAmount.toFixed(2)}</span></div>}
+                              {sgstAmount > 0 && <div className="d-flex justify-content-between small text-muted"><span className="ms-2">- SGST:</span> <span>₹ {sgstAmount.toFixed(2)}</span></div>}
+                              {igstAmount > 0 && <div className="d-flex justify-content-between small text-muted mt-1"><span className="ms-2">- IGST:</span> <span>₹ {igstAmount.toFixed(2)}</span></div>}
 
                               <div className="text-muted mt-2 fw-normal" style={{ fontSize: "0.75rem", borderTop: "1px dashed #ccc", paddingTop: "0.5rem" }}>
                                 (Receipt entry will be done at Rent Return)
@@ -819,10 +836,7 @@ function RentManagement() {
                             <div className="p-3 bg-light border rounded flex-grow-1" style={{ minWidth: "250px", maxWidth: "350px" }}>
                               <h6 className="mb-1 text-muted fw-bold">Total Security Deposit</h6>
                               <h4 className="mb-2 text-info">₹ {totalSecDep.toFixed(2)}</h4>
-                              
-                              <div className="text-muted mt-2 fw-normal" style={{ fontSize: "0.75rem", borderTop: "1px dashed #ccc", paddingTop: "0.5rem" }}>
-                                (Receipt entry will be done at Rent Return)
-                              </div>
+
                             </div>
                           </div>
                         </Col>
