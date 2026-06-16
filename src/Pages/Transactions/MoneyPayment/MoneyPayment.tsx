@@ -14,12 +14,12 @@ interface GridRow {
   PaidAmount: number;
 }
 
-const MoneyReceipt = () => {
+const MoneyPayment = () => {
   const [formData, setFormData] = useState({
-    SearchReceipt: "",
+    SearchPayment: "",
     Date: getCurrentDateYYYYMMDD(),
     LedgerName: "",
-    SalesLedger: "",
+    PurchaseLedger: "",
     Narration: "",
     Mode: "Manual",
     Amount: 0,
@@ -36,42 +36,42 @@ const MoneyReceipt = () => {
 
   const compactStyles = `
     @media (max-width: 991.98px) {
-      .money-receipt-page .container-fluid { padding: 0.4rem !important; }
-      .money-receipt-page .card-body { padding: 0.4rem !important; }
-      .money-receipt-page .card-footer { padding: 0.35rem 0.4rem !important; }
-      .money-receipt-page .form-label { font-size: 0.75rem; margin-bottom: 0.2rem; }
-      .money-receipt-page .form-control { font-size: 0.8rem; height: 26px; padding: 0.2rem 0.35rem; }
-      .money-receipt-page .btn { font-size: 0.8rem; padding: 0.22rem 0.4rem; }
+      .money-payment-page .container-fluid { padding: 0.4rem !important; }
+      .money-payment-page .card-body { padding: 0.4rem !important; }
+      .money-payment-page .card-footer { padding: 0.35rem 0.4rem !important; }
+      .money-payment-page .form-label { font-size: 0.75rem; margin-bottom: 0.2rem; }
+      .money-payment-page .form-control { font-size: 0.8rem; height: 26px; padding: 0.2rem 0.35rem; }
+      .money-payment-page .btn { font-size: 0.8rem; padding: 0.22rem 0.4rem; }
     }
     @media (max-width: 767.98px) {
-      .money-receipt-page .container-fluid { padding: 0.25rem !important; }
-      .money-receipt-page .card-body { padding: 0.3rem !important; }
-      .money-receipt-page .card-footer { padding: 0.25rem 0.3rem !important; }
-      .money-receipt-page .form-label { font-size: 0.7rem; margin-bottom: 0.15rem; }
-      .money-receipt-page .form-control { font-size: 0.75rem; height: 24px; padding: 0.15rem 0.28rem; }
-      .money-receipt-page .btn { font-size: 0.75rem; padding: 0.18rem 0.35rem; }
+      .money-payment-page .container-fluid { padding: 0.25rem !important; }
+      .money-payment-page .card-body { padding: 0.3rem !important; }
+      .money-payment-page .card-footer { padding: 0.25rem 0.3rem !important; }
+      .money-payment-page .form-label { font-size: 0.7rem; margin-bottom: 0.15rem; }
+      .money-payment-page .form-control { font-size: 0.75rem; height: 24px; padding: 0.15rem 0.28rem; }
+      .money-payment-page .btn { font-size: 0.75rem; padding: 0.18rem 0.35rem; }
     }
   `;
 
   return (
-    <div className="page-body money-receipt-page" style={{ maxWidth: "100%", overflowX: "hidden" }}>
+    <div className="page-body money-payment-page" style={{ maxWidth: "100%", overflowX: "hidden" }}>
       <style>{compactStyles}</style>
-      <Breadcrumbs mainTitle="Money Receipt" parent="Transactions" />
+      <Breadcrumbs mainTitle="Money Payment" parent="Transactions" />
       <Container fluid className="px-2 px-sm-3">
         <Row>
           <Col xs="12">
             <Card>
-              <CardHeaderCommon title="Money Receipt Details" tagClass="card-title mb-0" />
+              <CardHeaderCommon title="Money Payment Details" tagClass="card-title mb-0" />
               <CardBody className="p-2 p-sm-3">
                 <Row className="g-2 g-sm-3 mb-3">
                   <Col md="3">
-                    <label className="form-label">Search Receipt</label>
+                    <label className="form-label">Search Payment</label>
                     <select
                       className="form-control"
-                      value={formData.SearchReceipt}
-                      onChange={(e) => handleInputChange("SearchReceipt", e.target.value)}
+                      value={formData.SearchPayment}
+                      onChange={(e) => handleInputChange("SearchPayment", e.target.value)}
                     >
-                      <option value="">Select Money Receipt</option>
+                      <option value="">Select Money Payment</option>
                     </select>
                   </Col>
                   
@@ -97,13 +97,13 @@ const MoneyReceipt = () => {
                   </Col>
 
                   <Col md="3">
-                    <label className="form-label">Sales Ledger</label>
+                    <label className="form-label">Purchase Ledger</label>
                     <select
                       className="form-control"
-                      value={formData.SalesLedger}
-                      onChange={(e) => handleInputChange("SalesLedger", e.target.value)}
+                      value={formData.PurchaseLedger}
+                      onChange={(e) => handleInputChange("PurchaseLedger", e.target.value)}
                     >
-                      <option value="">Select Sales Ledger</option>
+                      <option value="">Select Purchase Ledger</option>
                     </select>
                   </Col>
 
@@ -159,7 +159,6 @@ const MoneyReceipt = () => {
                   </Col>
                 </Row>
 
-
                 <Row className="mt-3">
                   <Col xs="12" className="overflow-auto">
                     <Table className="table table-bordered table-sm mb-0 align-middle shadow-sm">
@@ -200,7 +199,7 @@ const MoneyReceipt = () => {
                     <div className="d-flex flex-wrap gap-3">
                       <div className="p-3 bg-light border rounded flex-grow-1" style={{ minWidth: "200px" }}>
                         <h6 className="mb-1 text-muted fw-bold">Curr. Balance</h6>
-                        <h4 className="mb-0 text-primary">₹ {formData.CurrBalance.toFixed(2)} <span className="fs-6 text-muted">Dr.</span></h4>
+                        <h4 className="mb-0 text-primary">₹ {formData.CurrBalance.toFixed(2)} <span className="fs-6 text-muted">Cr.</span></h4>
                       </div>
                       
                       <div className="p-3 bg-light border rounded flex-grow-1" style={{ minWidth: "200px" }}>
@@ -241,4 +240,4 @@ const MoneyReceipt = () => {
   );
 };
 
-export default MoneyReceipt;
+export default MoneyPayment;

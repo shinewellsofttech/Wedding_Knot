@@ -675,6 +675,7 @@ function RentReturn() {
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, []);
 
+
   const rentCompactStyles = `
     @media (max-width: 991.98px) {
       .rent-entry-page .container-fluid { padding: 0.4rem !important; }

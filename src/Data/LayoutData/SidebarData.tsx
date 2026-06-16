@@ -165,6 +165,14 @@ export const MenuList: MenuItem[] = [
         icon: "Box",
         type: "link",
         bookmark: true
+      },
+      {
+        id: 6,
+        title: "Money Payment",
+        path: `${process.env.PUBLIC_URL}/moneyPayment`,
+        icon: "Box",
+        type: "link",
+        bookmark: true
       }
     ]
   },
