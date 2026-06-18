@@ -919,6 +919,9 @@ function PurchaseEntry() {
       headerFormData.append("TotalCGST", finalCGST.toFixed(2));
       headerFormData.append("TotalSGST", finalSGST.toFixed(2));
       headerFormData.append("TotalIGST", finalIGST.toFixed(2));
+      headerFormData.append("F_LedgerMaster_CGST", finalCGST > 0 ? "18" : "0");
+      headerFormData.append("F_LedgerMaster_SGST", finalSGST > 0 ? "19" : "0");
+      headerFormData.append("F_LedgerMaster_IGST", finalIGST > 0 ? "17" : "0");
       headerFormData.append("TotalTax", finalTotalTax.toFixed(2));
       headerFormData.append("JsonData", JSON.stringify(jsonDataArray));
       headerFormData.append("F_CompanyMaster", "0");
