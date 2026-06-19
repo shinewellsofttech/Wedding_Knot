@@ -659,6 +659,8 @@ function RentManagement() {
           targetIndex = currentGridRows.length - 1;
         }
         
+
+      
         if (latestBarcodeFetch.current) {
           latestBarcodeFetch.current(targetIndex, finalBarcode);
         }
