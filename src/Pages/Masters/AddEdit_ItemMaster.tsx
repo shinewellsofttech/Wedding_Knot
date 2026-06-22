@@ -30,11 +30,15 @@ interface ItemRow {
   barcode: string;
   stock: string;
   schemes?: any[];
+  isEcom: boolean;
+  ecomPrice: string;
 }
 
 interface ItemSection {
   id: string;
   itemName: string;
+  shortDescription: string;
+  fullDescription: string;
   hasSize: string; // "Yes" or "No"
   category: string;
   hsnCode: string;
@@ -51,11 +55,14 @@ const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const makeRow = (): ItemRow => ({
   id: uid(), photos: [null, null, null, null, null],
   videoFile: null, videoName: "", length: "", width: "", height: "", weight: "", unitConversion: "", price: "", purchaseRate: "", barcode: "", stock: "0", schemes: [],
+  isEcom: false, ecomPrice: "",
 });
 
 const makeSection = (): ItemSection => ({
   id: uid(),
   itemName: "",
+  shortDescription: "",
+  fullDescription: "",
   hasSize: "Yes",
   category: "",
   hsnCode: "",
@@ -254,6 +261,8 @@ const AddEdit_ItemMaster = () => {
              return {
                 id: String(item.Id || uid()),
                 itemName: item.ItemName || "",
+                shortDescription: item.ShortDescription || "",
+                fullDescription: item.FullDescription || "",
                 hasSize: item.HasSize ? "Yes" : "No",
                 category: item.F_CategoryMaster ? String(item.F_CategoryMaster) : "",
                 hsnCode: item.HSNCode || "",
@@ -289,7 +298,9 @@ const AddEdit_ItemMaster = () => {
                     purchaseRate: d.PurchaseRate ? String(d.PurchaseRate) : "",
                     barcode: d.Barcode || "",
                     stock: d.OpeningStock ? String(d.OpeningStock) : "0",
-                    schemes: rowSchemes
+                    schemes: rowSchemes,
+                    isEcom: d.IsEcom ? true : false,
+                    ecomPrice: d.EcomPrice ? String(d.EcomPrice) : ""
                 };
               })
              };
@@ -642,6 +653,7 @@ const AddEdit_ItemMaster = () => {
                   <th style={{ width: 80 }}>Unit Val</th>
                   <th style={{ width: 110 }}>P. Rate</th>
                   <th style={{ width: 110 }}>Price</th>
+                  <th style={{ width: 110 }}>E-Com</th>
                   <th style={{ width: 200 }}>Barcode</th>
                   <th style={{ width: 110 }}>Stock</th>
                   <th style={{ width: 200 }}>Action</th>
@@ -650,7 +662,7 @@ const AddEdit_ItemMaster = () => {
               <tbody>
                 {sections.length === 0 ? (
                   <tr>
-                    <td colSpan={13}>
+                    <td colSpan={14}>
                       <div className="im-empty">
                         <div className="im-empty-icon">📋</div>
                         <h4>No items yet</h4>
@@ -668,7 +680,7 @@ const AddEdit_ItemMaster = () => {
                       <React.Fragment key={section.id}>
                         {/* Section Header Row inside the Table */}
                         <tr className="im-section-header-row" id={`item-section-${section.id}`}>
-                          <td colSpan={13} className="text-start">
+                          <td colSpan={14} className="text-start">
                             <div className="im-section-info-grid" style={{ flexWrap: section.isMinimized ? 'nowrap' : 'wrap' }}>
                               <div className="im-section-info-field">
                                 <label>Item Name <span className="req">*</span></label>
@@ -712,6 +724,32 @@ const AddEdit_ItemMaster = () => {
                                   onChange={e => {
                                     updateSectionField(secIdx, 'hsnCode', e.target.value);
                                     handleFieldUpdate(section.id, "ItemMaster", "HSNCode", e.target.value);
+                                  }}
+                                />
+                              </div>
+                              <div className="im-section-info-field">
+                                <label>Short Description</label>
+                                <input
+                                  type="text"
+                                  className="im-cell-input"
+                                  placeholder="Short Desc..."
+                                  value={section.shortDescription}
+                                  onChange={e => {
+                                    updateSectionField(secIdx, 'shortDescription', e.target.value);
+                                    handleFieldUpdate(section.id, "ItemMaster", "ShortDescription", e.target.value);
+                                  }}
+                                />
+                              </div>
+                              <div className="im-section-info-field" style={{ flex: '1 1 300px' }}>
+                                <label>Full Description</label>
+                                <input
+                                  type="text"
+                                  className="im-cell-input"
+                                  placeholder="Full Desc..."
+                                  value={section.fullDescription}
+                                  onChange={e => {
+                                    updateSectionField(secIdx, 'fullDescription', e.target.value);
+                                    handleFieldUpdate(section.id, "ItemMaster", "FullDescription", e.target.value);
                                   }}
                                 />
                               </div>
@@ -960,6 +998,40 @@ const AddEdit_ItemMaster = () => {
                                   <button type="button" className="im-btn" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', backgroundColor: '#3b82f6', color: 'white' }} onClick={() => openSchemeModal(row.id, row.schemes)}>
                                     Add Scheme
                                   </button>
+                                </div>
+                              </td>
+
+                              {/* E-Com */}
+                              <td>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                  <label style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', margin: 0 }}>
+                                    <input 
+                                      type="checkbox" 
+                                      checked={row.isEcom} 
+                                      onChange={e => {
+                                        updateRow(secIdx, rowIdx, { isEcom: e.target.checked });
+                                        handleFieldUpdate(row.id, "ItemDesignMaster", "IsEcom", e.target.checked ? "true" : "false");
+                                      }}
+                                    />
+                                    Is E-Com
+                                  </label>
+                                  {row.isEcom && (
+                                    <input
+                                      className="im-cell-input im-price"
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      placeholder="E-Com Price"
+                                      value={row.ecomPrice}
+                                      onChange={e => {
+                                        const v = e.target.value;
+                                        if (v === "" || Number(v) >= 0) {
+                                          updateRow(secIdx, rowIdx, { ecomPrice: v });
+                                          handleFieldUpdate(row.id, "ItemDesignMaster", "EcomPrice", v);
+                                        }
+                                      }}
+                                    />
+                                  )}
                                 </div>
                               </td>
 

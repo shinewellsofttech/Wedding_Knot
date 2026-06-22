@@ -38,6 +38,7 @@ const MoneyReceipt = () => {
   const [gridRows, setGridRows] = useState<GridRow[]>([]);
   const [ledgerList, setLedgerList] = useState<any[]>([]);
   const [salesLedgerList, setSalesLedgerList] = useState<any[]>([]);
+  const [receiptList, setReceiptList] = useState<any[]>([]);
 
   React.useEffect(() => {
     const fetchLedgers = async () => {
@@ -66,6 +67,18 @@ const MoneyReceipt = () => {
         else if (salesRes?.data && Array.isArray(salesRes.data)) salesList = salesRes.data;
         
         setSalesLedgerList(salesList);
+
+        const receiptUrl = `${API_WEB_URLS.MASTER}/0/token/MoneyReceiptData/Id/0`;
+        const receiptRes = await Fn_FillListData(dispatch, () => {}, "ignored", receiptUrl);
+        let receipts: any[] = [];
+        if (Array.isArray(receiptRes)) receipts = receiptRes;
+        else if (receiptRes?.data?.dataList && Array.isArray(receiptRes.data.dataList)) receipts = receiptRes.data.dataList;
+        else if (receiptRes?.dataList && Array.isArray(receiptRes.dataList)) receipts = receiptRes.dataList;
+        else if (receiptRes?.data?.response && Array.isArray(receiptRes.data.response)) receipts = receiptRes.data.response;
+        else if (receiptRes?.response && Array.isArray(receiptRes.response)) receipts = receiptRes.response;
+        else if (receiptRes?.data && Array.isArray(receiptRes.data)) receipts = receiptRes.data;
+        
+        setReceiptList(receipts);
       } catch (error) {
         console.error("Error fetching ledgers:", error);
       }
@@ -98,6 +111,61 @@ const MoneyReceipt = () => {
   };
 
   const handleInputChange = async (field: string, value: any) => {
+    if (field === "SearchReceipt" && value) {
+      const selectedReceipt = receiptList.find((r) => r.Id.toString() === value.toString());
+      if (selectedReceipt) {
+        setFormData((prev) => ({
+          ...prev,
+          SearchReceipt: value,
+          Date: selectedReceipt.ReceiptDate ? selectedReceipt.ReceiptDate.split('T')[0] : prev.Date,
+          LedgerName: selectedReceipt.F_LedgerMaster?.toString() || "",
+          SalesLedger: selectedReceipt.F_SalesLedger?.toString() || "",
+          Narration: selectedReceipt.Narration || "",
+          Mode: selectedReceipt.ModeType ? "Auto" : "Manual",
+          Amount: selectedReceipt.TotalAmount || 0,
+          CurrBalance: selectedReceipt.CurrentBalance || 0,
+          LineTotalAmt: selectedReceipt.LineTotal || 0,
+          DiffAmt: selectedReceipt.DifferenceAmount || 0,
+        }));
+
+        let parsedDetails: any[] = [];
+        try {
+          if (selectedReceipt.MoneyReceiptDetails) {
+            parsedDetails = typeof selectedReceipt.MoneyReceiptDetails === "string"
+              ? JSON.parse(selectedReceipt.MoneyReceiptDetails)
+              : selectedReceipt.MoneyReceiptDetails;
+          }
+        } catch (e) {
+          console.error("Error parsing details", e);
+        }
+
+        const mappedRows: GridRow[] = parsedDetails.map((item: any, index: number) => ({
+          SNo: index + 1,
+          Id: item.F_SalesInvoiceH || 0,
+          InvoiceNo: item.InvoiceNo || "",
+          Date: item.InvoiceDate ? item.InvoiceDate.split('T')[0] : "",
+          DueAmount: item.DueAmount || 0,
+          PaidAmount: item.PaidAmount || 0,
+        }));
+
+        setGridRows(mappedRows);
+        return;
+      }
+    } else if (field === "SearchReceipt" && !value) {
+      setFormData((prev) => ({
+        ...prev,
+        SearchReceipt: "",
+        LedgerName: "",
+        SalesLedger: "",
+        Narration: "",
+        Amount: 0,
+        LineTotalAmt: 0,
+        DiffAmt: 0,
+      }));
+      setGridRows([]);
+      return;
+    }
+
     setFormData((prev) => {
       const newAmount = field === "Amount" ? (parseFloat(value) || 0) : prev.Amount;
       return {
@@ -252,6 +320,11 @@ const MoneyReceipt = () => {
                       onChange={(e) => handleInputChange("SearchReceipt", e.target.value)}
                     >
                       <option value="">Select Money Receipt</option>
+                      {receiptList.map((receipt) => (
+                        <option key={receipt.Id} value={receipt.Id}>
+                          {receipt.ReceiptNo || `Receipt-${receipt.Id}`}
+                        </option>
+                      ))}
                     </select>
                   </Col>
                   
