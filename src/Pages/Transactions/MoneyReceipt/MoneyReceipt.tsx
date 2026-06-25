@@ -157,7 +157,7 @@ const MoneyReceipt = () => {
         SearchReceipt: "",
         LedgerName: "",
         SalesLedger: "",
-        Narration: "",
+        Narration: "  ",
         Amount: 0,
         LineTotalAmt: 0,
         DiffAmt: 0,

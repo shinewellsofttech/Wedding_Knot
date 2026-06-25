@@ -428,6 +428,9 @@ const PageList_ItemMaster = () => {
                                     </td>
                                     <td>
 
+                                      <Btn color="info" size="sm" className="me-2" onClick={() => handlePrintBarcodes(item)} title="Print All Barcodes">
+                                        <i className="fa fa-print" />
+                                      </Btn>
                                       <Btn color="primary" size="sm" className="me-2" onClick={() => handleEdit(item?.Id)} title="Edit Item">
                                         <i className="fa fa-edit" />
                                       </Btn>
