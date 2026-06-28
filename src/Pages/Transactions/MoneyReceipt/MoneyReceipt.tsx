@@ -224,6 +224,7 @@ const MoneyReceipt = () => {
     }
   };
 
+  
   const handleSave = async () => {
     if (!formData.LedgerName) {
       alert("Please select Ledger Name");
