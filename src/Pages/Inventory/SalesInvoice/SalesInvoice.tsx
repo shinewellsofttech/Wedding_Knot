@@ -607,6 +607,13 @@ function SalesInvoice() {
       if (selectedItem) {
         updatedRows[index].ItemCode = selectedItem.ItemCode || selectedItem.Code || "";
         updatedRows[index].AvailableQty = parseFloat(selectedItem.AvailableQty || 0);
+        let gstPercent = 0;
+        const gstGroupId = selectedItem.F_GSTGroupMaster || selectedItem.GSTGroupMasterId || selectedItem.GSTGroupId || "";
+        const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
+        if (gstGroup) {
+          gstPercent = parseFloat(gstGroup.GSTPercent) || 0;
+        }
+        updatedRows[index].GSTPercent = gstPercent;
       }
     } else if (field === "Qty") {
       const row = updatedRows[index];
@@ -638,7 +645,7 @@ function SalesInvoice() {
       }
 
       const gstPercent = row.GSTPercent || 0;
-      let baseRate = newSalePrice;
+      let baseRate = newSalePrice / (1 + gstPercent / 100);
       
       if (row.OriginalSalePrice !== undefined) {
         updatedRows[index].Rate = String(baseRate > 0 ? baseRate.toFixed(2) : "");
@@ -654,7 +661,9 @@ function SalesInvoice() {
           row.F_ColorMaster || state.DefaultColor?.Id || "0",
           row.F_WarehouseMaster || state.DefaultWarehouse?.Id || "0"
         );
-        updatedRows[index].Rate = String(fetchedRate || "");
+        let gstPercent = updatedRows[index].GSTPercent || 0;
+        let baseRate = fetchedRate ? fetchedRate / (1 + gstPercent / 100) : 0;
+        updatedRows[index].Rate = String(baseRate > 0 ? baseRate.toFixed(2) : "");
       }
     }
     setGridRows(updatedRows);
@@ -703,7 +712,9 @@ function SalesInvoice() {
       }
 
       if (dupRow.OriginalSalePrice !== undefined) {
-        dupRow.Rate = String(newSalePrice > 0 ? newSalePrice.toFixed(2) : "");
+        let gstPercent = dupRow.GSTPercent || 0;
+        let baseRate = newSalePrice / (1 + gstPercent / 100);
+        dupRow.Rate = String(baseRate > 0 ? baseRate.toFixed(2) : "");
       }
       
       updatedRows[duplicateIndex] = dupRow;
@@ -827,7 +838,7 @@ function SalesInvoice() {
         let unitVal = parseFloat(designItem.UnitConversion);
         if (isNaN(unitVal) || unitVal === 0) unitVal = 1;
 
-        let baseRate = finalSalePrice;
+        let baseRate = finalSalePrice / (1 + gstPercent / 100);
 
         updatedRows[index] = {
           ...updatedRows[index],
@@ -1064,17 +1075,10 @@ function SalesInvoice() {
           if (igstP > highestIGSTPercent) highestIGSTPercent = igstP;
 
           if (isInState) {
-            const totalPercent = cgstP + sgstP;
-            if (totalPercent > 0) {
-              const taxAmount = (amount * totalPercent) / (100 + totalPercent);
-              itemCGST = taxAmount * (cgstP / totalPercent);
-              itemSGST = taxAmount * (sgstP / totalPercent);
-            }
+            itemCGST = (amount * cgstP) / 100;
+            itemSGST = (amount * sgstP) / 100;
           } else {
-            const totalPercent = igstP;
-            if (totalPercent > 0) {
-              itemIGST = (amount * totalPercent) / (100 + totalPercent);
-            }
+            itemIGST = (amount * igstP) / 100;
           }
         }
         
@@ -1114,9 +1118,9 @@ function SalesInvoice() {
         totalIGST += totalOtherCharges * (highestIGSTPercent / 100);
       }
 
-      const finalCGST = Math.round(taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST);
-      const finalSGST = Math.round(taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST);
-      const finalIGST = Math.round(taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST);
+      const finalCGST = Number((taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST).toFixed(2));
+      const finalSGST = Number((taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST).toFixed(2));
+      const finalIGST = Number((taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST).toFixed(2));
       const finalTotalTax = finalCGST + finalSGST + finalIGST;
 
       const headerFormData = new FormData();
@@ -1700,9 +1704,9 @@ function SalesInvoice() {
                         totalIGST += totalOtherCharges * (highestIGSTPercent / 100);
                       }
 
-                      const finalCGST = Math.round(taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST);
-                      const finalSGST = Math.round(taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST);
-                      const finalIGST = Math.round(taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST);
+                      const finalCGST = Number((taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST).toFixed(2));
+                      const finalSGST = Number((taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST).toFixed(2));
+                      const finalIGST = Number((taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST).toFixed(2));
 
                       const totalTax = finalCGST + finalSGST + finalIGST;
                       const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
