@@ -184,6 +184,16 @@ const LedgerDetailsReport: React.FC = () => {
     return amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
 
+  const formatDateForDisplay = (dateString: string): string => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    const day = date.getDate().toString().padStart(2, "0");
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
   const formatDateForAPI = (dateString: string): string => {
     // Convert YYYY-MM-DD to DD-MMM-YYYY format (e.g., 2025-04-01 to 01-Apr-2025)
     const date = new Date(dateString);
@@ -251,67 +261,54 @@ const LedgerDetailsReport: React.FC = () => {
       if (rows.length > 0) {
         setReportData(rows);
 
-        if (viewType === "Summarised") {
-          // Summarised: single row with LedgerName, OpeningBalance, DrAmt, CrAmt, ClosingBalance, CrDrType
-          const summaryRow = rows[0];
-          const opening = Math.abs(Number(summaryRow.OpeningBalance) || 0);
-          const closing = Math.abs(Number(summaryRow.ClosingBalance) || 0);
-          const crDrType = (summaryRow.CrDrType as "Dr" | "Cr") || "Dr";
-
-          setOpeningBalance(opening);
-          setCurrentBalance(closing);
-          setBalanceType(crDrType);
-          if (summaryRow.LedgerName) setLedgerName(summaryRow.LedgerName);
-
-          const transactionList: Transaction[] = [{
-            date: `${formatDateForAPI(fromDate)} to ${formatDateForAPI(toDate)}`,
-            party: summaryRow.LedgerName || "",
-            voucherNo: "",
-            voucherType: "",
-            debit: Number(summaryRow.DrAmt) || 0,
-            credit: Number(summaryRow.CrAmt) || 0,
-            balance: closing,
-            balanceType: crDrType,
-            narration: "",
-            creditDays: 0,
-          }];
-          setTransactions(transactionList);
-
-        } else {
-          // Detailed view: Opening Balance row has VoucherDate = null
-          const openingRow = rows.find((r: any) => r.VoucherDate === null || r.VoucherDate === "");
-          const opening = Number(openingRow?.Balance) || 0;
-          setOpeningBalance(Math.abs(opening));
-          setBalanceType((openingRow?.CrDrType as "Dr" | "Cr") || "Dr");
-
-          // Transaction rows: VoucherDate not null
-          const txRows = rows.filter((r: any) => r.VoucherDate !== null && r.VoucherDate !== "");
-
-          // Closing balance = last row
-          if (txRows.length > 0) {
-            const lastRow = txRows[txRows.length - 1];
-            setCurrentBalance(Math.abs(Number(lastRow.Balance) || 0));
-            setBalanceType((lastRow.CrDrType as "Dr" | "Cr") || "Dr");
-          }
-
-          const transactionList: Transaction[] = txRows.map((row: any) => ({
-            date: row.VoucherDate || "",
-            party: row.LedgerName || "",
-            voucherNo: row.VoucherNo || "",
-            voucherId: row.F_VoucherMaster ?? row.VoucherId ?? row.Id ?? row.VoucherID,
-            voucherType: row.VoucherType || "",
-            debit: Number(row.DrAmt) || 0,
-            credit: Number(row.CrAmt) || 0,
-            balance: Math.abs(Number(row.Balance) || 0),
-            balanceType: (row.CrDrType as "Dr" | "Cr") || "Dr",
-            narration: (row.ParticularNarration === "0" || row.ParticularNarration === 0)
-              ? ""
-              : (row.ParticularNarration || ""),
-            creditDays: Number(row.CreditDays) || 0,
-          }));
-
-          setTransactions(transactionList);
+        // Find Opening Balance row
+        const openingRow = rows.find((r: any) => !r.Date || r.Date === "" || r.Party === "Op. Bal.");
+        const opening = Number(openingRow?.Balance) || 0;
+        setOpeningBalance(Math.abs(opening));
+        
+        // Calculate CrDrType manually since it's not in the response
+        let currentRunBal = (Number(openingRow?.Dr) || 0) - (Number(openingRow?.Cr) || 0);
+        if (openingRow?.Balance !== undefined) {
+            // Best guess for opening balance type if Dr/Cr is 0
+            if (currentRunBal === 0 && opening > 0) {
+                // If we don't know, default to Dr
+                currentRunBal = opening; 
+            }
         }
+        setBalanceType(currentRunBal >= 0 ? "Dr" : "Cr");
+
+        // Transaction rows
+        const txRows = rows.filter((r: any) => r.Date && r.Party !== "Op. Bal.");
+
+        // Calculate running balances and determine Dr/Cr
+        let runBal = currentRunBal;
+        const transactionList: Transaction[] = txRows.map((row: any) => {
+          runBal = runBal + (Number(row.Dr) || 0) - (Number(row.Cr) || 0);
+          return {
+            date: row.Date ? formatDateForDisplay(row.Date) : "",
+            party: row.Party || row.DrLedger || row.CrLedger || "",
+            voucherNo: row.VoucherNo || "",
+            voucherId: row.F_VoucherMaster ?? row.VoucherId ?? row.Id ?? row.VoucherID ?? "",
+            voucherType: row.VoucherType || "",
+            debit: Number(row.Dr) || 0,
+            credit: Number(row.Cr) || 0,
+            balance: Math.abs(Number(row.Balance) || runBal),
+            balanceType: runBal >= 0 ? "Dr" : "Cr",
+            narration: row.Narration || "",
+            creditDays: Number(row.CreditDays) || 0,
+          };
+        });
+
+        if (transactionList.length > 0) {
+          const lastTx = transactionList[transactionList.length - 1];
+          setCurrentBalance(lastTx.balance);
+          setBalanceType(lastTx.balanceType);
+        } else {
+          setCurrentBalance(Math.abs(opening));
+          setBalanceType(currentRunBal >= 0 ? "Dr" : "Cr");
+        }
+
+        setTransactions(transactionList);
       } else {
         setReportData([]);
         setTransactions([]);

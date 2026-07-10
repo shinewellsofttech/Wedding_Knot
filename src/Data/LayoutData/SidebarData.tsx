@@ -221,6 +221,14 @@ Items:[
         type:"link",
         bookmark:true
       },
+      {
+        id: 1.5,
+        title: "Stock Report",
+        path: `${process.env.PUBLIC_URL}/stockReport`,
+        icon: "Box",
+        type: "link",
+        bookmark: true
+      },
       //   {
       //   id:2,
       //   title: "Trial Balance",

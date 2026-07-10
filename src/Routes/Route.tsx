@@ -64,6 +64,7 @@ import BalanceSheetStandard from "../Pages/Reports/BalanceSheet/BalanceSheetStan
 import BalanceSheetDetailed from "../Pages/Reports/BalanceSheet/BalanceSheetDetailed";
 import GroupLedgerSummary from "../Pages/Reports/GroupLedgerSummary/GroupLedgerSummary";
 import StockPositionReport from "../Pages/Reports/StockPositionReport/StockPositionReport";
+import StockReport from "../Pages/Reports/StockReport/StockReport";
 import CustomerOutstandingReport from "../Pages/Reports/CustomerOutstandingReport/CustomerOutstandingRepprt";
 import PermissionMetrixs from "../Pages/Tools/PermissionMetrixs";
 import ChangePassword from "../Pages/Tools/ChangePassword";
@@ -142,6 +143,7 @@ export const routes = [
       { path: `${process.env.PUBLIC_URL}/trialBalance`, Component: <TrialBalance /> },
         { path: `${process.env.PUBLIC_URL}/balanceSheet`, Component: <BalanceSheetTraditional /> },
         { path: `${process.env.PUBLIC_URL}/stockPositionReport`, Component: <StockPositionReport /> },
+        { path: `${process.env.PUBLIC_URL}/stockReport`, Component: <StockReport /> },
         { path: `${process.env.PUBLIC_URL}/customerOutstandingReport`, Component: <CustomerOutstandingReport /> },
         { path: `${process.env.PUBLIC_URL}/addEditUserRoleMaster`, Component: <AddEdit_UserRoleMaster /> },
         { path: `${process.env.PUBLIC_URL}/userRoleMaster`, Component: <PageList_UserRoleMaster /> },

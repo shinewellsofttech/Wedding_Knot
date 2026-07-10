@@ -1,4 +1,4 @@
-export let languageData = [
+ export let languageData = [
     {
         languageParameter: "en",
         languageName: "English",
