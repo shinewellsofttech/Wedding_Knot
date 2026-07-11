@@ -89,6 +89,7 @@ import RentReturn from "../Pages/Rent/RentReturn";
 import DummyDashboard from "../Pages/Dashboard/DummyDashboard";
 import MoneyReceipt from "../Pages/Transactions/MoneyReceipt/MoneyReceipt";
 import MoneyPayment from "../Pages/Transactions/MoneyPayment/MoneyPayment";
+import Orders from "../Pages/Ecommerce/Orders";
 export const routes = [
   // Default landing route is /voucherEntry (see index.tsx Navigate)
   /*
@@ -155,6 +156,7 @@ export const routes = [
         { path: `${process.env.PUBLIC_URL}/dummyDashboard` , Component: <DummyDashboard /> },
         { path: `${process.env.PUBLIC_URL}/moneyReceipt`, Component: <MoneyReceipt /> },
         { path: `${process.env.PUBLIC_URL}/moneyPayment`, Component: <MoneyPayment /> },
+        { path: `${process.env.PUBLIC_URL}/orders`, Component: <Orders /> },
         
   /*
   { path: `${process.env.PUBLIC_URL}/itemMaster`, Component: <PageList_ItemMaster /> },

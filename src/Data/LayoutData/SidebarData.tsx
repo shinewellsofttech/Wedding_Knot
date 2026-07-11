@@ -271,6 +271,19 @@ Items:[
       // }
     ]
   },
+  {
+    title: "Ecommerce",
+    Items: [
+      {
+        id: 1,
+        title: "Orders",
+        path: `${process.env.PUBLIC_URL}/orders`,
+        icon: "Box",
+        type: "link",
+        bookmark: true
+      }
+    ]
+  },
    {
     title: "Tools",
     Items: [

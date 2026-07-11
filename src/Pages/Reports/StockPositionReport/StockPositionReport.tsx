@@ -204,6 +204,8 @@ const StockPositionReport: React.FC = () => {
         formData.append("F_CategoryMaster", categoryId);
       }
 
+
+
       const response = await Fn_GetReport(
         dispatch,
         () => {},
@@ -232,7 +234,6 @@ const StockPositionReport: React.FC = () => {
       setIsLoading(false);
     }
   };
-
   useEffect(() => {
     if (fromDate && toDate) fetchReport();
   }, [fromDate, toDate, categoryId]);
