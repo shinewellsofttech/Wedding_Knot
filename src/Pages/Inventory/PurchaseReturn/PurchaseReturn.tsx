@@ -870,7 +870,9 @@ function PurchaseReturn() {
       headerFormData.append("F_CompanyMaster", (() => { try { const a = JSON.parse(localStorage.getItem("authUser")||"{}"); return String(a?.F_CompanyMaster ?? a?.CompanyId ?? a?.F_Company ?? "0"); } catch(e){return "0";} })());
       headerFormData.append("JsonData", JSON.stringify(jsonDataArray));
       await Fn_AddEditData(dispatch, setState, { arguList: { id: state.id, formData: headerFormData } }, API_URL_SAVE, true, "memberid", navigate, "#");
-      alert("Purchase Return saved successfully");
+      if (window.confirm("Purchase Return saved successfully. Do you want to print it?")) {
+        handlePrint();
+      }
       window.location.reload();
     } catch (error) {
       console.error("Error saving Purchase Return:", error);
@@ -1279,12 +1281,16 @@ function PurchaseReturn() {
                 <button ref={saveButtonRef} type="button" className="btn btn-primary m-0" onClick={handleSave} disabled={!state.isGridEditable}>
                   <i className="bx bx-save me-2"></i>Save
                 </button>
-                <Btn color="success" type="button" className="m-0" onClick={handlePrint}>
-                  <i className="bx bx-printer me-2"></i>Print
-                </Btn>
-                <Btn color="danger" type="button" className="m-0" onClick={handlePDFExport}>
-                  <i className="bx bxs-file-pdf me-2"></i>PDF
-                </Btn>
+                {state.isEditMode && (
+                  <>
+                    <Btn color="success" type="button" className="m-0" onClick={handlePrint}>
+                      <i className="bx bx-printer me-2"></i>Print
+                    </Btn>
+                    <Btn color="danger" type="button" className="m-0" onClick={handlePDFExport}>
+                      <i className="bx bxs-file-pdf me-2"></i>PDF
+                    </Btn>
+                  </>
+                )}
                 <Btn color="secondary" type="button" className="m-0" onClick={() => navigate(-1)}>Cancel</Btn>
               </CardFooter>
             </Card>

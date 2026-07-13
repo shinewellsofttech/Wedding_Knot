@@ -70,8 +70,9 @@ const PageList_UserMaster = () => {
    */
   const handleDelete = (id: number | string) => {
     if (!id) return;
-    if (window.confirm("Are you sure you want to delete this user master?")) {
-      const itemToDelete = state.UserMasterList.find((item: any) => item?.Id === id);
+    const itemToDelete = state.UserMasterList.find((item: any) => item?.Id === id);
+    const itemName = itemToDelete?.Name || itemToDelete?.ItemName || itemToDelete?.LedgerName || itemToDelete?.CompanyName || itemToDelete?.UserName || itemToDelete?.VoucherName || itemToDelete?.GroupName || itemToDelete?.AdminName || itemToDelete?.Title || itemToDelete?.RoleName || itemToDelete?.CityName || itemToDelete?.StateName || itemToDelete?.CountryName || itemToDelete?.MaterialName || "this item";
+    if (window.confirm(`Are you sure you want to delete '${itemName}'?`)) {
 
       Fn_DeleteData(dispatch, () => {}, Number(id), DELETE_API_URL).catch(() => {
         // Rollback the optimistic UI update if delete fails

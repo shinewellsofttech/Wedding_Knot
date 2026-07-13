@@ -311,7 +311,7 @@ const GridSystemPurchaseEntry: React.FC<GridSystemPurchaseEntryProps> = ({
                           }
                         }}
                         onBlur={(e) => {
-                          if (onBarcodeFetch && e.target.value) {
+                          if (onBarcodeFetch && e.target.value && !row.F_ItemMaster) {
                             onBarcodeFetch(index, e.target.value);
                           }
                         }}

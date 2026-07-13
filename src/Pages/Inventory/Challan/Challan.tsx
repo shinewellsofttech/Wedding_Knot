@@ -648,7 +648,9 @@ function SalesInvoice() {
 
       const res = await Fn_AddEditData(dispatch, setState, { arguList: { id: state.id, formData } }, apiURL, true, "memberid", navigate, "#");
       if (res?.id) {
-        toast.success("Sales Invoice saved successfully!");
+        if (window.confirm("Sales Invoice saved successfully! Do you want to print it?")) {
+          handlePrint();
+        }
         handleReset();
       }
     } catch (e) {
@@ -1178,8 +1180,6 @@ function SalesInvoice() {
                     >
                       <i className="fa fa-save me-2"></i>Save
                     </button>
-                    <Btn color="success" type="button" onClick={handlePrint}><i className="fa fa-print me-2"></i>Print</Btn>
-                    <Btn color="danger" type="button" onClick={handlePDFExport}><i className="bx bxs-file-pdf me-2"></i>PDF</Btn>
                     <Btn color="secondary" onClick={handleReset}><i className="fa fa-refresh me-2"></i>Reset</Btn>
                   </>
                 ) : (

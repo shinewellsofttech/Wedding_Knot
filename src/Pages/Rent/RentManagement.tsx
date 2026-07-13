@@ -313,7 +313,18 @@ function RentManagement() {
   };
 
   const handleFormFieldChange = (field: string, value: any) => {
-    setState((prev) => ({ ...prev, formData: { ...prev.formData, [field]: value } }));
+    setState((prev) => {
+      const newFormData = { ...prev.formData, [field]: value };
+      if (field === "PODate" || field === "TillDate") {
+        if (newFormData.PODate && newFormData.TillDate) {
+          if (new Date(newFormData.TillDate) < new Date(newFormData.PODate)) {
+            alert("Till Date cannot be earlier than Entry Date.");
+            return prev;
+          }
+        }
+      }
+      return { ...prev, formData: newFormData };
+    });
   };
 
   const addRow = () => {

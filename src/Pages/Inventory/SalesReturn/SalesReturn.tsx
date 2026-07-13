@@ -545,6 +545,8 @@ function SalesReturn() {
       if (row.OriginalSalePrice !== undefined) {
         updatedRows[index].Rate = String(baseRate > 0 ? baseRate.toFixed(2) : "");
       }
+    } else if (field === "Rate") {
+      updatedRows[index].OriginalSalePrice = parseFloat(value) || 0;
     }
 
     if (field === "F_ItemMaster" || field === "F_ColorMaster" || field === "F_WarehouseMaster") {
@@ -974,7 +976,9 @@ function SalesReturn() {
       headerFormData.append("JsonData", JSON.stringify(jsonDataArray));
       headerFormData.append("OtherChargesJson", "[]");
       await Fn_AddEditData(dispatch, setState, { arguList: { id: state.id, formData: headerFormData } }, API_URL_SAVE, true, "memberid", navigate, "#");
-      alert("Sales Return saved successfully");
+      if (window.confirm("Sales Return saved successfully. Do you want to print it?")) {
+        handlePrint();
+      }
       window.location.reload();
     } catch (error) {
       console.error("Error saving Sales Return:", error);
@@ -1383,12 +1387,16 @@ function SalesReturn() {
                 <button ref={saveButtonRef} type="button" className="btn btn-primary m-0" onClick={handleSave} disabled={!state.isGridEditable}>
                   <i className="bx bx-save me-2"></i>Save
                 </button>
-                <Btn color="success" type="button" className="m-0" onClick={handlePrint}>
-                  <i className="bx bx-printer me-2"></i>Print
-                </Btn>
-                <Btn color="danger" type="button" className="m-0" onClick={handlePDFExport}>
-                  <i className="bx bxs-file-pdf me-2"></i>PDF
-                </Btn>
+                {state.isEditMode && (
+                  <>
+                    <Btn color="success" type="button" className="m-0" onClick={handlePrint}>
+                      <i className="bx bx-printer me-2"></i>Print
+                    </Btn>
+                    <Btn color="danger" type="button" className="m-0" onClick={handlePDFExport}>
+                      <i className="bx bxs-file-pdf me-2"></i>PDF
+                    </Btn>
+                  </>
+                )}
                 <Btn color="secondary" type="button" className="m-0" onClick={() => navigate(-1)}>Cancel</Btn>
               </CardFooter>
             </Card>

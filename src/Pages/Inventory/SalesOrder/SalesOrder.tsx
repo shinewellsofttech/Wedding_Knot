@@ -697,6 +697,9 @@ const SalesOrder = () => {
     );
 
     if (result && result.success) {
+      if (window.confirm("Sales Order saved successfully. Do you want to print it?")) {
+        handlePrint();
+      }
       const updated = await Fn_FillListData(dispatch, () => ({}), "createdSalesOrders", API_CREATED_SO);
       const parsed = parseSalesOrderData(updated);
       setCreatedSalesOrders(parsed);
@@ -1089,12 +1092,16 @@ const SalesOrder = () => {
                   >
                     <i className="fa fa-save me-1"></i> Save
                   </button>
-                  <Btn type="button" color="success" onClick={handlePrint}>
-                    <i className="fa fa-print me-1"></i> Print
-                  </Btn>
-                  <Btn type="button" color="danger" onClick={handlePDFExport}>
-                    <i className="bx bxs-file-pdf me-1"></i> PDF
-                  </Btn>
+                  {isEditMode && (
+                    <>
+                      <Btn type="button" color="success" onClick={handlePrint}>
+                        <i className="fa fa-print me-1"></i> Print
+                      </Btn>
+                      <Btn type="button" color="danger" onClick={handlePDFExport}>
+                        <i className="bx bxs-file-pdf me-1"></i> PDF
+                      </Btn>
+                    </>
+                  )}
                   <Btn type="button" color="secondary" onClick={resetSalesOrderToBlank}>
                     <i className="fa fa-redo me-1"></i> Reset
                   </Btn>

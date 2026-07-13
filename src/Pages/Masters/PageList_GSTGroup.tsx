@@ -54,7 +54,9 @@ const PageList_GSTGroup = () => {
 
   const handleDelete = (id: number | string) => {
     if (!id) return;
-    if (window.confirm("Are you sure you want to delete this Tax Group?")) {
+    const itemToDelete = state.TaxGroupList?.find((item: any) => String(item?.Id) === String(id));
+    const itemName = itemToDelete?.Name || itemToDelete?.ItemName || itemToDelete?.LedgerName || itemToDelete?.CompanyName || itemToDelete?.UserName || itemToDelete?.VoucherName || itemToDelete?.GroupName || itemToDelete?.AdminName || itemToDelete?.Title || itemToDelete?.RoleName || itemToDelete?.CityName || itemToDelete?.StateName || itemToDelete?.CountryName || itemToDelete?.MaterialName || "this item";
+    if (window.confirm(`Are you sure you want to delete '${itemName}'?`)) {
       Fn_DeleteData(dispatch, setState as any, Number(id), DELETE_API_URL, LIST_API_URL)
         .then(() => loadData())
         .catch((error) => {

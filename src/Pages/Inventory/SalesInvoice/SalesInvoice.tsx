@@ -650,6 +650,9 @@ function SalesInvoice() {
       if (row.OriginalSalePrice !== undefined) {
         updatedRows[index].Rate = String(baseRate > 0 ? baseRate.toFixed(2) : "");
       }
+    } else if (field === "Rate") {
+      const gstPercent = updatedRows[index].GSTPercent || 0;
+      updatedRows[index].OriginalSalePrice = (parseFloat(value) || 0) * (1 + gstPercent / 100);
     }
 
     if (field === "F_ItemMaster" || field === "F_ColorMaster" || field === "F_WarehouseMaster") {
@@ -1142,7 +1145,9 @@ function SalesInvoice() {
       headerFormData.append("JsonData", JSON.stringify(jsonDataArray));
       headerFormData.append("OtherChargesJson", JSON.stringify(otherChargesArray));
       await Fn_AddEditData(dispatch, setState, { arguList: { id: state.id, formData: headerFormData } }, API_URL_SAVE, true, "memberid", navigate, "#");
-      alert("Sales Invoice saved successfully");
+      if (window.confirm("Sales Invoice saved successfully. Do you want to print it?")) {
+        executePrint();
+      }
       window.location.reload();
     } catch (error) {
       console.error("Error saving sales entry:", error);
@@ -1801,12 +1806,16 @@ function SalesInvoice() {
                 <button ref={saveButtonRef} type="button" className="btn btn-primary m-0" onClick={handleSave} disabled={!state.isGridEditable}>
                   <i className="bx bx-save me-2"></i>Save
                 </button>
-                <Btn color="success" type="button" className="m-0" onClick={executePrint}>
-                  <i className="bx bx-printer me-2"></i>Print
-                </Btn>
-                <Btn color="danger" type="button" className="m-0" onClick={handlePDFExport}>
-                  <i className="bx bxs-file-pdf me-2"></i>PDF
-                </Btn>
+                {state.isEditMode && (
+                  <>
+                    <Btn color="success" type="button" className="m-0" onClick={executePrint}>
+                      <i className="bx bx-printer me-2"></i>Print
+                    </Btn>
+                    <Btn color="danger" type="button" className="m-0" onClick={handlePDFExport}>
+                      <i className="bx bxs-file-pdf me-2"></i>PDF
+                    </Btn>
+                  </>
+                )}
                 <Btn color="info" type="button" className="m-0" onClick={handleGenerateQR} disabled={!state.isEditMode || state.id === 0}>
                   <i className="bx bx-qr me-2"></i>Generate QR
                 </Btn>

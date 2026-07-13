@@ -861,6 +861,10 @@ const PurchaseOrder = () => {
       "#"
     );
 
+    if (window.confirm("Purchase Order saved successfully. Do you want to print it?")) {
+      handlePrint();
+    }
+
     const updatedPurchaseOrders = await Fn_FillListData(dispatch, () => ({}), "createdPurchaseOrders", API_CREATED_PO);
     const parsed = parsePurchaseOrderData(updatedPurchaseOrders);
     setCreatedPurchaseOrders(parsed);
@@ -1211,12 +1215,16 @@ const PurchaseOrder = () => {
                   >
                     <i className="fa fa-save me-1"></i> Save
                   </button>
-                  <Btn type="button" color="success" onClick={handlePrint}>
-                    <i className="fa fa-print me-1"></i> Print
-                  </Btn>
-                  <Btn type="button" color="danger" onClick={handlePDFExport}>
-                    <i className="bx bxs-file-pdf me-1"></i> PDF
-                  </Btn>
+                  {isEditMode && (
+                    <>
+                      <Btn type="button" color="success" onClick={handlePrint}>
+                        <i className="fa fa-print me-1"></i> Print
+                      </Btn>
+                      <Btn type="button" color="danger" onClick={handlePDFExport}>
+                        <i className="bx bxs-file-pdf me-1"></i> PDF
+                      </Btn>
+                    </>
+                  )}
                   <Btn type="button" color="secondary" onClick={resetPurchaseOrderToBlank}>
                     <i className="fa fa-redo me-1"></i> Reset
                   </Btn>

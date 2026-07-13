@@ -67,7 +67,9 @@ const PageList_AdminMaster = () => {
     if (!id) {
       return;
     }
-    if (window.confirm("Are you sure you want to delete this admin?")) {
+    const itemToDelete = state.UserMasterList?.find((item: any) => String(item?.Id) === String(id));
+    const itemName = itemToDelete?.AdminName || itemToDelete?.UserName || itemToDelete?.Name || "this admin";
+    if (window.confirm(`Are you sure you want to delete '${itemName}'?`)) {
       Fn_DeleteData(dispatch, setState as any, Number(id), DELETE_API_URL, LIST_API_URL)
         .then(() => {
           loadData();
