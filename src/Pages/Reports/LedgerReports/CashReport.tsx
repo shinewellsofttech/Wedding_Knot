@@ -146,7 +146,7 @@ const CashReport: React.FC = () => {
       }).catch(console.error);
   }, [dispatch]);
 
-  // 3. Fetch Ledger details (filtered for selected cash ledger)
+  // 3. Fetch Cash Book details
   const fetchCashReport = async () => {
     if (!selectedLedgerId || selectedLedgerId === "" || selectedLedgerId === "0") return;
 
@@ -156,15 +156,12 @@ const CashReport: React.FC = () => {
       const userId = String(authUser?.uid ?? authUser?.Id ?? "0");
       const userToken = authUser?.Token ?? authUser?.token ?? "token";
 
-      const apiURL = `GetLedgerDetails/${userId}/${userToken}`;
+      const apiURL = `GetCashBookReport/${userId}/${userToken}`;
 
       const formData = new FormData();
       formData.append("FromDate", fromDate);
       formData.append("ToDate", toDate);
-      formData.append("F_LedgerMaster", String(Number(selectedLedgerId)));
-      formData.append("ReportType", "1"); // Daily
-      formData.append("ViewType", "2"); // Detailed (needed to get Narration)
-      formData.append("F_VoucherTypeMaster", "0"); // All voucher types
+      formData.append("CashLedgerId", String(Number(selectedLedgerId)));
 
       const arguList = { formData };
 
@@ -187,33 +184,35 @@ const CashReport: React.FC = () => {
       const rows = resolveRows(responseData);
 
       if (rows.length > 0) {
-        // Find Opening Balance
-        const openingRow = rows.find((r: any) => !r.Date || r.Date === "" || r.Party === "Op. Bal.");
-        const opening = Number(openingRow?.Balance) || 0;
-        setOpeningBalance(Math.abs(opening));
-
-        let currentRunBal = (Number(openingRow?.Dr) || 0) - (Number(openingRow?.Cr) || 0);
-        if (openingRow?.Balance !== undefined && currentRunBal === 0 && opening > 0) {
-          currentRunBal = opening;
+        // Calculate Opening Balance based on the first transaction row's balance
+        const first = rows[0];
+        let opening = 0;
+        let opType: "Dr" | "Cr" = "Dr";
+        if (first) {
+          const firstBal = Number(first.Balance) || 0;
+          const firstDebit = Number(first.Debit) || 0;
+          const firstCredit = Number(first.Credit) || 0;
+          const firstType = first.BalanceType || "Dr";
+          
+          const firstBalSigned = firstType === "Cr" ? -firstBal : firstBal;
+          const opSigned = firstBalSigned - firstDebit + firstCredit;
+          opening = Math.abs(opSigned);
+          opType = opSigned >= 0 ? "Dr" : "Cr";
         }
-        setBalanceType(currentRunBal >= 0 ? "Dr" : "Cr");
+        setOpeningBalance(opening);
+        setBalanceType(opType);
 
-        // Transaction rows
-        const txRows = rows.filter((r: any) => r.Date && r.Party !== "Op. Bal.");
-
-        let runBal = currentRunBal;
-        const transactionList: Transaction[] = txRows.map((row: any) => {
-          runBal = runBal + (Number(row.Dr) || 0) - (Number(row.Cr) || 0);
+        const transactionList: Transaction[] = rows.map((row: any) => {
           return {
             date: row.Date ? formatDateForDisplay(row.Date) : "",
-            party: row.Party || row.DrLedger || row.CrLedger || "",
-            voucherNo: row.VoucherNo || "",
+            party: row.Particular || "—",
+            voucherNo: row.VoucherNo || "—",
             voucherId: row.F_VoucherMaster ?? row.VoucherId ?? row.Id ?? row.VoucherID ?? "",
             voucherType: row.VoucherType || "",
-            debit: Number(row.Dr) || 0,
-            credit: Number(row.Cr) || 0,
-            balance: Math.abs(Number(row.Balance) || runBal),
-            balanceType: runBal >= 0 ? "Dr" : "Cr",
+            debit: Number(row.Debit) || 0,
+            credit: Number(row.Credit) || 0,
+            balance: Math.abs(Number(row.Balance) || 0),
+            balanceType: row.BalanceType || "Dr",
             narration: row.Narration || "",
           };
         });
@@ -225,8 +224,8 @@ const CashReport: React.FC = () => {
           setCurrentBalance(lastTx.balance);
           setBalanceType(lastTx.balanceType);
         } else {
-          setCurrentBalance(Math.abs(opening));
-          setBalanceType(currentRunBal >= 0 ? "Dr" : "Cr");
+          setCurrentBalance(opening);
+          setBalanceType(opType);
         }
       } else {
         setTransactions([]);
@@ -319,22 +318,37 @@ const CashReport: React.FC = () => {
         /* ── Print Styles ── */
         .cash-print-layout { display: none; }
         @media print {
-          body * { visibility: hidden; }
-          .cash-print-layout, .cash-print-layout * { visibility: visible; }
+          .sidebar-wrapper, .page-header, .breadcrumbs, .card-header, .card-footer, .header-fields-row, .btn, .no-print {
+            display: none !important;
+          }
+          body, html {
+            background: #fff !important;
+            color: #000 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          .page-wrapper, .page-body-wrapper, .page-body, .container-fluid, .card, .card-body {
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            width: 100% !important;
+            max-width: 100% !important;
+          }
           .cash-print-layout {
             display: block !important;
-            position: absolute;
-            left: 0; top: 0;
-            width: 100%;
-            padding: 20px;
-            background: white;
-            color: black;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 10px !important;
+            background: white !important;
+            color: black !important;
             font-family: Arial, sans-serif;
           }
-          .cash-print-layout table { width: 100%; border-collapse: collapse; }
-          .cash-print-layout th, .cash-print-layout td { border: 1px solid black; padding: 6px 8px; font-size: 12px; }
-          .cash-print-layout th { background: #f0f0f0; -webkit-print-color-adjust: exact; }
-          .page-wrapper, .page-body-wrapper { margin: 0 !important; padding: 0 !important; }
+          .cash-print-layout table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+          .cash-print-layout th, .cash-print-layout td { border: 1px solid #000; padding: 6px 8px; font-size: 11px; }
+          .cash-print-layout th { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          @page { size: A4 portrait; margin: 10mm; }
         }
       `}</style>
       
@@ -556,6 +570,18 @@ const CashReport: React.FC = () => {
                 <td style={{ textAlign: "right" }}>{formatCurrency(t.balance)} {t.balanceType}</td>
               </tr>
             ))}
+
+            {/* Closing Balance Row */}
+            <tr style={{ fontWeight: "bold", borderTop: "2px solid #000" }}>
+              <td colSpan={3} style={{ textAlign: "right" }}>Closing Balance:</td>
+              <td style={{ textAlign: "right" }}>
+                {formatCurrency(transactions.reduce((s, t) => s + t.debit, 0))}
+              </td>
+              <td style={{ textAlign: "right" }}>
+                {formatCurrency(transactions.reduce((s, t) => s + t.credit, 0))}
+              </td>
+              <td style={{ textAlign: "right" }}>{formatCurrency(currentBalance)} {balanceType}</td>
+            </tr>
           </tbody>
         </table>
       </div>

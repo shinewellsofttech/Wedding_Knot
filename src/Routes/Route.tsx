@@ -134,7 +134,7 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/addEditCompanyYears`, Component: <AddEdit_CompanyYears /> },
   { path: `${process.env.PUBLIC_URL}/companyYears`, Component: <PageList_CompanyYears /> },
   
-  { path: `${process.env.PUBLIC_URL}/dashboard`, Component: <Dashboard /> },
+  { path: `${process.env.PUBLIC_URL}/dashboard`, Component: <DummyDashboard /> },
 
     { path: `${process.env.PUBLIC_URL}/voucherEntry`, Component: <VoucherEntry /> },
 
@@ -155,7 +155,7 @@ export const routes = [
         { path: `${process.env.PUBLIC_URL}/permissionMetrixs`, Component: <PermissionMetrixs /> },
         { path: `${process.env.PUBLIC_URL}/rentManagement`, Component: <RentManagement /> },
         { path: `${process.env.PUBLIC_URL}/rentReturn`, Component: <RentReturn /> },
-        { path: `${process.env.PUBLIC_URL}/dummyDashboard` , Component: <DummyDashboard /> },
+        // { path: `${process.env.PUBLIC_URL}/dummyDashboard` , Component: <DummyDashboard /> },
         { path: `${process.env.PUBLIC_URL}/moneyReceipt`, Component: <MoneyReceipt /> },
         { path: `${process.env.PUBLIC_URL}/moneyPayment`, Component: <MoneyPayment /> },
         { path: `${process.env.PUBLIC_URL}/orders`, Component: <Orders /> },

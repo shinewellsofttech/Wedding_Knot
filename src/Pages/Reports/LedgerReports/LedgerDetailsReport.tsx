@@ -431,22 +431,37 @@ const LedgerDetailsReport: React.FC = () => {
         /* ── Print Styles ── */
         .ledger-print-layout { display: none; }
         @media print {
-          body * { visibility: hidden; }
-          .ledger-print-layout, .ledger-print-layout * { visibility: visible; }
+          .sidebar-wrapper, .page-header, .breadcrumbs, .card-header, .card-footer, .header-fields-row, .btn, .no-print, .display-options {
+            display: none !important;
+          }
+          body, html {
+            background: #fff !important;
+            color: #000 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          .page-wrapper, .page-body-wrapper, .page-body, .container-fluid, .card, .card-body {
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            width: 100% !important;
+            max-width: 100% !important;
+          }
           .ledger-print-layout {
             display: block !important;
-            position: absolute;
-            left: 0; top: 0;
-            width: 100%;
-            padding: 20px;
-            background: white;
-            color: black;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 10px !important;
+            background: white !important;
+            color: black !important;
             font-family: Arial, sans-serif;
           }
-          .ledger-print-layout table { width: 100%; border-collapse: collapse; }
-          .ledger-print-layout th, .ledger-print-layout td { border: 1px solid black; padding: 4px 8px; font-size: 12px; }
-          .ledger-print-layout th { background: #f0f0f0; -webkit-print-color-adjust: exact; }
-          .page-wrapper, .page-body-wrapper { margin: 0 !important; padding: 0 !important; }
+          .ledger-print-layout table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+          .ledger-print-layout th, .ledger-print-layout td { border: 1px solid #000; padding: 6px 8px; font-size: 11px; }
+          .ledger-print-layout th { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          @page { size: A4 portrait; margin: 10mm; }
         }
       `}</style>
       <Breadcrumbs mainTitle="Ledger Details Report" parent="Reports" />

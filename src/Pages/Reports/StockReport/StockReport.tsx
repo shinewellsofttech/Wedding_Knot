@@ -61,19 +61,37 @@ const PAGE_CSS = `
   }
   .stock-print { display: none; }
   @media print {
-    body * { visibility: hidden; }
-    .stock-print, .stock-print * { visibility: visible; }
+    .sidebar-wrapper, .page-header, .breadcrumbs, .card-header, .card-footer, .row.gy-3.mb-3.align-items-end, .btn, .no-print, .pb-3.text-end {
+      display: none !important;
+    }
+    body, html {
+      background: #fff !important;
+      color: #000 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .page-wrapper, .page-body-wrapper, .page-body, .container-fluid, .card, .card-body {
+      margin: 0 !important;
+      padding: 0 !important;
+      border: none !important;
+      box-shadow: none !important;
+      background: transparent !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
     .stock-print {
       display: block !important;
-      position: absolute; left: 0; top: 0;
-      width: 100%; padding: 20px;
-      background: white; color: black;
-      font-family: Arial, sans-serif; font-size: 10px;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 10px !important;
+      background: white !important;
+      color: black !important;
+      font-family: Arial, sans-serif;
     }
-    .stock-print table { width: 100%; border-collapse: collapse; }
-    .stock-print th, .stock-print td { border: 1px solid #333; padding: 4px; }
-    .stock-print thead th { background: #f0f0f0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .page-wrapper, .page-body-wrapper { margin: 0 !important; padding: 0 !important; }
+    .stock-print table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    .stock-print th, .stock-print td { border: 1px solid #000; padding: 6px 8px; font-size: 10px; }
+    .stock-print thead th { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    @page { size: A4 landscape; margin: 10mm; }
   }
 `;
 
@@ -391,6 +409,17 @@ const StockReport: React.FC = () => {
                               </tr>
                             );
                           })}
+                          {reportData.length > 0 && (
+                            <tr className="table-info fw-bold">
+                              <td colSpan={6} className="text-end">Totals:</td>
+                              <td className="text-end text-primary">{formatQty(reportData.reduce((s, r) => s + (Number(r.OpeningStock) || 0), 0))}</td>
+                              <td className="text-end text-success">{formatQty(reportData.reduce((s, r) => s + (Number(r.PurchaseQty) || 0), 0))}</td>
+                              <td className="text-end text-danger">{formatQty(reportData.reduce((s, r) => s + (Number(r.PurchaseReturnQty) || 0), 0))}</td>
+                              <td className="text-end text-info">{formatQty(reportData.reduce((s, r) => s + (Number(r.SaleQty) || 0), 0))}</td>
+                              <td className="text-end text-warning">{formatQty(reportData.reduce((s, r) => s + (Number(r.SalesReturnQty) || 0), 0))}</td>
+                              <td className="text-end fw-bold">{formatQty(reportData.reduce((s, r) => s + (Number(r.CurrentStock) || 0), 0))}</td>
+                            </tr>
+                          )}
                           {reportData.length === 0 && (
                             <tr>
                               <td colSpan={12} className="text-center text-muted py-4">
@@ -459,6 +488,17 @@ const StockReport: React.FC = () => {
                 <td style={{ textAlign: "right", fontWeight: "bold" }}>{formatQty(row.CurrentStock)}</td>
               </tr>
             ))}
+            {reportData.length > 0 && (
+              <tr style={{ fontWeight: "bold", background: "#f0f0f0" }}>
+                <td colSpan={6} style={{ textAlign: "right" }}>Totals:</td>
+                <td style={{ textAlign: "right" }}>{formatQty(reportData.reduce((s, r) => s + (Number(r.OpeningStock) || 0), 0))}</td>
+                <td style={{ textAlign: "right" }}>{formatQty(reportData.reduce((s, r) => s + (Number(r.PurchaseQty) || 0), 0))}</td>
+                <td style={{ textAlign: "right" }}>{formatQty(reportData.reduce((s, r) => s + (Number(r.PurchaseReturnQty) || 0), 0))}</td>
+                <td style={{ textAlign: "right" }}>{formatQty(reportData.reduce((s, r) => s + (Number(r.SaleQty) || 0), 0))}</td>
+                <td style={{ textAlign: "right" }}>{formatQty(reportData.reduce((s, r) => s + (Number(r.SalesReturnQty) || 0), 0))}</td>
+                <td style={{ textAlign: "right", fontWeight: "bold" }}>{formatQty(reportData.reduce((s, r) => s + (Number(r.CurrentStock) || 0), 0))}</td>
+              </tr>
+            )}
             {reportData.length === 0 && (
               <tr>
                 <td colSpan={12} style={{ textAlign: "center", padding: "10px" }}>
