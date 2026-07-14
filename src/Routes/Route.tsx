@@ -50,6 +50,7 @@ import PageList_TaxGroupLedgerMap from "../Pages/Masters/PageList_TaxGroupLedger
 import AddEdit_VoucherType from "../Pages/Masters/AddEdit_VoucherType";
 import PageList_VoucherType from "../Pages/Masters/PageList_VoucherType";
 import LedgerDetailsReport from "../Pages/Reports/LedgerReports/LedgerDetailsReport";
+import CashReport from "../Pages/Reports/LedgerReports/CashReport";
 import FastEntryOfLedgerBalance from "../Pages/Transactions/FastEntryOfLedgerBalance/FastEntryOfLedgerBalance";
 import VoucherSearch from "../Pages/Transactions/VouterSearch/VouterSearch";
 import BankReconcilation from "../Pages/Transactions/BankReconcilation/BankReconcilation";
@@ -138,6 +139,7 @@ export const routes = [
     { path: `${process.env.PUBLIC_URL}/voucherEntry`, Component: <VoucherEntry /> },
 
     { path: `${process.env.PUBLIC_URL}/ledgerDetailsReport`, Component: <LedgerDetailsReport /> },
+    { path: `${process.env.PUBLIC_URL}/cashReport`, Component: <CashReport /> },
     {path : `${process.env.PUBLIC_URL}/salesReturn`, Component : <SalesReturn/>},
     {path: `${process.env.PUBLIC_URL}/purchaseReturn`, Component : <PurchaseReturn/>},
     {path :`${process.env.PUBLIC_URL}/profitAndLoss`,Component:<ProfitAndLoss/>},

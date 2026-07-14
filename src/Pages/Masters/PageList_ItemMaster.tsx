@@ -347,7 +347,7 @@ const PageList_ItemMaster = () => {
                             <th>Unit Val</th>
                             <th>Price</th>
                             <th>Barcode</th>
-                            <th>Stock</th>
+                            <th>IsEcommerce</th>
                             <th>Photos</th>
                             <th>Video Link</th>
                             <th style={{ width: 100 }}>Actions</th>
@@ -480,7 +480,13 @@ const PageList_ItemMaster = () => {
                                               "-"
                                             )}
                                           </td>
-                                          <td>{d.OpeningStock || "0"}</td>
+                                          <td>
+                                            {d.IsEcom ? (
+                                              <Badge color="success">Yes</Badge>
+                                            ) : (
+                                              <Badge color="danger">No</Badge>
+                                            )}
+                                          </td>
                                           <td>
                                             <div className="d-flex flex-wrap gap-2">
                                               {images.map((img: any, i: number) => (
