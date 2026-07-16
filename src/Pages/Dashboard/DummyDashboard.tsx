@@ -279,6 +279,12 @@ const Dashboard = () => {
         .dashboard-table-wrapper {
           max-height: 310px;
           overflow-y: auto;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        
+        .dashboard-table-wrapper::-webkit-scrollbar {
+          display: none;
         }
       `}</style>
 

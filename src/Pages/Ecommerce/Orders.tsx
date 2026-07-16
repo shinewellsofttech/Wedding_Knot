@@ -46,6 +46,7 @@ interface Order {
   Remarks: string;
   DispatchDocNo: string | null;
   DispatchedThrough: string | null;
+  F_StatusMaster: number;
   OrderStatus: string;
   OrderStatusRemarks: string | null;
   OrderStatusUpdatedOn: string | null;
@@ -117,7 +118,7 @@ const Orders = () => {
     setSelectedOrder(order);
     
     // Attempt to pre-fill the status dropdown with the current order status
-    const currentStatus = statuses.find(s => s.Name === order.OrderStatus);
+    const currentStatus = statuses.find(s => s.Id === order.F_StatusMaster);
     setUpdateStatusId(currentStatus ? currentStatus.Id : 0);
     
     setModalOpen(true);
@@ -180,6 +181,24 @@ const Orders = () => {
     return cleaned;
   };
 
+  const getActualStatusName = (fStatusId: number, fallback: string) => {
+    const s = statuses.find(x => x.Id === fStatusId);
+    return s ? s.Name : (fallback || "Pending");
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "Pending": return "warning";
+      case "Approved": return "info";
+      case "Rejected": return "danger";
+      case "Packed": return "secondary";
+      case "Shipped": return "primary";
+      case "Out for Delivery": return "info";
+      case "Delivered": return "success";
+      default: return "dark";
+    }
+  };
+
   return (
     <>
       <div className="page-body">
@@ -206,7 +225,6 @@ const Orders = () => {
                             <th>Order No</th>
                             <th>Date</th>
                             <th>Customer Details</th>
-                            <th>Total Tax</th>
                             <th>Status</th>
                             <th>Remarks</th>
                             <th className="text-center">Action</th>
@@ -227,10 +245,9 @@ const Orders = () => {
                                     <span className="text-muted small">{order.ContactMobile}</span>
                                   </div>
                                 </td>
-                                <td>₹ {order.TotalTax.toFixed(2)}</td>
                                 <td>
-                                  <Badge color={order.OrderStatus === "Pending" ? "warning" : "success"}>
-                                    {order.OrderStatus || "Received"}
+                                  <Badge color={getStatusColor(getActualStatusName(order.F_StatusMaster, order.OrderStatus))}>
+                                    {getActualStatusName(order.F_StatusMaster, order.OrderStatus)}
                                   </Badge>
                                 </td>
                                 <td style={{ maxWidth: "200px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontSize: "0.85rem" }}>
@@ -245,7 +262,7 @@ const Orders = () => {
                             ))
                           ) : (
                             <tr>
-                              <td colSpan={7} className="text-center text-muted py-4">
+                              <td colSpan={6} className="text-center text-muted py-4">
                                 No orders found.
                               </td>
                             </tr>
@@ -277,8 +294,7 @@ const Orders = () => {
                 <Col md="6">
                   <h6 className="fw-bold">Order Summary</h6>
                   <p className="mb-1">Date: {formatDate(selectedOrder.EntryDate)}</p>
-                  <p className="mb-1">Status: <Badge color={selectedOrder.OrderStatus === "Pending" ? "warning" : "success"}>{selectedOrder.OrderStatus}</Badge></p>
-                  <p className="mb-1">Total Tax: ₹ {selectedOrder.TotalTax.toFixed(2)}</p>
+                  <p className="mb-1">Status: <Badge color={getStatusColor(getActualStatusName(selectedOrder.F_StatusMaster, selectedOrder.OrderStatus))}>{getActualStatusName(selectedOrder.F_StatusMaster, selectedOrder.OrderStatus)}</Badge></p>
                 </Col>
                 <Col md="12" className="mt-3">
                   <h6 className="fw-bold">Remarks & Addresses</h6>

@@ -237,30 +237,30 @@ Items:[
         type: "link",
         bookmark: true
       },
-      //   {
-      //   id:2,
-      //   title: "Trial Balance",
-      //   path: `${process.env.PUBLIC_URL}/trialBalance`,
-      //   icon: "Box",
-      //   type: "link",
-      //   bookmark: true
-      // },
-      // {
-      //   id: 3,
-      //   title:"Profit & Loss",
-      //   path:`${process.env.PUBLIC_URL}/profitAndLoss`,
-      //   icon:"Box",
-      //   type:"link",
-      //   bookmark:true
-      // },
-      // {
-      //   id:4,
-      //   title:"Balance Sheet",
-      //   path:`${process.env.PUBLIC_URL}/balanceSheet`,
-      //   icon:"Box",
-      //   type:"link",
-      //   bookmark:true
-      // },
+        {
+        id:2,
+        title: "Trial Balance",
+        path: `${process.env.PUBLIC_URL}/trialBalance`,
+        icon: "Box",
+        type: "link",
+        bookmark: true
+      },
+      {
+        id: 3,
+        title:"Profit & Loss",
+        path:`${process.env.PUBLIC_URL}/profitAndLoss`,
+        icon:"Box",
+        type:"link",
+        bookmark:true
+      },
+      {
+        id:4,
+        title:"Balance Sheet",
+        path:`${process.env.PUBLIC_URL}/balanceSheet`,
+        icon:"Box",
+        type:"link",
+        bookmark:true
+      },
       // {
       //   id:5,
       //   title:"Stock Position",
