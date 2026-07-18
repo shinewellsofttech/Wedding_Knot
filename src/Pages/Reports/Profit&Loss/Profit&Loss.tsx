@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardBody, CardFooter, Col, Container, FormGroup, Label, Row, Table } from "reactstrap";
+import { Card, CardBody, CardFooter, Col, Container, FormGroup, Input, Label, Row, Table } from "reactstrap";
 import { Btn } from "../../../AbstractElements";
 import Breadcrumbs from "../../../CommonElements/Breadcrumbs/Breadcrumbs";
 import DateInput from "../../../CommonElements/DateInput";
@@ -12,6 +12,7 @@ import { API_WEB_URLS } from "../../../constants/constAPI";
 interface TradingPLRow {
   SNo?: number;
   LedgerGroupId?: number;
+  LedgerGroupName?: string;
   DrParticular?: string;
   DrAmount?: number | string;
   CrParticular?: string;
@@ -27,7 +28,15 @@ const isTotalRow = (r: TradingPLRow) =>
 
 const canDrillGroup = (name: string | undefined) => {
   const n = (name || "").trim();
-  return n !== "" && n.toUpperCase() !== "TOTAL";
+  if (!n) return false;
+  const upper = n.toUpperCase();
+  return (
+    upper !== "TOTAL" &&
+    !upper.includes("GROSS PROFIT") &&
+    !upper.includes("GROSS LOSS") &&
+    !upper.includes("NET PROFIT") &&
+    !upper.includes("NET LOSS")
+  );
 };
 
 const isGrossProfitOrLossCd = (r: TradingPLRow) => {
@@ -54,6 +63,10 @@ const ProfitAndLoss: React.FC = () => {
     const fyStart = m >= 4 ? y : y - 1;
     return `${fyStart + 1}-03-31`;
   });
+
+  // IsDetailed state (false = 0 / Summarized, true = 1 / Detailed)
+  const [isDetailed, setIsDetailed] = useState(false);
+
   const [reportData, setReportData] = useState<TradingPLRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [printCompanyName, setPrintCompanyName] = useState("");
@@ -93,7 +106,7 @@ const ProfitAndLoss: React.FC = () => {
       formData.append("ToDate", formatDateForAPI(toDate));
       formData.append("UserId", userId);
       formData.append("F_CompanyMaster", String(authUser?.F_CompanyMaster ?? authUser?.CompanyId ?? authUser?.F_Company ?? "0"));
-      formData.append("IsDetailed", "2");
+      formData.append("IsDetailed", isDetailed ? "1" : "0");
 
       const arguList = { formData };
 
@@ -128,7 +141,7 @@ const ProfitAndLoss: React.FC = () => {
 
   useEffect(() => {
     if (fromDate && toDate) fetchReport();
-  }, [fromDate, toDate]);
+  }, [fromDate, toDate, isDetailed]);
 
   useEffect(() => {
     try {
@@ -153,7 +166,16 @@ const ProfitAndLoss: React.FC = () => {
     }
   }, []);
 
-  type ReportRow = { sno: number; drParticular: string; drAmount: string; crParticular: string; crAmount: string };
+  type ReportRow = {
+    sno: number;
+    drParticular: string;
+    drAmount: string;
+    crParticular: string;
+    crAmount: string;
+    ledgerGroupName: string;
+    ledgerGroupId: number;
+  };
+
   const toReportRow = (row: TradingPLRow): ReportRow => {
     const drAmt = row.DrAmount;
     const crAmt = row.CrAmount;
@@ -163,6 +185,8 @@ const ProfitAndLoss: React.FC = () => {
       drAmount: typeof drAmt === "number" || (typeof drAmt === "string" && drAmt !== "" && !isNaN(Number(drAmt))) ? formatCurrency(Number(drAmt)) : (row.DrAmount as string) ?? "",
       crParticular: row.CrParticular ?? "",
       crAmount: typeof crAmt === "number" || (typeof crAmt === "string" && crAmt !== "" && !isNaN(Number(crAmt))) ? formatCurrency(Number(crAmt)) : (row.CrAmount as string) ?? "",
+      ledgerGroupName: row.LedgerGroupName ?? "",
+      ledgerGroupId: Number(row.LedgerGroupId) || 0,
     };
   };
 
@@ -190,7 +214,18 @@ const ProfitAndLoss: React.FC = () => {
 
   return (
     <div className="page-body report-page">
-      <style>{`.pnl-print{display:none}@media print{body *{visibility:hidden}.pnl-print,.pnl-print *{visibility:visible}.pnl-print{display:block!important;position:absolute;left:0;top:0;width:100%;padding:20px;background:#fff;color:#000;font-family:Arial,sans-serif}.pnl-print table{width:100%;border-collapse:collapse}.pnl-print th,.pnl-print td{border:1px solid #333;padding:4px 8px;font-size:12px}.pnl-print th{background:#f0f0f0;-webkit-print-color-adjust:exact}`}</style>
+      <style>{`
+        .pnl-print { display: none; }
+        @media print {
+          body * { visibility: hidden; }
+          .pnl-print, .pnl-print * { visibility: visible; }
+          .pnl-print { display: block !important; position: absolute; left: 0; top: 0; width: 100%; padding: 20px; background: #fff; color: #000; font-family: Arial, sans-serif; }
+          .pnl-print table { width: 100%; border-collapse: collapse; }
+          .pnl-print th, .pnl-print td { border: 1px solid #333; padding: 4px 8px; font-size: 12px; }
+          .pnl-print th { background: #f0f0f0; -webkit-print-color-adjust: exact; }
+        }
+        .cursor-pointer { cursor: pointer; }
+      `}</style>
       <Breadcrumbs mainTitle="Profit & Loss A/c" parent="Reports" />
       <Container fluid>
         <Row>
@@ -198,17 +233,30 @@ const ProfitAndLoss: React.FC = () => {
             <Card>
               <CardHeaderCommon title="Profit & Loss A/c" tagClass="card-title mb-0" />
               <CardBody>
-                <Row className="gy-3 mb-3">
+                <Row className="gy-3 mb-4 align-items-center">
                   <Col md="3">
-                    <FormGroup>
-                      <Label>From Date</Label>
+                    <FormGroup className="mb-0">
+                      <Label className="fw-bold">From Date</Label>
                       <DateInput value={fromDate} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFromDate(e.target.value)} />
                     </FormGroup>
                   </Col>
                   <Col md="3">
-                    <FormGroup>
-                      <Label>To Date</Label>
+                    <FormGroup className="mb-0">
+                      <Label className="fw-bold">To Date</Label>
                       <DateInput value={toDate} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setToDate(e.target.value)} />
+                    </FormGroup>
+                  </Col>
+                  <Col md="3" className="pt-4">
+                    <FormGroup check className="mb-0">
+                      <Input
+                        type="checkbox"
+                        id="pnl-detailed"
+                        checked={isDetailed}
+                        onChange={(e) => setIsDetailed(e.target.checked)}
+                      />
+                      <Label check htmlFor="pnl-detailed" className="fw-bold cursor-pointer">
+                        Detailed View
+                      </Label>
                     </FormGroup>
                   </Col>
                 </Row>
@@ -251,19 +299,47 @@ const ProfitAndLoss: React.FC = () => {
                                   <tr key={`t-${idx}`}>
                                     <td className="text-center">{row.sno}</td>
                                     <td
-                                      onDoubleClick={() => drillDr && navigate(`${process.env.PUBLIC_URL}/groupLedgerSummary`, { state: { ledgerGroupName: (row.drParticular || "").trim(), fromDate, toDate } })}
-                                      style={{ cursor: drillDr ? "pointer" : "default" }}
+                                      onDoubleClick={() =>
+                                        drillDr &&
+                                        navigate(`${process.env.PUBLIC_URL}/groupLedgerSummary`, {
+                                          state: {
+                                            ledgerGroupName: (isDetailed && row.ledgerGroupName ? row.ledgerGroupName : row.drParticular || "").trim(),
+                                            fromDate,
+                                            toDate,
+                                          },
+                                        })
+                                      }
+                                      className={drillDr ? "cursor-pointer" : ""}
                                       title={drillDr ? "Double-click for Group Ledger Summary" : undefined}
                                     >
-                                      {row.drParticular || ""}
+                                      <div>{row.drParticular || ""}</div>
+                                      {isDetailed && row.ledgerGroupName && row.drParticular && row.ledgerGroupName !== row.drParticular && (
+                                        <small className="text-muted d-block" style={{ fontSize: "11px" }}>
+                                          Group: {row.ledgerGroupName}
+                                        </small>
+                                      )}
                                     </td>
                                     <td className="text-end">{row.drAmount || ""}</td>
                                     <td
-                                      onDoubleClick={() => drillCr && navigate(`${process.env.PUBLIC_URL}/groupLedgerSummary`, { state: { ledgerGroupName: (row.crParticular || "").trim(), fromDate, toDate } })}
-                                      style={{ cursor: drillCr ? "pointer" : "default" }}
+                                      onDoubleClick={() =>
+                                        drillCr &&
+                                        navigate(`${process.env.PUBLIC_URL}/groupLedgerSummary`, {
+                                          state: {
+                                            ledgerGroupName: (isDetailed && row.ledgerGroupName ? row.ledgerGroupName : row.crParticular || "").trim(),
+                                            fromDate,
+                                            toDate,
+                                          },
+                                        })
+                                      }
+                                      className={drillCr ? "cursor-pointer" : ""}
                                       title={drillCr ? "Double-click for Group Ledger Summary" : undefined}
                                     >
-                                      {row.crParticular || ""}
+                                      <div>{row.crParticular || ""}</div>
+                                      {isDetailed && row.ledgerGroupName && row.crParticular && row.ledgerGroupName !== row.crParticular && (
+                                        <small className="text-muted d-block" style={{ fontSize: "11px" }}>
+                                          Group: {row.ledgerGroupName}
+                                        </small>
+                                      )}
                                     </td>
                                     <td className="text-end">{row.crAmount || ""}</td>
                                   </tr>
@@ -289,19 +365,47 @@ const ProfitAndLoss: React.FC = () => {
                                   <tr key={`p-${idx}`}>
                                     <td className="text-center">{row.sno}</td>
                                     <td
-                                      onDoubleClick={() => drillDr && navigate(`${process.env.PUBLIC_URL}/groupLedgerSummary`, { state: { ledgerGroupName: (row.drParticular || "").trim(), fromDate, toDate } })}
-                                      style={{ cursor: drillDr ? "pointer" : "default" }}
+                                      onDoubleClick={() =>
+                                        drillDr &&
+                                        navigate(`${process.env.PUBLIC_URL}/groupLedgerSummary`, {
+                                          state: {
+                                            ledgerGroupName: (isDetailed && row.ledgerGroupName ? row.ledgerGroupName : row.drParticular || "").trim(),
+                                            fromDate,
+                                            toDate,
+                                          },
+                                        })
+                                      }
+                                      className={drillDr ? "cursor-pointer" : ""}
                                       title={drillDr ? "Double-click for Group Ledger Summary" : undefined}
                                     >
-                                      {row.drParticular || ""}
+                                      <div>{row.drParticular || ""}</div>
+                                      {isDetailed && row.ledgerGroupName && row.drParticular && row.ledgerGroupName !== row.drParticular && (
+                                        <small className="text-muted d-block" style={{ fontSize: "11px" }}>
+                                          Group: {row.ledgerGroupName}
+                                        </small>
+                                      )}
                                     </td>
                                     <td className="text-end">{row.drAmount || ""}</td>
                                     <td
-                                      onDoubleClick={() => drillCr && navigate(`${process.env.PUBLIC_URL}/groupLedgerSummary`, { state: { ledgerGroupName: (row.crParticular || "").trim(), fromDate, toDate } })}
-                                      style={{ cursor: drillCr ? "pointer" : "default" }}
+                                      onDoubleClick={() =>
+                                        drillCr &&
+                                        navigate(`${process.env.PUBLIC_URL}/groupLedgerSummary`, {
+                                          state: {
+                                            ledgerGroupName: (isDetailed && row.ledgerGroupName ? row.ledgerGroupName : row.crParticular || "").trim(),
+                                            fromDate,
+                                            toDate,
+                                          },
+                                        })
+                                      }
+                                      className={drillCr ? "cursor-pointer" : ""}
                                       title={drillCr ? "Double-click for Group Ledger Summary" : undefined}
                                     >
-                                      {row.crParticular || ""}
+                                      <div>{row.crParticular || ""}</div>
+                                      {isDetailed && row.ledgerGroupName && row.crParticular && row.ledgerGroupName !== row.crParticular && (
+                                        <small className="text-muted d-block" style={{ fontSize: "11px" }}>
+                                          Group: {row.ledgerGroupName}
+                                        </small>
+                                      )}
                                     </td>
                                     <td className="text-end">{row.crAmount || ""}</td>
                                   </tr>
@@ -327,8 +431,13 @@ const ProfitAndLoss: React.FC = () => {
                 </div>
               </CardBody>
               <CardFooter className="text-end">
-                <Btn color="primary" type="button" className="me-2" onClick={() => navigate(`${process.env.PUBLIC_URL}/profitAndLossDetails`)}>
-                  Detail View
+                <Btn
+                  color={isDetailed ? "warning" : "primary"}
+                  type="button"
+                  className="me-2"
+                  onClick={() => setIsDetailed(!isDetailed)}
+                >
+                  {isDetailed ? "Summarized View" : "Detail View"}
                 </Btn>
                 <Btn color="success" type="button" className="me-2" onClick={handlePrint}>
                   Print
@@ -341,6 +450,8 @@ const ProfitAndLoss: React.FC = () => {
           </Col>
         </Row>
       </Container>
+
+      {/* Dynamic Print Layout */}
       <div className="pnl-print">
         <div className="text-center border-bottom pb-3 mb-3" style={{ borderColor: "#333" }}>
           <h2 style={{ fontWeight: "bold", marginBottom: "4px" }}>{printCompanyName || "—"}</h2>
@@ -350,8 +461,9 @@ const ProfitAndLoss: React.FC = () => {
         <table style={{ width: "100%", marginBottom: "12px", fontSize: "13px" }}>
           <tbody>
             <tr>
-              <td style={{ width: "50%" }}><strong>From Date:</strong> {formatDateForDisplay(fromDate)}</td>
-              <td style={{ width: "50%" }}><strong>To Date:</strong> {formatDateForDisplay(toDate)}</td>
+              <td style={{ width: "33.3%" }}><strong>From Date:</strong> {formatDateForDisplay(fromDate)}</td>
+              <td style={{ width: "33.3%" }}><strong>To Date:</strong> {formatDateForDisplay(toDate)}</td>
+              <td style={{ width: "33.3%" }}><strong>View:</strong> {isDetailed ? "Detailed" : "Summarized"}</td>
             </tr>
           </tbody>
         </table>
@@ -372,9 +484,23 @@ const ProfitAndLoss: React.FC = () => {
                 {tradingRows.map((row, idx) => (
                   <tr key={`t-${idx}`}>
                     <td style={{ textAlign: "center" }}>{row.sno}</td>
-                    <td>{row.drParticular || ""}</td>
+                    <td>
+                      <div>{row.drParticular || ""}</div>
+                      {isDetailed && row.ledgerGroupName && row.drParticular && row.ledgerGroupName !== row.drParticular && (
+                        <small style={{ fontSize: "10px", color: "#666", display: "block" }}>
+                          Group: {row.ledgerGroupName}
+                        </small>
+                      )}
+                    </td>
                     <td style={{ textAlign: "right" }}>{row.drAmount || ""}</td>
-                    <td>{row.crParticular || ""}</td>
+                    <td>
+                      <div>{row.crParticular || ""}</div>
+                      {isDetailed && row.ledgerGroupName && row.crParticular && row.ledgerGroupName !== row.crParticular && (
+                        <small style={{ fontSize: "10px", color: "#666", display: "block" }}>
+                          Group: {row.ledgerGroupName}
+                        </small>
+                      )}
+                    </td>
                     <td style={{ textAlign: "right" }}>{row.crAmount || ""}</td>
                   </tr>
                 ))}
@@ -392,9 +518,23 @@ const ProfitAndLoss: React.FC = () => {
                 {pnlRows.map((row, idx) => (
                   <tr key={`p-${idx}`}>
                     <td style={{ textAlign: "center" }}>{row.sno}</td>
-                    <td>{row.drParticular || ""}</td>
+                    <td>
+                      <div>{row.drParticular || ""}</div>
+                      {isDetailed && row.ledgerGroupName && row.drParticular && row.ledgerGroupName !== row.drParticular && (
+                        <small style={{ fontSize: "10px", color: "#666", display: "block" }}>
+                          Group: {row.ledgerGroupName}
+                        </small>
+                      )}
+                    </td>
                     <td style={{ textAlign: "right" }}>{row.drAmount || ""}</td>
-                    <td>{row.crParticular || ""}</td>
+                    <td>
+                      <div>{row.crParticular || ""}</div>
+                      {isDetailed && row.ledgerGroupName && row.crParticular && row.ledgerGroupName !== row.crParticular && (
+                        <small style={{ fontSize: "10px", color: "#666", display: "block" }}>
+                          Group: {row.ledgerGroupName}
+                        </small>
+                      )}
+                    </td>
                     <td style={{ textAlign: "right" }}>{row.crAmount || ""}</td>
                   </tr>
                 ))}

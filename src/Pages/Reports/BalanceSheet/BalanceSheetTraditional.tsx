@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
     Card, CardBody, CardFooter, Col, Container,
-    FormGroup, Label, Row, Table
+    FormGroup, Input, Label, Row, Table
 } from "reactstrap";
 import { Btn } from "../../../AbstractElements";
 import Breadcrumbs from "../../../CommonElements/Breadcrumbs/Breadcrumbs";
@@ -17,8 +17,13 @@ interface BalanceSheetRow {
   RowNo?: number;
   LiabilityParticular?: string | null;
   LAmount?: number | null;
+  LNetAmount?: number | null;
   AssetParticular?: string | null;
   AAmount?: number | null;
+  ANetAmount?: number | null;
+  Particular?: string | null;
+  Amount?: number | null;
+  NetAmount?: number | null;
   [key: string]: any;
 }
 
@@ -54,14 +59,17 @@ const PAGE_CSS = `
     }
     .bs-trad-print table { width: 100%; border-collapse: collapse; }
     .bs-trad-print th, .bs-trad-print td { border: 1px solid #333; padding: 4px 8px; }
-    .bs-trad-print thead th { background: #f9d0b0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .bs-trad-print tbody tr:nth-child(even) { background: #fdf5e6; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .bs-trad-print thead th { background: #f0f0f0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
+  .cursor-pointer { cursor: pointer; }
 `;
 
 const BalanceSheetTraditional: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  // IsDetailed state (1 = Detailed Traditional, 2 = Summarized Traditional, 3 = Vertical / Single Column)
+  const [isDetailed, setIsDetailed] = useState<number>(2);
 
   const drillDown = (particular: string | null | undefined) => {
     if (!particular || particular.trim() === "" || /^total\s*(liabilities|assets)?$/i.test(particular.trim())) return;
@@ -116,7 +124,7 @@ const BalanceSheetTraditional: React.FC = () => {
       formData.append("DateAsOn", formatDateForAPI(toDate));
       formData.append("UserId", String(userId));
       formData.append("F_CompanyMaster", String(fCompany));
-      formData.append("IsDetailed", "2");
+      formData.append("IsDetailed", String(isDetailed));
 
       const response = await Fn_GetReport(
         dispatch,
@@ -149,7 +157,7 @@ const BalanceSheetTraditional: React.FC = () => {
 
   useEffect(() => {
     if (toDate) fetchReport();
-  }, [toDate]);
+  }, [toDate, isDetailed]);
 
   useEffect(() => {
     try {
@@ -179,19 +187,6 @@ const BalanceSheetTraditional: React.FC = () => {
     }
   }, []);
 
-  const reportRows = reportData.map((row) => {
-    const liabAmt = row.LAmount ?? row.LiabilitiesAmount ?? row.Liabilities_Amount ?? row.Amount;
-    const assetAmt = row.AAmount ?? row.AssetsAmount ?? row.Assets_Amount ?? row.Amount;
-    const liabPart = row.LiabilityParticular ?? row.LiabilitiesParticular ?? row.Liabilities ?? row.Liabilities_Particular ?? "";
-    const assetPart = row.AssetParticular ?? row.AssetsParticular ?? row.Assets ?? row.Assets_Particular ?? "";
-    return {
-      liabilitiesParticular: liabPart ?? "",
-      liabilitiesAmount: typeof liabAmt === "number" || (liabAmt != null && !isNaN(Number(liabAmt))) ? formatCurrency(Number(liabAmt)) : (liabAmt ?? ""),
-      assetsParticular: assetPart ?? "",
-      assetsAmount: typeof assetAmt === "number" || (assetAmt != null && !isNaN(Number(assetAmt))) ? formatCurrency(Number(assetAmt)) : (assetAmt ?? ""),
-    };
-  });
-
   const handlePrint = () => window.print();
   const handleClose = () => window.history.back();
 
@@ -205,11 +200,26 @@ const BalanceSheetTraditional: React.FC = () => {
             <Card>
               <CardHeaderCommon title="Balance Sheet" tagClass="card-title mb-0" />
               <CardBody>
-                <Row className="gy-3 mb-3">
+                {/* Control Panel */}
+                <Row className="gy-3 mb-4 align-items-center">
                   <Col md="4">
-                    <FormGroup>
-                      <Label>As On</Label>
+                    <FormGroup className="mb-0">
+                      <Label className="fw-bold">As On</Label>
                       <DateInput value={toDate} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setToDate(e.target.value)} />
+                    </FormGroup>
+                  </Col>
+                  <Col md="4">
+                    <FormGroup className="mb-0">
+                      <Label className="fw-bold">Report Format</Label>
+                      <Input
+                        type="select"
+                        value={isDetailed}
+                        onChange={(e) => setIsDetailed(Number(e.target.value))}
+                      >
+                        <option value={1}>Detailed Traditional</option>
+                        <option value={2}>Summarized Traditional</option>
+                        <option value={3}>Vertical / Single Column</option>
+                      </Input>
                     </FormGroup>
                   </Col>
                 </Row>
@@ -217,63 +227,157 @@ const BalanceSheetTraditional: React.FC = () => {
                 <h5 className="text-center fw-bold mb-1">Balance Sheet</h5>
                 <p className="text-center text-muted mb-3">As On {formatDateForDisplay(toDate)}</p>
 
-                  <div className="table-responsive">
+                <div className="table-responsive">
+                  {isLoading ? (
+                    <div className="text-center p-4">
+                      <div className="spinner-border" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                      </div>
+                      <p className="mt-2 mb-0">Loading Balance Sheet...</p>
+                    </div>
+                  ) : reportData.length > 0 ? (
                     <Table bordered hover className="mb-0">
-                      <thead className="table-light" style={{ position: "sticky", top: 0, zIndex: 1 }}>
-                        <tr>
-                          <th>Liabilities</th>
-                          <th className="text-end" style={{ width: "140px" }}>Amount</th>
-                          <th>Assets</th>
-                          <th className="text-end" style={{ width: "140px" }}>Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {isLoading ? (
-                          <tr>
-                            <td colSpan={4} className="text-center p-4">
-                              <div className="spinner-border" role="status">
-                                <span className="visually-hidden">Loading...</span>
-                              </div>
-                              <p className="mt-2 mb-0">Loading Balance Sheet...</p>
-                            </td>
-                          </tr>
-                        ) : (
-                          <>
-                            {reportRows.map((row, idx) => {
-                              const canDrillLiab = (row.liabilitiesParticular || "").trim() && !/^total\s*(liabilities|assets)?$/i.test((row.liabilitiesParticular || "").trim());
-                              const canDrillAsset = (row.assetsParticular || "").trim() && !/^total\s*(liabilities|assets)?$/i.test((row.assetsParticular || "").trim());
+                      {/* Format 1: Detailed Traditional */}
+                      {isDetailed === 1 && (
+                        <>
+                          <thead className="table-light sticky-top">
+                            <tr>
+                              <th>Liabilities</th>
+                              <th className="text-end" style={{ width: "120px" }}>Amount</th>
+                              <th className="text-end" style={{ width: "130px" }}>Net Amount</th>
+                              <th>Assets</th>
+                              <th className="text-end" style={{ width: "120px" }}>Amount</th>
+                              <th className="text-end" style={{ width: "130px" }}>Net Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {reportData.map((row, idx) => {
+                              const canDrillLiab = row.LiabilityParticular && !/^total\s*(liabilities|assets)?$/i.test(row.LiabilityParticular);
+                              const canDrillAsset = row.AssetParticular && !/^total\s*(liabilities|assets)?$/i.test(row.AssetParticular);
+
+                              // Traditional group headers/totals have NetAmount but LAmount is null
+                              const isLiabGroup = row.LNetAmount !== null && row.LAmount === null;
+                              const isAssetGroup = row.ANetAmount !== null && row.AAmount === null;
+                              const isTotal = row.LiabilityParticular === "Total Liabilities";
+
                               return (
-                                <tr
-                                  key={idx}
-                                  onDoubleClick={(e) => {
-                                    const cell = (e.target as HTMLElement).closest("td");
-                                    if (!cell) return;
-                                    const colIdx = cell.cellIndex;
-                                    if (colIdx === 0 && canDrillLiab) drillDown(row.liabilitiesParticular);
-                                    else if (colIdx === 2 && canDrillAsset) drillDown(row.assetsParticular);
-                                  }}
-                                  style={{ cursor: canDrillLiab || canDrillAsset ? "pointer" : "default" }}
-                                  title={canDrillLiab || canDrillAsset ? "Double-click for Group Ledger Summary" : undefined}
-                                >
-                                  <td>{row.liabilitiesParticular || ""}</td>
-                                  <td className="text-end">{row.liabilitiesAmount || ""}</td>
-                                  <td>{row.assetsParticular || ""}</td>
-                                  <td className="text-end">{row.assetsAmount || ""}</td>
+                                <tr key={idx} className={isTotal ? "table-secondary fw-bold" : ""}>
+                                  <td
+                                    className={isTotal || isLiabGroup ? "fw-bold" : "ps-4 text-muted"}
+                                    onDoubleClick={() => canDrillLiab && drillDown(row.LiabilityParticular)}
+                                    style={{ cursor: canDrillLiab ? "pointer" : "default" }}
+                                  >
+                                    {row.LiabilityParticular || ""}
+                                  </td>
+                                  <td className="text-end">{formatCurrency(row.LAmount)}</td>
+                                  <td className={`text-end ${isTotal || isLiabGroup ? "fw-bold text-dark" : ""}`}>
+                                    {formatCurrency(row.LNetAmount)}
+                                  </td>
+                                  <td
+                                    className={isTotal || isAssetGroup ? "fw-bold" : "ps-4 text-muted"}
+                                    onDoubleClick={() => canDrillAsset && drillDown(row.AssetParticular)}
+                                    style={{ cursor: canDrillAsset ? "pointer" : "default" }}
+                                  >
+                                    {row.AssetParticular || ""}
+                                  </td>
+                                  <td className="text-end">{formatCurrency(row.AAmount)}</td>
+                                  <td className={`text-end ${isTotal || isAssetGroup ? "fw-bold text-dark" : ""}`}>
+                                    {formatCurrency(row.ANetAmount)}
+                                  </td>
                                 </tr>
                               );
                             })}
-                            {reportRows.length === 0 && (
-                              <tr>
-                                <td colSpan={4} className="text-center text-muted py-4">
-                                  No data
-                                </td>
-                              </tr>
-                            )}
-                          </>
-                        )}
-                      </tbody>
+                          </tbody>
+                        </>
+                      )}
+
+                      {/* Format 2: Summarized Traditional */}
+                      {isDetailed === 2 && (
+                        <>
+                          <thead className="table-light sticky-top">
+                            <tr>
+                              <th>Liabilities</th>
+                              <th className="text-end" style={{ width: "140px" }}>Amount</th>
+                              <th>Assets</th>
+                              <th className="text-end" style={{ width: "140px" }}>Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {reportData.map((row, idx) => {
+                              const isLiabTotal = /^total/i.test(row.LiabilityParticular || "");
+                              const isAssetTotal = /^total/i.test(row.AssetParticular || "");
+                              const canDrillLiab = row.LiabilityParticular && !isLiabTotal;
+                              const canDrillAsset = row.AssetParticular && !isAssetTotal;
+
+                              return (
+                                <tr key={idx} className={isLiabTotal || isAssetTotal ? "table-secondary fw-bold" : ""}>
+                                  <td
+                                    onDoubleClick={() => canDrillLiab && drillDown(row.LiabilityParticular)}
+                                    style={{ cursor: canDrillLiab ? "pointer" : "default" }}
+                                    className={isLiabTotal ? "fw-bold" : ""}
+                                  >
+                                    {row.LiabilityParticular || ""}
+                                  </td>
+                                  <td className="text-end">{formatCurrency(row.LAmount)}</td>
+                                  <td
+                                    onDoubleClick={() => canDrillAsset && drillDown(row.AssetParticular)}
+                                    style={{ cursor: canDrillAsset ? "pointer" : "default" }}
+                                    className={isAssetTotal ? "fw-bold" : ""}
+                                  >
+                                    {row.AssetParticular || ""}
+                                  </td>
+                                  <td className="text-end">{formatCurrency(row.AAmount)}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </>
+                      )}
+
+                      {/* Format 3: Vertical / Single Column */}
+                      {isDetailed === 3 && (
+                        <>
+                          <thead className="table-light sticky-top">
+                            <tr>
+                              <th>Particulars</th>
+                              <th className="text-end" style={{ width: "160px" }}>Amount</th>
+                              <th className="text-end" style={{ width: "160px" }}>Net Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {reportData.map((row, idx) => {
+                              const upperPart = (row.Particular || "").toUpperCase().trim();
+                              const isHeader = upperPart === "ASSETS" || upperPart === "LIABILITIES";
+                              const isTotalRow = upperPart.includes("TOTAL") || upperPart.includes("LIABILITIES TOTAL");
+                              const canDrill = row.Particular && !isHeader && !isTotalRow;
+
+                              return (
+                                <tr
+                                  key={idx}
+                                  className={isHeader ? "table-light fw-bold text-uppercase" : isTotalRow ? "table-secondary fw-bold" : ""}
+                                >
+                                  <td
+                                    onDoubleClick={() => canDrill && drillDown(row.Particular)}
+                                    style={{ cursor: canDrill ? "pointer" : "default" }}
+                                    className={isHeader || isTotalRow ? "fw-bold" : "ps-4"}
+                                  >
+                                    {row.Particular || ""}
+                                  </td>
+                                  <td className="text-end">{formatCurrency(row.Amount)}</td>
+                                  <td className="text-end fw-bold">{formatCurrency(row.NetAmount)}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </>
+                      )}
                     </Table>
-                  </div>
+                  ) : (
+                    <div className="text-center p-4 text-muted">
+                      No Balance Sheet data available.
+                    </div>
+                  )}
+                </div>
               </CardBody>
               <CardFooter className="text-end">
                 <Btn color="success" type="button" className="me-2" onClick={handlePrint}>
@@ -288,6 +392,7 @@ const BalanceSheetTraditional: React.FC = () => {
         </Row>
       </Container>
 
+      {/* Print View Layout */}
       <div className="bs-trad-print">
         <div style={{ textAlign: "center", borderBottom: "2px solid #333", paddingBottom: "10px", marginBottom: "12px" }}>
           {printCompanyName && <h2 style={{ margin: "0 0 4px", fontWeight: "bold" }}>{printCompanyName}</h2>}
@@ -295,26 +400,97 @@ const BalanceSheetTraditional: React.FC = () => {
           <h3 style={{ margin: "0 0 4px" }}>Balance Sheet</h3>
           <p style={{ margin: 0, fontSize: "13px" }}>As On: {formatDateForDisplay(toDate)}</p>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th style={{ textAlign: "left" }}>Liabilities</th>
-              <th style={{ textAlign: "right" }}>Amount</th>
-              <th style={{ textAlign: "left" }}>Assets</th>
-              <th style={{ textAlign: "right" }}>Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {reportRows.map((row, idx) => (
-              <tr key={idx}>
-                <td>{row.liabilitiesParticular || ""}</td>
-                <td style={{ textAlign: "right" }}>{row.liabilitiesAmount || ""}</td>
-                <td>{row.assetsParticular || ""}</td>
-                <td style={{ textAlign: "right" }}>{row.assetsAmount || ""}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+        {reportData.length > 0 && (
+          <>
+            {isDetailed === 1 && (
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left" }}>Liabilities</th>
+                    <th style={{ textAlign: "right" }}>Amount</th>
+                    <th style={{ textAlign: "right" }}>Net Amount</th>
+                    <th style={{ textAlign: "left" }}>Assets</th>
+                    <th style={{ textAlign: "right" }}>Amount</th>
+                    <th style={{ textAlign: "right" }}>Net Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.map((row, idx) => {
+                    const isLiabGroup = row.LNetAmount !== null && row.LAmount === null;
+                    const isAssetGroup = row.ANetAmount !== null && row.AAmount === null;
+                    const isTotal = row.LiabilityParticular === "Total Liabilities";
+
+                    return (
+                      <tr key={idx} style={{ fontWeight: isTotal || isLiabGroup || isAssetGroup ? "bold" : "normal", background: isTotal ? "#e9ecef" : "transparent" }}>
+                        <td style={{ paddingLeft: isTotal || isLiabGroup ? "8px" : "20px" }}>{row.LiabilityParticular || ""}</td>
+                        <td style={{ textAlign: "right" }}>{formatCurrency(row.LAmount)}</td>
+                        <td style={{ textAlign: "right" }}>{formatCurrency(row.LNetAmount)}</td>
+                        <td style={{ paddingLeft: isTotal || isAssetGroup ? "8px" : "20px" }}>{row.AssetParticular || ""}</td>
+                        <td style={{ textAlign: "right" }}>{formatCurrency(row.AAmount)}</td>
+                        <td style={{ textAlign: "right" }}>{formatCurrency(row.ANetAmount)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+
+            {isDetailed === 2 && (
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left" }}>Liabilities</th>
+                    <th style={{ textAlign: "right" }}>Amount</th>
+                    <th style={{ textAlign: "left" }}>Assets</th>
+                    <th style={{ textAlign: "right" }}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.map((row, idx) => {
+                    const isLiabTotal = /^total/i.test(row.LiabilityParticular || "");
+                    const isAssetTotal = /^total/i.test(row.AssetParticular || "");
+                    return (
+                      <tr key={idx} style={{ fontWeight: isLiabTotal || isAssetTotal ? "bold" : "normal", background: isLiabTotal || isAssetTotal ? "#e9ecef" : "transparent" }}>
+                        <td>{row.LiabilityParticular || ""}</td>
+                        <td style={{ textAlign: "right" }}>{formatCurrency(row.LAmount)}</td>
+                        <td>{row.AssetParticular || ""}</td>
+                        <td style={{ textAlign: "right" }}>{formatCurrency(row.AAmount)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+
+            {isDetailed === 3 && (
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left" }}>Particulars</th>
+                    <th style={{ textAlign: "right" }}>Amount</th>
+                    <th style={{ textAlign: "right" }}>Net Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.map((row, idx) => {
+                    const upperPart = (row.Particular || "").toUpperCase().trim();
+                    const isHeader = upperPart === "ASSETS" || upperPart === "LIABILITIES";
+                    const isTotalRow = upperPart.includes("TOTAL") || upperPart.includes("LIABILITIES TOTAL");
+
+                    return (
+                      <tr key={idx} style={{ fontWeight: isHeader || isTotalRow ? "bold" : "normal", background: isTotalRow ? "#e9ecef" : "transparent" }}>
+                        <td style={{ paddingLeft: isHeader || isTotalRow ? "8px" : "20px" }}>{row.Particular || ""}</td>
+                        <td style={{ textAlign: "right" }}>{formatCurrency(row.Amount)}</td>
+                        <td style={{ textAlign: "right", fontWeight: "bold" }}>{formatCurrency(row.NetAmount)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

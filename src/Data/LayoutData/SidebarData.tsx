@@ -298,7 +298,7 @@ Items:[
       // { id: 1, title: "User Rights", path: `${process.env.PUBLIC_URL}/userRights`, icon: "Shield", type: "link", bookmark: true },
       { id: 2, title: "Global Options", path: `${process.env.PUBLIC_URL}/globalOptions`, icon: "Settings", type: "link", bookmark: true },
       { id: 3, title: "Permission Matrixs", path: `${process.env.PUBLIC_URL}/permissionMetrixs`, icon: "Settings", type: "link", bookmark: true },
-    ],
+    ],  
   },
   /*
   {

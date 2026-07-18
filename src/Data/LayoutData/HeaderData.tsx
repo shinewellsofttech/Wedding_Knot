@@ -1,4 +1,6 @@
 import { profilesMessageType } from "../../Types/Layout/HeaderType";
+import { AadharNumber } from "../../utils/Constant";
+
 
 export const notificationData = [
     {
@@ -20,7 +22,6 @@ export const notificationData = [
         color:""
     }
 ]
-
 
 export const messageData = [
     {
