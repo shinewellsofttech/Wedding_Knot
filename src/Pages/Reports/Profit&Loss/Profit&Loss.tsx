@@ -42,7 +42,7 @@ const canDrillGroup = (name: string | undefined) => {
 const isGrossProfitOrLossCd = (r: TradingPLRow) => {
   const dr = (r.DrParticular || "").trim();
   const cr = (r.CrParticular || "").trim();
-  return /Gross\s*Profit\s*c\/d/i.test(dr) || /Gross\s*Loss\s*c\/d/i.test(dr) || /Gross\s*Profit\s*c\/d/i.test(cr) || /Gross\s*Loss\s*c\/d/i.test(cr);
+  return /Gross\s*(Profit|Loss)/i.test(dr) || /Gross\s*(Profit|Loss)/i.test(cr);
 };
 
 const ProfitAndLoss: React.FC = () => {

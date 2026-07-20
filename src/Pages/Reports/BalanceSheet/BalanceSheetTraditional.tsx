@@ -71,10 +71,20 @@ const BalanceSheetTraditional: React.FC = () => {
   // IsDetailed state (1 = Detailed Traditional, 2 = Summarized Traditional, 3 = Vertical / Single Column)
   const [isDetailed, setIsDetailed] = useState<number>(2);
 
+  const calculateFinancialYearStart = (dateStr: string) => {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    const fyStart = m >= 4 ? y : y - 1;
+    return `${fyStart}-04-01`;
+  };
+
   const drillDown = (particular: string | null | undefined) => {
     if (!particular || particular.trim() === "" || /^total\s*(liabilities|assets)?$/i.test(particular.trim())) return;
+    const fyFromDate = calculateFinancialYearStart(toDate);
     navigate(`${process.env.PUBLIC_URL}/groupLedgerSummary`, {
-      state: { ledgerGroupName: particular.trim(), fromDate: toDate, toDate },
+      state: { ledgerGroupName: particular.trim(), fromDate: fyFromDate, toDate },
     });
   };
 

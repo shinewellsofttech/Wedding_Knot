@@ -90,6 +90,7 @@ const TrialBalance: React.FC = () => {
       const apiURL = `GetTrialBalance/${userId}/${userToken}`;
 
       const formData = new FormData();
+      formData.append("F_CompanyMaster", String(authUser?.F_CompanyMaster ?? authUser?.CompanyId ?? authUser?.F_Company ?? "0"));
       formData.append("FromDate", formatDateForAPI(fromDate));
       formData.append("ToDate", formatDateForAPI(toDate));
       formData.append("IsSummrized", isSummrized ? "true" : "false");
