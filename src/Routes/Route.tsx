@@ -78,6 +78,8 @@ import PurchaseReturn from "../Pages/Inventory/PurchaseReturn/PurchaseReturn";
 import AddEdit_MaterialMaster from "../Pages/Masters/AddEdit_MaterialMaster";
 import PageList_MaterialMaster from "../Pages/Masters/PageList_MaterialMaster";
 import AddEdit_CategoryMaster from "../Pages/Masters/AddEdit_CategoryMaster";
+import AddEdit_BarcodeTemplate from "../Pages/Masters/AddEdit_BarcodeTemplate";
+import PageList_BarcodeTemplate from "../Pages/Masters/PageList_BarcodeTemplate";
 import PageList_CategoryMaster from "../Pages/Masters/PageList_CategoryMaster";
 import Dashboard from "../Pages/Dashboard/Dashboard";
 import SalesReturn from "../Pages/Inventory/SalesReturn/SalesReturn";
@@ -112,6 +114,8 @@ export const routes = [
   { path: `${process.env.PUBLIC_URL}/categoryMaster`, Component: <PageList_CategoryMaster /> },
   { path: `${process.env.PUBLIC_URL}/itemMaster`, Component: <PageList_ItemMaster /> },
   { path: `${process.env.PUBLIC_URL}/barcodePrintWizard`, Component: <BarcodePrintWizard /> },
+  { path: `${process.env.PUBLIC_URL}/barcodeTemplate`, Component: <PageList_BarcodeTemplate /> },
+  { path: `${process.env.PUBLIC_URL}/addEditBarcodeTemplate`, Component: <AddEdit_BarcodeTemplate /> },
     { path: `${process.env.PUBLIC_URL}/addEditUserMaster`, Component: <AddEdit_UserMaster /> },
   { path: `${process.env.PUBLIC_URL}/userMaster`, Component: <PageList_UserMaster /> },
     { path: `${process.env.PUBLIC_URL}/taxGroupMaster`, Component: <PageList_GSTGroup /> },

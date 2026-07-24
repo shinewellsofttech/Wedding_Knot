@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import Barcode from "react-barcode";
 import { toast } from "react-toastify";
+import { API_WEB_URLS } from "../../constants/constAPI";
 
 interface Variant {
   Id: number | string;
@@ -13,6 +14,7 @@ interface Item {
   ItemName: string;
   DesignDetails: Variant[] | string;
   firmName?: string;
+  HSNCode?: string;
 }
 interface PaperSize {
   name: string; widthMm: number; heightMm: number; widthIn: number; heightIn: number;
@@ -23,7 +25,280 @@ interface PrinterInfo {
   defaultDpi: number; isLandscape: boolean;
 }
 
+interface Element {
+  id: string;
+  type: "text" | "barcode" | "logo" | "line";
+  value: string;
+  x: number; // mm
+  y: number; // mm
+  w: number; // mm
+  h: number; // mm
+  fontSize: number; // 1-5 for text font
+  fontWeight: "normal" | "bold";
+  rotation: 0 | 90 | 180 | 270;
+  alignment: 1 | 2 | 3; // 1=left, 2=center, 3=right
+  barcodeScale: number; // narrow bar width
+  showText: boolean; // show human readable barcode text
+  logoType?: "hallmark" | "diamond" | "ring" | "tag" | "box";
+}
+
+interface Template {
+  id: string;
+  name: string;
+  labelW: number;
+  labelH: number;
+  columns: number;
+  colGap: number;
+  rowGap: number;
+  marginT: number;
+  marginL: number;
+  elements: Element[];
+}
+
 const AGENT = "http://127.0.0.1:9187";
+
+// SVG Icons
+const HallmarkIcon = () => (
+  <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%" }}>
+    <polygon points="50,10 90,80 10,80" fill="none" stroke="#e11d48" strokeWidth="6" />
+    <circle cx="50" cy="55" r="16" fill="none" stroke="#e11d48" strokeWidth="6" />
+    <text x="50" y="59" fontSize="10" fontWeight="bold" textAnchor="middle" fill="#e11d48" fontFamily="sans-serif">916</text>
+  </svg>
+);
+
+const DiamondIcon = () => (
+  <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%" }}>
+    <polygon points="50,15 80,45 50,85 20,45" fill="none" stroke="#0ea5e9" strokeWidth="6" />
+    <line x1="20" y1="45" x2="80" y2="45" stroke="#0ea5e9" strokeWidth="4" />
+    <line x1="50" y1="15" x2="50" y2="85" stroke="#0ea5e9" strokeWidth="4" />
+  </svg>
+);
+
+const RingIcon = () => (
+  <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%" }}>
+    <circle cx="50" cy="60" r="25" fill="none" stroke="#d97706" strokeWidth="6" />
+    <polygon points="50,20 62,35 50,50 38,35" fill="#d97706" />
+  </svg>
+);
+
+const TagIcon = () => (
+  <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%" }}>
+    <path d="M20,20 L60,20 L80,50 L40,80 L20,80 Z" fill="none" stroke="#4f46e5" strokeWidth="6" />
+    <circle cx="35" cy="35" r="6" fill="#4f46e5" />
+  </svg>
+);
+
+const BoxIcon = () => (
+  <svg viewBox="0 0 100 100" style={{ width: "100%", height: "100%" }}>
+    <rect x="20" y="25" width="60" height="50" rx="5" fill="none" stroke="#16a34a" strokeWidth="6" />
+    <line x1="20" y1="50" x2="80" y2="50" stroke="#16a34a" strokeWidth="4" />
+    <line x1="50" y1="25" x2="50" y2="75" stroke="#16a34a" strokeWidth="4" />
+  </svg>
+);
+
+const DEFAULT_TEMPLATES: Template[] = [
+  {
+    id: "std_50_25_double",
+    name: "Standard Double Column (50x25mm)",
+    labelW: 102,
+    labelH: 25,
+    columns: 2,
+    colGap: 2,
+    rowGap: 2,
+    marginT: 1.5,
+    marginL: 2,
+    elements: [
+      { id: "1", type: "text", value: "{{FirmName}}", x: 2, y: 1.5, w: 46, h: 4, fontSize: 3, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 1.5, showText: true },
+      { id: "2", type: "text", value: "{{ItemName}}", x: 2, y: 6, w: 46, h: 4, fontSize: 2, fontWeight: "normal", rotation: 0, alignment: 1, barcodeScale: 1.5, showText: true },
+      { id: "3", type: "barcode", value: "{{Barcode}}", x: 6, y: 10.5, w: 38, h: 8, fontSize: 2, fontWeight: "normal", rotation: 0, alignment: 2, barcodeScale: 1.3, showText: true },
+      { id: "4", type: "text", value: "MRP: ₹{{SalePrice}}", x: 2, y: 20.5, w: 46, h: 3, fontSize: 2, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 1.5, showText: true }
+    ]
+  },
+  {
+    id: "std_50_25_single",
+    name: "Standard Single Column (50x25mm)",
+    labelW: 50,
+    labelH: 25,
+    columns: 1,
+    colGap: 0,
+    rowGap: 2,
+    marginT: 1.5,
+    marginL: 2,
+    elements: [
+      { id: "1", type: "text", value: "{{FirmName}}", x: 2, y: 1.5, w: 46, h: 4, fontSize: 3, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 1.5, showText: true },
+      { id: "2", type: "text", value: "{{ItemName}}", x: 2, y: 6, w: 46, h: 4, fontSize: 2, fontWeight: "normal", rotation: 0, alignment: 1, barcodeScale: 1.5, showText: true },
+      { id: "3", type: "barcode", value: "{{Barcode}}", x: 6, y: 10.5, w: 38, h: 8, fontSize: 2, fontWeight: "normal", rotation: 0, alignment: 2, barcodeScale: 1.3, showText: true },
+      { id: "4", type: "text", value: "MRP: ₹{{SalePrice}}", x: 2, y: 20.5, w: 46, h: 3, fontSize: 2, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 1.5, showText: true }
+    ]
+  },
+  {
+    id: "std_triple",
+    name: "Standard Triple Column (33x25mm)",
+    labelW: 105,
+    labelH: 25,
+    columns: 3,
+    colGap: 2,
+    rowGap: 2,
+    marginT: 1.5,
+    marginL: 1.5,
+    elements: [
+      { id: "t1", type: "text", value: "{{FirmName}}", x: 1, y: 1.5, w: 31, h: 4, fontSize: 1, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 0.9, showText: true },
+      { id: "t2", type: "text", value: "{{ItemName}}", x: 1, y: 6, w: 31, h: 4, fontSize: 1, fontWeight: "normal", rotation: 0, alignment: 1, barcodeScale: 0.9, showText: true },
+      { id: "t3", type: "barcode", value: "{{Barcode}}", x: 2, y: 10.5, w: 29, h: 8, fontSize: 1, fontWeight: "normal", rotation: 0, alignment: 2, barcodeScale: 0.9, showText: true },
+      { id: "t4", type: "text", value: "MRP: ₹{{SalePrice}}", x: 1, y: 20.5, w: 31, h: 3, fontSize: 1, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 0.9, showText: true }
+    ]
+  },
+  {
+    id: "jewelry_dumbbell",
+    name: "Jewelry Dumbbell Tag (76x25mm)",
+    labelW: 76,
+    labelH: 25,
+    columns: 1,
+    colGap: 0,
+    rowGap: 3,
+    marginT: 2,
+    marginL: 2,
+    elements: [
+      { id: "j1", type: "text", value: "{{FirmName}}", x: 2, y: 2, w: 30, h: 4, fontSize: 3, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 1.2, showText: true },
+      { id: "j2", type: "barcode", value: "{{Barcode}}", x: 2, y: 7, w: 30, h: 10, fontSize: 2, fontWeight: "normal", rotation: 0, alignment: 2, barcodeScale: 1.1, showText: true },
+      { id: "j3", type: "text", value: "{{ItemName}}", x: 2, y: 19, w: 30, h: 4, fontSize: 2, fontWeight: "normal", rotation: 0, alignment: 1, barcodeScale: 1.2, showText: true },
+      { id: "j4", type: "text", value: "MRP: ₹{{SalePrice}}", x: 44, y: 4, w: 30, h: 5, fontSize: 3, fontWeight: "bold", rotation: 180, alignment: 2, barcodeScale: 1.2, showText: true },
+      { id: "j5", type: "text", value: "Size: {{SizeName}}", x: 44, y: 14, w: 30, h: 4, fontSize: 2, fontWeight: "normal", rotation: 180, alignment: 2, barcodeScale: 1.2, showText: true }
+    ]
+  },
+  {
+    id: "jewelry_small",
+    name: "Small Jewelry Dumbbell Tag (50x12mm)",
+    labelW: 50,
+    labelH: 12,
+    columns: 1,
+    colGap: 0,
+    rowGap: 2,
+    marginT: 1,
+    marginL: 1,
+    elements: [
+      { id: "js1", type: "barcode", value: "{{Barcode}}", x: 1, y: 2, w: 19, h: 5, fontSize: 1, fontWeight: "normal", rotation: 0, alignment: 2, barcodeScale: 0.8, showText: false },
+      { id: "js2", type: "text", value: "{{ItemName}}", x: 1, y: 7.5, w: 19, h: 3, fontSize: 1, fontWeight: "normal", rotation: 0, alignment: 1, barcodeScale: 0.8, showText: true },
+      { id: "js3", type: "text", value: "₹{{SalePrice}}", x: 30, y: 2, w: 19, h: 4, fontSize: 1, fontWeight: "bold", rotation: 180, alignment: 2, barcodeScale: 0.8, showText: true },
+      { id: "js4", type: "text", value: "S:{{SizeName}}", x: 30, y: 7, w: 19, h: 3, fontSize: 1, fontWeight: "normal", rotation: 180, alignment: 2, barcodeScale: 0.8, showText: true }
+    ]
+  },
+  {
+    id: "apparel",
+    name: "Apparel Price Tag (50x75mm)",
+    labelW: 50,
+    labelH: 75,
+    columns: 1,
+    colGap: 0,
+    rowGap: 3,
+    marginT: 3,
+    marginL: 3,
+    elements: [
+      { id: "ap1", type: "text", value: "{{FirmName}}", x: 5, y: 3, w: 40, h: 6, fontSize: 4, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 1.5, showText: true },
+      { id: "ap2", type: "text", value: "{{ItemName}}", x: 5, y: 11, w: 40, h: 5, fontSize: 3, fontWeight: "normal", rotation: 0, alignment: 2, barcodeScale: 1.5, showText: true },
+      { id: "ap3", type: "text", value: "Size: {{SizeName}}", x: 5, y: 18, w: 40, h: 4, fontSize: 2, fontWeight: "normal", rotation: 0, alignment: 1, barcodeScale: 1.5, showText: true },
+      { id: "ap4", type: "text", value: "HSN: {{HSNCode}}", x: 5, y: 23, w: 40, h: 4, fontSize: 2, fontWeight: "normal", rotation: 0, alignment: 1, barcodeScale: 1.5, showText: true },
+      { id: "ap5", type: "line", value: "", x: 5, y: 29, w: 40, h: 1, fontSize: 2, fontWeight: "normal", rotation: 0, alignment: 1, barcodeScale: 1.5, showText: true },
+      { id: "ap6", type: "barcode", value: "{{Barcode}}", x: 5, y: 33, w: 40, h: 18, fontSize: 2, fontWeight: "normal", rotation: 0, alignment: 2, barcodeScale: 1.5, showText: true },
+      { id: "ap7", type: "line", value: "", x: 5, y: 54, w: 40, h: 1, fontSize: 2, fontWeight: "normal", rotation: 0, alignment: 1, barcodeScale: 1.5, showText: true },
+      { id: "ap8", type: "text", value: "MRP: ₹{{SalePrice}}", x: 5, y: 58, w: 40, h: 6, fontSize: 4, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 1.5, showText: true },
+      { id: "ap9", type: "text", value: "THANK YOU FOR SHOPPING", x: 5, y: 66, w: 40, h: 4, fontSize: 1, fontWeight: "normal", rotation: 0, alignment: 2, barcodeScale: 1.5, showText: true }
+    ]
+  },
+  {
+    id: "warehouse",
+    name: "Warehouse Logistics Label (100x100mm)",
+    labelW: 100,
+    labelH: 100,
+    columns: 1,
+    colGap: 0,
+    rowGap: 4,
+    marginT: 4,
+    marginL: 4,
+    elements: [
+      { id: "wh1", type: "text", value: "LOGISTICS / STORAGE LABEL", x: 5, y: 5, w: 90, h: 6, fontSize: 4, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 2, showText: true },
+      { id: "wh2", type: "line", value: "", x: 5, y: 13, w: 90, h: 2, fontSize: 2, fontWeight: "normal", rotation: 0, alignment: 1, barcodeScale: 2, showText: true },
+      { id: "wh3", type: "text", value: "{{ItemName}}", x: 5, y: 18, w: 90, h: 8, fontSize: 4, fontWeight: "bold", rotation: 0, alignment: 1, barcodeScale: 2, showText: true },
+      { id: "wh4", type: "text", value: "VARIANT: {{SizeName}}", x: 5, y: 28, w: 90, h: 6, fontSize: 3, fontWeight: "normal", rotation: 0, alignment: 1, barcodeScale: 2, showText: true },
+      { id: "wh5", type: "text", value: "HSN CODE: {{HSNCode}}", x: 5, y: 36, w: 90, h: 6, fontSize: 3, fontWeight: "normal", rotation: 0, alignment: 1, barcodeScale: 2, showText: true },
+      { id: "wh6", type: "barcode", value: "{{Barcode}}", x: 10, y: 45, w: 80, h: 32, fontSize: 2, fontWeight: "normal", rotation: 0, alignment: 2, barcodeScale: 2, showText: true },
+      { id: "wh7", type: "line", value: "", x: 5, y: 80, w: 90, h: 2, fontSize: 2, fontWeight: "normal", rotation: 0, alignment: 1, barcodeScale: 2, showText: true },
+      { id: "wh8", type: "text", value: "MRP: ₹{{SalePrice}}", x: 5, y: 85, w: 90, h: 8, fontSize: 5, fontWeight: "bold", rotation: 0, alignment: 1, barcodeScale: 2, showText: true }
+    ]
+  },
+  {
+    id: "jewelry_asym",
+    name: "Asymmetrical Jewelry Tag (80x20mm)",
+    labelW: 80,
+    labelH: 20,
+    columns: 1,
+    colGap: 0,
+    rowGap: 3,
+    marginT: 1.5,
+    marginL: 2,
+    elements: [
+      { id: "ja1", type: "text", value: "{{FirmName}}", x: 2, y: 1.5, w: 26, h: 3.5, fontSize: 2, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 1.1, showText: true },
+      { id: "ja2", type: "barcode", value: "{{Barcode}}", x: 2, y: 5.5, w: 26, h: 8, fontSize: 1, fontWeight: "normal", rotation: 0, alignment: 2, barcodeScale: 1.0, showText: true },
+      { id: "ja3", type: "text", value: "{{ItemName}}", x: 2, y: 14.5, w: 26, h: 3.5, fontSize: 1, fontWeight: "normal", rotation: 0, alignment: 1, barcodeScale: 1.1, showText: true },
+      { id: "ja4", type: "text", value: "₹{{SalePrice}}", x: 52, y: 3, w: 26, h: 4, fontSize: 2, fontWeight: "bold", rotation: 180, alignment: 2, barcodeScale: 1.1, showText: true },
+      { id: "ja5", type: "text", value: "Size: {{SizeName}}", x: 52, y: 12, w: 26, h: 4, fontSize: 1, fontWeight: "normal", rotation: 180, alignment: 2, barcodeScale: 1.1, showText: true }
+    ]
+  },
+  {
+    id: "jewelry_81_12",
+    name: "Hallmark Jewelry Tag (81x12mm)",
+    labelW: 81,
+    labelH: 12,
+    columns: 1,
+    colGap: 0,
+    rowGap: 2.5,
+    marginT: 1,
+    marginL: 1.5,
+    elements: [
+      { id: "h81_1", type: "text", value: "{{FirmName}}", x: 2, y: 1, w: 23, h: 3, fontSize: 2, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 0.9, showText: true },
+      { id: "h81_2", type: "barcode", value: "{{Barcode}}", x: 2, y: 4.5, w: 23, h: 5.5, fontSize: 1, fontWeight: "normal", rotation: 0, alignment: 2, barcodeScale: 0.8, showText: false },
+      { id: "h81_3", type: "text", value: "{{ItemName}}", x: 2, y: 10.5, w: 23, h: 3, fontSize: 1, fontWeight: "normal", rotation: 0, alignment: 1, barcodeScale: 0.9, showText: true },
+      { id: "h81_4", type: "text", value: "₹{{SalePrice}}", x: 56, y: 1.5, w: 23, h: 3.5, fontSize: 2, fontWeight: "bold", rotation: 180, alignment: 2, barcodeScale: 0.9, showText: true },
+      { id: "h81_5", type: "text", value: "S:{{SizeName}}", x: 56, y: 6.5, w: 23, h: 3, fontSize: 1, fontWeight: "normal", rotation: 180, alignment: 2, barcodeScale: 0.9, showText: true }
+    ]
+  },
+  {
+    id: "jewelry_100_13",
+    name: "Hallmark Jewelry Tag (100x13mm)",
+    labelW: 100,
+    labelH: 13,
+    columns: 1,
+    colGap: 0,
+    rowGap: 3,
+    marginT: 1.5,
+    marginL: 2,
+    elements: [
+      { id: "h100_13_1", type: "text", value: "{{FirmName}}", x: 2, y: 1, w: 23.5, h: 3, fontSize: 2, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 0.9, showText: true },
+      { id: "h100_13_2", type: "barcode", value: "{{Barcode}}", x: 2, y: 4.5, w: 23.5, h: 5.5, fontSize: 1, fontWeight: "normal", rotation: 0, alignment: 2, barcodeScale: 0.8, showText: false },
+      { id: "h100_13_3", type: "text", value: "{{ItemName}}", x: 2, y: 10.5, w: 23.5, h: 3, fontSize: 1, fontWeight: "normal", rotation: 0, alignment: 1, barcodeScale: 0.9, showText: true },
+      { id: "h100_13_4", type: "text", value: "₹{{SalePrice}}", x: 74.5, y: 1.5, w: 23.5, h: 3.5, fontSize: 2, fontWeight: "bold", rotation: 180, alignment: 2, barcodeScale: 0.9, showText: true },
+      { id: "h100_13_5", type: "text", value: "S:{{SizeName}}", x: 74.5, y: 6.5, w: 23.5, h: 3, fontSize: 1, fontWeight: "normal", rotation: 180, alignment: 2, barcodeScale: 0.9, showText: true }
+    ]
+  },
+  {
+    id: "jewelry_100_15",
+    name: "Hallmark Jewelry Tag (100x15mm)",
+    labelW: 100,
+    labelH: 15,
+    columns: 1,
+    colGap: 0,
+    rowGap: 3.5,
+    marginT: 2,
+    marginL: 2.5,
+    elements: [
+      { id: "h100_15_1", type: "text", value: "{{FirmName}}", x: 2, y: 1.5, w: 30, h: 4, fontSize: 2, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 1.0, showText: true },
+      { id: "h100_15_2", type: "barcode", value: "{{Barcode}}", x: 2, y: 6, w: 30, h: 6.5, fontSize: 1, fontWeight: "normal", rotation: 0, alignment: 2, barcodeScale: 0.9, showText: false },
+      { id: "h100_15_3", type: "text", value: "{{ItemName}}", x: 2, y: 13, w: 30, h: 3.5, fontSize: 1, fontWeight: "normal", rotation: 0, alignment: 1, barcodeScale: 1.0, showText: true },
+      { id: "h100_15_4", type: "text", value: "₹{{SalePrice}}", x: 68, y: 2, w: 30, h: 4.5, fontSize: 2, fontWeight: "bold", rotation: 180, alignment: 2, barcodeScale: 1.0, showText: true },
+      { id: "h100_15_5", type: "text", value: "Size: {{SizeName}}", x: 68, y: 8, w: 30, h: 4, fontSize: 1, fontWeight: "normal", rotation: 180, alignment: 2, barcodeScale: 1.0, showText: true }
+    ]
+  }
+];
 
 function parseVariants(item: Item): Variant[] {
   try {
@@ -44,66 +319,138 @@ export default function BarcodePrintWizard() {
   // Step 2 - printer
   const [agentActive, setAgentActive] = useState(false);
   const [printers, setPrinters] = useState<string[]>([]);
-  const [printerName, setPrinterName] = useState("");
+  const [printerName, setPrinterName] = useState(() => {
+    return localStorage.getItem("barcodePrinterName") || "";
+  });
   const [printerInfo, setPrinterInfo] = useState<PrinterInfo | null>(null);
   const [selectedPaper, setSelectedPaper] = useState("");
   const [dpi, setDpi] = useState(203);
   const [loadingPrinters, setLoadingPrinters] = useState(false);
   const [loadingInfo, setLoadingInfo] = useState(false);
 
-  // Layout (mm)
+  // Template States
+  const [templates, setTemplates] = useState<Template[]>(() => {
+    const saved = localStorage.getItem("barcodeCustomTemplates");
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return DEFAULT_TEMPLATES;
+  });
+  const [selectedTemplateId, setSelectedTemplateId] = useState(() => {
+    return localStorage.getItem("barcodeSelectedTemplateId") || "std_50_25_double";
+  });
+  const [selectedElementId, setSelectedElementId] = useState<string>("");
+
+  // Layout Dimensions (mm)
   const [labelW, setLabelW] = useState(100);
   const [labelH, setLabelH] = useState(25);
   const [marginT, setMarginT] = useState(2);
   const [marginL, setMarginL] = useState(2);
-  const [bcH, setBcH] = useState(8);
-  const [firmName, setFirmName] = useState("FIRM NAME");
-  const [showFirm, setShowFirm] = useState(true);
-  const [showItem, setShowItem] = useState(true);
-  const [showCode, setShowCode] = useState(true);
-  const [printing, setPrinting] = useState(false);
   const [columns, setColumns] = useState(2);   // labels per row
   const [colGap, setColGap] = useState(2);     // gap between columns in mm
-  const [lineSpacing, setLineSpacing] = useState(1); // vertical gap between text elements (mm)
-  const [bcTextSize, setBcTextSize] = useState(1); // size multiplier for barcode text
+  const [rowGap, setRowGap] = useState(2);     // gap between rows in mm
+  const [elements, setElements] = useState<Element[]>([]);
+  
+  // Header firm name
+  const [firmName, setFirmName] = useState("FIRM NAME");
+  const [printing, setPrinting] = useState(false);
 
-  // Step 3 preview
   const previewRef = useRef<HTMLDivElement>(null);
-  const hasSavedSettings = useRef(false);
+  const isFirstLoad = useRef(true);
 
-  // Load saved settings
+  // Load custom templates from Database
   useEffect(() => {
-    const saved = localStorage.getItem("barcodeWizardSettings");
-    if (saved) {
+    const loadDbTemplates = async () => {
       try {
-        const s = JSON.parse(saved);
-        if (s.columns) setColumns(s.columns);
-        if (s.colGap !== undefined) setColGap(s.colGap);
-        if (s.lineSpacing !== undefined) setLineSpacing(s.lineSpacing);
-        if (s.bcTextSize !== undefined) setBcTextSize(s.bcTextSize);
-        if (s.labelW !== undefined) setLabelW(s.labelW);
-        if (s.labelH !== undefined) setLabelH(s.labelH);
-        if (s.marginT !== undefined) setMarginT(s.marginT);
-        if (s.marginL !== undefined) setMarginL(s.marginL);
-        if (s.bcH !== undefined) setBcH(s.bcH);
-        hasSavedSettings.current = true;
-      } catch (e) {}
-    }
+        const url = `${API_WEB_URLS.BASE}Masters/0/token/BarcodeTemplateMaster/Id/0`;
+        const r = await fetch(url);
+        if (r.ok) {
+          const d = await r.json();
+          const rawList = d?.data?.DataList || d?.response || [];
+          if (Array.isArray(rawList) && rawList.length > 0) {
+            const parsedList = rawList.map((item: any) => {
+              try {
+                const parsed = JSON.parse(item.Name);
+                return { ...parsed, id: String(item.Id), dbId: item.Id };
+              } catch (e) {
+                return null;
+              }
+            }).filter(Boolean) as Template[];
+            
+            setTemplates(prev => {
+              const customOnly = parsedList.filter(t => !DEFAULT_TEMPLATES.some(d => d.id === t.id));
+              return [...DEFAULT_TEMPLATES, ...customOnly];
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load database templates:", e);
+      }
+    };
+    loadDbTemplates();
   }, []);
 
-  // Save settings on change
+  // Load custom template details when selection changes
   useEffect(() => {
-    if (labelW > 0 && labelH > 0) {
-      const settings = {
-        columns, colGap, lineSpacing, bcTextSize, labelW, labelH, marginT, marginL, bcH
-      };
-      localStorage.setItem("barcodeWizardSettings", JSON.stringify(settings));
-      
-      // Save settings specifically keyed to this label size
-      const paperKey = `${labelW}x${labelH}`;
-      localStorage.setItem(`barcodeWizardSettings_${paperKey}`, JSON.stringify(settings));
+    const t = templates.find(temp => temp.id === selectedTemplateId) || templates[0];
+    if (t) {
+      setLabelW(t.labelW);
+      setLabelH(t.labelH);
+      setColumns(t.columns);
+      setColGap(t.colGap);
+      setRowGap(t.rowGap);
+      setMarginT(t.marginT);
+      setMarginL(t.marginL);
+      setElements(t.elements || []);
+      setSelectedElementId("");
+      localStorage.setItem("barcodeSelectedTemplateId", t.id);
     }
-  }, [columns, colGap, lineSpacing, bcTextSize, labelW, labelH, marginT, marginL, bcH]);
+  }, [selectedTemplateId, templates]);
+
+  // Save current template layout changes
+  useEffect(() => {
+    if (!selectedTemplateId) return;
+    setTemplates(prev => {
+      const updated = prev.map(t => {
+        if (t.id === selectedTemplateId) {
+          return {
+            ...t,
+            labelW,
+            labelH,
+            columns,
+            colGap,
+            rowGap,
+            marginT,
+            marginL,
+            elements
+          };
+        }
+        return t;
+      });
+      localStorage.setItem("barcodeCustomTemplates", JSON.stringify(updated));
+      return updated;
+    });
+  }, [selectedTemplateId, labelW, labelH, columns, colGap, rowGap, marginT, marginL, elements]);
+
+  // Save printer details on change
+  useEffect(() => {
+    if (printerName) {
+      localStorage.setItem("barcodePrinterName", printerName);
+    }
+  }, [printerName]);
+
+  useEffect(() => {
+    if (printerName && selectedPaper) {
+      localStorage.setItem(`barcodePrinterPaper_${printerName}`, selectedPaper);
+    }
+  }, [printerName, selectedPaper]);
+
+  // Save customized firm name
+  useEffect(() => {
+    if (firmName && firmName !== "FIRM NAME") {
+      localStorage.setItem("barcodeFirmName", firmName);
+    }
+  }, [firmName]);
 
   // Force white background + black text on body for this new-tab page
   useEffect(() => {
@@ -151,7 +498,8 @@ export default function BarcodePrintWizard() {
 
   useEffect(() => {
     const raw = sessionStorage.getItem("barcodePrintItem");
-    const fn = sessionStorage.getItem("barcodePrintFirmName") || "FIRM NAME";
+    const savedFirmName = localStorage.getItem("barcodeFirmName");
+    const fn = savedFirmName || sessionStorage.getItem("barcodePrintFirmName") || "FIRM NAME";
     setFirmName(fn);
     if (!raw) { toast.error("No item data found. Please go back and try again."); return; }
     const parsed: Item = JSON.parse(raw);
@@ -187,7 +535,10 @@ export default function BarcodePrintWizard() {
         const d = await r.json();
         const list: string[] = d.printers || [];
         setPrinters(list);
-        const def = d.defaultPrinter || list[0] || "";
+        const savedPrinter = localStorage.getItem("barcodePrinterName");
+        const def = savedPrinter && list.includes(savedPrinter)
+          ? savedPrinter
+          : (d.defaultPrinter || list[0] || "");
         setPrinterName(def);
         if (def) fetchPrinterInfo(def);
       }
@@ -206,10 +557,19 @@ export default function BarcodePrintWizard() {
         const d: PrinterInfo = await r.json();
         setPrinterInfo(d);
         setDpi(d.defaultDpi);
-        const def = d.paperSizes.find(p => p.name === d.defaultPaperName) || d.paperSizes[0];
+        const savedPaper = localStorage.getItem(`barcodePrinterPaper_${name}`);
+        const def = (savedPaper && d.paperSizes.find(p => p.name === savedPaper))
+          || d.paperSizes.find(p => p.name === d.defaultPaperName)
+          || d.paperSizes[0];
         if (def) { 
           setSelectedPaper(def.name); 
-          applyPaper(def, d.defaultDpi); 
+          const hasSaved = !!localStorage.getItem("barcodeCustomTemplates");
+          if (isFirstLoad.current && hasSaved) {
+            isFirstLoad.current = false;
+          } else {
+            applyPaper(def, d.defaultDpi);
+            isFirstLoad.current = false;
+          }
         }
       }
     } catch { }
@@ -217,159 +577,112 @@ export default function BarcodePrintWizard() {
   };
 
   const applyPaper = (p: PaperSize, dpiVal: number) => {
-    setLabelW(p.widthMm); setLabelH(p.heightMm); setDpi(dpiVal);
-    
-    // Try loading saved settings for this specific paper size
-    const paperKey = `${p.widthMm}x${p.heightMm}`;
-    const saved = localStorage.getItem(`barcodeWizardSettings_${paperKey}`);
-    if (saved) {
-      try {
-        const s = JSON.parse(saved);
-        if (s.columns) setColumns(s.columns);
-        if (s.colGap !== undefined) setColGap(s.colGap);
-        if (s.lineSpacing !== undefined) setLineSpacing(s.lineSpacing);
-        if (s.bcTextSize !== undefined) setBcTextSize(s.bcTextSize);
-        if (s.marginT !== undefined) setMarginT(s.marginT);
-        if (s.marginL !== undefined) setMarginL(s.marginL);
-        if (s.bcH !== undefined) setBcH(s.bcH);
-        return;
-      } catch (e) {}
-    }
-
-    // Default smart configuration for this paper size
-    setMarginT(Math.max(Math.round(p.heightMm * 0.03 * 10) / 10, 1.5));
-    setMarginL(Math.max(Math.round(p.widthMm * 0.03 * 10) / 10, 1.5));
-    
-    let defaultBcH = 12;
-    if (p.heightMm < 30) {
-      defaultBcH = 8;
-    } else if (p.heightMm < 60) {
-      defaultBcH = 12;
+    setDpi(dpiVal);
+    // Find matching template or resize current one
+    const matching = templates.find(t => t.labelW === p.widthMm && t.labelH === p.heightMm);
+    if (matching) {
+      setSelectedTemplateId(matching.id);
     } else {
-      defaultBcH = 25;
+      setLabelW(p.widthMm);
+      setLabelH(p.heightMm);
     }
-    setBcH(defaultBcH);
-    setLineSpacing(p.heightMm < 40 ? 1 : 2);
-    setColumns(p.widthMm > 70 ? 2 : 1);
   };
 
   // Build print queue
   const printQueue = variants.flatMap((d, i) => {
     const k = String(d.Id || i);
     if (!selected[k] || !d.Barcode || quantities[k] <= 0) return [];
-    return Array(quantities[k]).fill({ barcode: d.Barcode, name: d.SizeName || item?.ItemName || "", code: codes[k] || "" });
+    return Array(quantities[k]).fill({
+      barcode: d.Barcode,
+      itemName: item?.ItemName || "",
+      sizeName: d.SizeName || "Std",
+      salePrice: codes[k] || String(d.SalePrice || "0"),
+      hsnCode: item?.HSNCode || ""
+    });
   });
 
-  // Layout height helper computations
-  const dots = dpi === 300 ? 11.8 : 8;
-  const elementsCount = (showFirm ? 1 : 0) + (showItem ? 1 : 0) + 2 + (showCode ? 1 : 0); // +2 for Barcode graphic + Barcode text
-  const textH = (showFirm ? 28 : 0) + (showItem ? 22 : 0) + 20 + (showCode ? ({ 1: 12, 2: 20, 3: 22, 4: 32, 5: 48 }[bcTextSize] || 22) : 0); // +20 for Barcode text
-  const totalHdots = (marginT * dots) + textH + (bcH * dots) + (Math.max(0, elementsCount - 1) * (lineSpacing * dots));
-  
-  // A layout is overflowing the physical label if it exceeds labelH * dots
-  const isOverflowing = totalHdots > (labelH * dots);
-  
-  // Warning threshold: physical unprintable margin of typical thermal printers (3mm = 24 dots at 203dpi)
-  const isWarningOverflow = totalHdots > ((labelH * dots) - Math.round(3 * dots));
+  // Calculate overflow check
+  const isOverflowing = useMemo(() => {
+    const singleLabelW = labelW / columns;
+    return elements.some(el => {
+      // Rotate 90/270 flips dimensions
+      const checkW = (el.rotation === 90 || el.rotation === 270) ? el.h : el.w;
+      const checkH = (el.rotation === 90 || el.rotation === 270) ? el.w : el.h;
+      return el.x + checkW > singleLabelW || el.y + checkH > labelH;
+    });
+  }, [elements, labelW, labelH, columns]);
 
-  const autoFitLayout = () => {
-    let currentBcH = bcH;
-    let currentLineSpacing = lineSpacing;
-    let currentMarginT = marginT;
-
-    const calculateHeight = (bH: number, ls: number, mT: number) => {
-      const dotsVal = dpi === 300 ? 11.8 : 8;
-      const ec = (showFirm ? 1 : 0) + (showItem ? 1 : 0) + 2 + (showCode ? 1 : 0);
-      const tH = (showFirm ? 28 : 0) + (showItem ? 22 : 0) + 20 + (showCode ? ({ 1: 12, 2: 20, 3: 22, 4: 32, 5: 48 }[bcTextSize] || 22) : 0);
-      return (mT * dotsVal) + tH + (bH * dotsVal) + (Math.max(0, ec - 1) * (ls * dotsVal));
-    };
-
-    const targetHeight = (labelH * dots) - Math.round(3 * dots); // 3mm bottom safety margin
-
-    for (let step = 0; step < 30; step++) {
-      const h = calculateHeight(currentBcH, currentLineSpacing, currentMarginT);
-      if (h <= targetHeight) break;
-
-      // 1. First, reduce line spacing if it is > 0.5 mm
-      if (currentLineSpacing > 0.5) {
-        currentLineSpacing = Math.max(0.5, currentLineSpacing - 0.5);
-      }
-      // 2. Next, reduce top margin if it is > 1.0 mm
-      else if (currentMarginT > 1.0) {
-        currentMarginT = Math.max(1.0, currentMarginT - 0.5);
-      }
-      // 3. Finally, reduce barcode height
-      else if (currentBcH > 8) {
-        currentBcH = Math.max(8, currentBcH - 1);
-      }
-      else {
-        break;
-      }
-    }
-
-    setBcH(currentBcH);
-    setLineSpacing(currentLineSpacing);
-    setMarginT(currentMarginT);
-    toast.success(`Layout auto-adjusted! Barcode: ${currentBcH}mm, Line Spacing: ${currentLineSpacing}mm, Top Margin: ${currentMarginT}mm`);
+  // Interpolate dynamic template placeholders
+  const interpolate = (val: string, label: { barcode: string; itemName: string; sizeName: string; salePrice: string; hsnCode: string }) => {
+    let s = val || "";
+    s = s.replace(/\{\{FirmName\}\}/g, firmName || "");
+    s = s.replace(/\{\{ItemName\}\}/g, label.itemName || "");
+    s = s.replace(/\{\{SalePrice\}\}/g, label.salePrice || "0.00");
+    s = s.replace(/\{\{Barcode\}\}/g, label.barcode || "");
+    s = s.replace(/\{\{SizeName\}\}/g, label.sizeName || "Std");
+    s = s.replace(/\{\{HSNCode\}\}/g, label.hsnCode || "");
+    return s;
   };
 
-  // Build TSPL — labelW = total paper width, singleLabelW = per-column width
+  // Interpolate sample data for live visual designer preview
+  const interpolateSample = (val: string) => {
+    let s = val || "";
+    s = s.replace(/\{\{FirmName\}\}/g, firmName || "MY FIRM NAME");
+    s = s.replace(/\{\{ItemName\}\}/g, item?.ItemName || "JEWELLERY DIAMOND RING");
+    s = s.replace(/\{\{SalePrice\}\}/g, "45000");
+    s = s.replace(/\{\{Barcode\}\}/g, "89012345");
+    s = s.replace(/\{\{SizeName\}\}/g, "12 (16.5mm)");
+    s = s.replace(/\{\{HSNCode\}\}/g, "7113");
+    return s;
+  };
+
+  // Build TSPL command block matching absolute templates
   const buildTspl = () => {
     const dots = dpi === 300 ? 11.8 : 8;
-    // labelW IS the total paper/roll width (e.g. 4" roll = 101.6mm)
-    // Each individual label occupies: totalWidth / columns
     const singleLabelW = labelW / columns;
     let cmd = "";
 
     for (let i = 0; i < printQueue.length; i += columns) {
       const row = printQueue.slice(i, i + columns);
-      // SIZE = full paper width (unchanged)
-      cmd += `SIZE ${labelW} mm, ${labelH} mm\nGAP 2 mm, 0 mm\nDIRECTION 1\nCLS\n`;
+      cmd += `SIZE ${labelW} mm, ${labelH} mm\nGAP ${rowGap} mm, 0 mm\nDIRECTION 1\nCLS\n`;
 
       row.forEach((label: any, colIdx: number) => {
-        // X start of this column's label area
-        const colXmm = colIdx * singleLabelW + marginL;
-        const xOff = Math.round(colXmm * dots);
-        const xCenterMm = colIdx * singleLabelW + singleLabelW / 2;
-        const xCenter = Math.round(xCenterMm * dots);
-        let y = Math.round(marginT * dots);
-        const yGap = Math.round(lineSpacing * dots);
+        const colXmm = colIdx * singleLabelW;
 
-        if (showFirm) { cmd += `TEXT ${xCenter}, ${y}, "3", 0, 1, 1, 2, "${firmName}"\n`; y += 28 + yGap; }
-        if (showItem) { cmd += `TEXT ${xOff}, ${y}, "2", 0, 1, 1, "${label.name}"\n`; y += 22 + yGap; }
-        
-        const bh = Math.round(bcH * dots);
-        const barcodeY = y;
-        y += bh + yGap;
+        elements.forEach((el) => {
+          const val = interpolate(el.value, label);
+          const actualXmm = colXmm + el.x;
+          const actualYmm = el.y;
 
-        // Print Barcode Text explicitly below the graphic
-        const bcNumY = y;
-        y += 20 + yGap; // Font size 2 height
+          const xDots = Math.round(actualXmm * dots);
+          const yDots = Math.round(actualYmm * dots);
 
-        let bcTextY = 0;
-        if (showCode && label.code) {
-          bcTextY = y;
-          y += (22 * bcTextSize) + yGap;
-        }
-
-        // Print Text FIRST
-        cmd += `TEXT ${xCenter}, ${bcNumY}, "2", 0, 1, 1, 2, "${label.barcode}"\n`;
-
-        if (showCode && label.code) {
-          cmd += `TEXT ${xCenter}, ${bcTextY}, "${bcTextSize}", 0, 1, 1, 2, "${label.code}"\n`;
-        }
-
-        // Calculate centered X position for standard 1D barcode on the label column
-        const singleLabelWdots = singleLabelW * dots;
-        const bcStr = label.barcode ? String(label.barcode) : "";
-        const barcodeLength = bcStr.length;
-        const isAllDigits = /^\d+$/.test(bcStr);
-        const code128CharCount = isAllDigits ? Math.ceil(barcodeLength / 2) : barcodeLength;
-        const approxBarcodeW = (11 * code128CharCount + 35) * 2; // narrow bar width = 2 dots
-        const barcodeX = Math.max(Math.round(colIdx * singleLabelW * dots), Math.round(colIdx * singleLabelW * dots + (singleLabelWdots - approxBarcodeW) / 2));
-
-        // Print Barcode LAST
-        cmd += `BARCODE ${barcodeX}, ${barcodeY}, "128", ${bh}, 0, 0, 2, 2, "${label.barcode}"\n`;
+          if (el.type === "text") {
+            const font = String(el.fontSize || 2);
+            const rotation = el.rotation || 0;
+            const align = el.alignment || 1;
+            // TSPL TEXT command: TEXT x, y, "font", rotation, x_mul, y_mul, [alignment,] "content"
+            if (align > 1) {
+              cmd += `TEXT ${xDots}, ${yDots}, "${font}", ${rotation}, 1, 1, ${align}, "${val}"\n`;
+            } else {
+              cmd += `TEXT ${xDots}, ${yDots}, "${font}", ${rotation}, 1, 1, "${val}"\n`;
+            }
+          } else if (el.type === "barcode") {
+            const bh = Math.round(el.h * dots);
+            const rotation = el.rotation || 0;
+            const scale = el.barcodeScale || 2;
+            const showText = el.showText ? 1 : 0;
+            // TSPL BARCODE command: BARCODE x, y, "128", height, human_readable, rotation, narrow_bar, wide_bar, "code"
+            cmd += `BARCODE ${xDots}, ${yDots}, "128", ${bh}, ${showText}, ${rotation}, ${scale}, ${scale}, "${val}"\n`;
+          } else if (el.type === "line") {
+            const lwDots = Math.round(el.w * dots);
+            const lhDots = Math.round(el.h * dots);
+            // TSPL BAR command: BAR x, y, width, height
+            cmd += `BAR ${xDots}, ${yDots}, ${lwDots}, ${lhDots}\n`;
+          } else if (el.type === "logo") {
+            cmd += `; LOGO: ${el.logoType || "hallmark"} at ${xDots}, ${yDots}\n`;
+          }
+        });
       });
 
       cmd += `PRINT 1\n\n`;
@@ -383,7 +696,7 @@ export default function BarcodePrintWizard() {
     
     if (isOverflowing) {
       const confirmPrint = window.confirm(
-        `Warning: Your printed content (${Math.round(totalHdots / dots)}mm) is larger than the sticker height (${labelH}mm).\n\nThe barcode number and MRP at the bottom may get cut off on the physical print.\n\nDo you want to print anyway?`
+        `Warning: Some barcode elements in your template exceed label width or height bounds.\n\nDo you want to print anyway?`
       );
       if (!confirmPrint) return;
     }
@@ -403,7 +716,38 @@ export default function BarcodePrintWizard() {
     finally { setPrinting(false); }
   };
 
-  // ── STEP 1 UI ──────────────────────────────────────────────────────────────
+  // Canvas style positioning helper
+  const PX_PER_MM = 3.2;
+
+  const getElementStyle = (el: Element): React.CSSProperties => {
+    const isSel = selectedElementId === el.id;
+    return {
+      position: "absolute",
+      left: `${el.x * PX_PER_MM}px`,
+      top: `${el.y * PX_PER_MM}px`,
+      width: `${el.w * PX_PER_MM}px`,
+      height: `${el.h * PX_PER_MM}px`,
+      transform: `rotate(${el.rotation || 0}deg)`,
+      transformOrigin: "top left",
+      fontSize: el.type === "text" ? `${(el.fontSize || 2) * 4.5}px` : "12px",
+      fontWeight: el.fontWeight || "normal",
+      border: isSel ? "1.5px solid #0d6efd" : "1px dashed #ced4da",
+      boxSizing: "border-box",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: el.alignment === 2 ? "center" : el.alignment === 3 ? "flex-end" : "flex-start",
+      justifyContent: "center",
+      cursor: "pointer",
+      overflow: "hidden",
+      whiteSpace: "nowrap",
+      userSelect: "none",
+      background: isSel ? "rgba(13,110,253,0.05)" : "transparent",
+      color: "#212529",
+      lineHeight: 1
+    };
+  };
+
+  // ── STEP 1 UI: Select items & variant print quantities ──────────────────────────────
   const Step1 = () => (
     <div>
       <h5 className="fw-bold mb-1">Select Variants &amp; Quantities</h5>
@@ -415,7 +759,7 @@ export default function BarcodePrintWizard() {
               <th style={{ width: 40 }}><input type="checkbox" onChange={e => { const s: any = {}; variants.forEach((d, i) => { if (d.Barcode) s[String(d.Id || i)] = e.target.checked; }); setSelected(s); }} /></th>
               <th>Variant / Size</th>
               <th style={{ width: 120 }}>Barcode</th>
-              <th style={{ width: 180 }}>Code</th>
+              <th style={{ width: 150 }}>MRP / Price</th>
               <th style={{ width: 110 }}>Quantity</th>
             </tr>
           </thead>
@@ -425,13 +769,13 @@ export default function BarcodePrintWizard() {
               return (
                 <tr key={k} style={{ opacity: !d.Barcode ? 0.5 : 1, color: "#212529", backgroundColor: "#fff" }}>
                   <td className="text-center" style={{ color: "#212529" }}>
-                    <input type="checkbox" disabled={!d.Barcode} checked={!!selected[k]} onChange={e => setSelected(p => ({ ...p, [k]: e.target.checked }))} />
+                     <input type="checkbox" disabled={!d.Barcode} checked={!!selected[k]} onChange={e => setSelected(p => ({ ...p, [k]: e.target.checked }))} />
                   </td>
                   <td style={{ color: "#212529" }}><strong>{d.SizeName || `Variant ${i + 1}`}</strong></td>
                   <td style={{ color: "#212529" }}><small className="font-monospace">{d.Barcode || <span className="text-danger">No Barcode</span>}</small></td>
                   <td style={{ color: "#212529" }}>
-                    <input type="text" className="form-control form-control-sm" style={{ color: "#212529", backgroundColor: "#fff" }} value={codes[k] || ""}
-                      onChange={e => setCodes(p => ({ ...p, [k]: e.target.value }))} />
+                    <input type="text" className="form-control form-control-sm text-center" style={{ color: "#212529", backgroundColor: "#fff", maxWidth: 120 }} value={codes[k] || ""}
+                      onChange={e => setCodes(p => ({ ...p, [k]: e.target.value }))} placeholder={String(d.SalePrice || "0")} />
                   </td>
                   <td style={{ color: "#212529" }}>
                     <div className="d-flex align-items-center gap-1">
@@ -454,7 +798,7 @@ export default function BarcodePrintWizard() {
     </div>
   );
 
-  // ── STEP 2 UI ──────────────────────────────────────────────────────────────
+  // ── STEP 2 UI: Printer setup ──────────────────────────────────────────────
   const Step2 = () => (
     <div>
       <h5 className="fw-bold mb-1">Select Printer &amp; Paper Size</h5>
@@ -542,179 +886,469 @@ export default function BarcodePrintWizard() {
         </>
       )}
 
-      {/* Columns per row */}
+      {/* Firmware title customization */}
       <div className="border rounded p-3 bg-light mt-2">
-        <label className="fw-bold small mb-2 d-block">Label Content &amp; Layout</label>
-        <div className="d-flex gap-3 flex-wrap mb-2">
-          <label className="form-check-label"><input type="checkbox" className="form-check-input me-1" checked={showFirm} onChange={e => setShowFirm(e.target.checked)} />Firm Name</label>
-          <label className="form-check-label"><input type="checkbox" className="form-check-input me-1" checked={showItem} onChange={e => setShowItem(e.target.checked)} />Item Name</label>
-          <label className="form-check-label"><input type="checkbox" className="form-check-input me-1" checked={showCode} onChange={e => setShowCode(e.target.checked)} />Print Code</label>
-        </div>
-        <div className="d-flex gap-3 align-items-center flex-wrap">
-          <div className="d-flex align-items-center gap-2">
-            <label className="small fw-bold mb-0">Firm Name:</label>
-            <input className="form-control form-control-sm" style={{ maxWidth: 180 }} value={firmName} onChange={e => setFirmName(e.target.value)} />
-          </div>
-          <div className="d-flex align-items-center gap-2">
-            <label className="small fw-bold mb-0">Labels per Row:</label>
-            <div className="d-flex gap-1">
-              {[1,2,3,4].map(c => (
-                <button key={c} className={`btn btn-sm ${columns === c ? "btn-primary" : "btn-outline-secondary"}`} onClick={() => setColumns(c)}>{c}</button>
-              ))}
-            </div>
-          </div>
-          {columns > 1 && (
-            <div className="d-flex align-items-center gap-2">
-              <label className="small fw-bold mb-0">Col Gap (mm):</label>
-              <input type="number" className="form-control form-control-sm" style={{ width: 65 }} min={0} max={20} value={colGap} onChange={e => setColGap(Number(e.target.value) || 0)} />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Auto layout summary */}
-      <div className="mt-3 p-3 border rounded bg-white small">
-        <strong className="d-block mb-1 text-success"><i className="fa fa-magic me-1" />Auto-Configured Layout</strong>
-        <div className="d-flex gap-3 flex-wrap">
-          <span>Paper Width (SIZE): <strong>{labelW}mm</strong></span>
-          <span>Label Height: <strong>{labelH}mm</strong></span>
-          <span>Labels per Row: <strong>{columns}</strong></span>
-          <span>Per-Label Width: <strong>{Math.round(labelW / columns * 10) / 10}mm</strong></span>
-          <span>DPI: <strong>{dpi}</strong></span>
-          <span>Barcode H: <strong>{bcH}mm</strong></span>
+        <label className="fw-bold small mb-2 d-block">Firm Details</label>
+        <div className="d-flex align-items-center gap-2">
+          <label className="small fw-bold mb-0">Firm Name:</label>
+          <input className="form-control form-control-sm" style={{ maxWidth: 240 }} value={firmName} onChange={e => setFirmName(e.target.value)} />
         </div>
       </div>
     </div>
   );
 
-  // ── STEP 3 UI (DESIGNER) ───────────────────────────────────────────────────
+  // ── STEP 3 UI: Advanced Visual Barcode Designer ───────────────────────────────────────────────────
   const Step3 = () => {
-    const PX_PER_MM = 3.2;
-    const singleWpx = (labelW / columns) * PX_PER_MM;
+    const singleLabelW = labelW / columns;
+    const singleWpx = singleLabelW * PX_PER_MM;
     const hPx = labelH * PX_PER_MM;
-    const mTPx = marginT * PX_PER_MM;
-    const mLPx = marginL * PX_PER_MM;
-    const bcHpx = bcH * PX_PER_MM;
-    const dummyLabel = { barcode: "890123456789", name: "Sample Item Name", code: "CODE123" };
-    
+    const selEl = elements.find(el => el.id === selectedElementId);
+
+    const handleAddElement = (type: "text" | "barcode" | "logo" | "line") => {
+      const newEl: Element = {
+        id: `el_${Date.now()}`,
+        type,
+        value: type === "text" ? "New Text" : type === "barcode" ? "{{Barcode}}" : "",
+        x: 5,
+        y: 5,
+        w: type === "barcode" ? 30 : type === "line" ? 40 : type === "logo" ? 10 : 25,
+        h: type === "barcode" ? 8 : type === "line" ? 1 : type === "logo" ? 10 : 4,
+        fontSize: 2,
+        fontWeight: "normal",
+        rotation: 0,
+        alignment: 1,
+        barcodeScale: 1.3,
+        showText: true,
+        logoType: type === "logo" ? "hallmark" : undefined
+      };
+      setElements(prev => [...prev, newEl]);
+      setSelectedElementId(newEl.id);
+    };
+
+    const handleDeleteElement = (id: string) => {
+      setElements(prev => prev.filter(el => el.id !== id));
+      setSelectedElementId("");
+    };
+
+    const handleUpdateElement = (updated: Element) => {
+      setElements(prev => prev.map(el => el.id === updated.id ? updated : el));
+    };
+
+    const handleCreateTemplate = () => {
+      const name = window.prompt("Enter new template name:");
+      if (!name) return;
+      const newId = `custom_${Date.now()}`;
+      const newTemp: Template = {
+        id: newId,
+        name,
+        labelW,
+        labelH,
+        columns,
+        colGap,
+        rowGap,
+        marginT,
+        marginL,
+        elements: [...elements]
+      };
+      setTemplates(prev => [...prev, newTemp]);
+      setSelectedTemplateId(newId);
+      toast.success("New template created successfully!");
+    };
+
+    const handleDeleteTemplate = () => {
+      if (["std_50_25_double", "std_50_25_single", "std_triple", "jewelry_dumbbell", "jewelry_small", "apparel", "warehouse"].includes(selectedTemplateId)) {
+        toast.error("Default presets cannot be deleted.");
+        return;
+      }
+      if (window.confirm("Are you sure you want to delete this template?")) {
+        const nextId = "std_50_25_double";
+        setTemplates(prev => prev.filter(t => t.id !== selectedTemplateId));
+        setSelectedTemplateId(nextId);
+        toast.success("Template deleted.");
+      }
+    };
+
+    const handleExportLayout = () => {
+      const activeT = templates.find(t => t.id === selectedTemplateId);
+      if (activeT) {
+        navigator.clipboard.writeText(JSON.stringify(activeT, null, 2));
+        toast.success("Template layout JSON copied to clipboard!");
+      }
+    };
+
+    const handleImportLayout = () => {
+      const input = window.prompt("Paste template JSON layout string here:");
+      if (!input) return;
+      try {
+        const imported = JSON.parse(input);
+        if (imported.name && imported.elements) {
+          const newId = `imported_${Date.now()}`;
+          const newT: Template = { ...imported, id: newId };
+          setTemplates(prev => [...prev, newT]);
+          setSelectedTemplateId(newId);
+          toast.success("Template layout imported successfully!");
+        } else {
+          toast.error("Invalid template format. Missing name or elements.");
+        }
+      } catch (e) {
+        toast.error("Failed to parse JSON layout.");
+      }
+    };
+
     return (
-      <div>
-        <div className="d-flex justify-content-between align-items-center mb-1">
-          <h5 className="fw-bold mb-0">Label Layout Designer</h5>
-          <button className="btn btn-sm btn-outline-danger" onClick={() => {
-            localStorage.removeItem("barcodeWizardSettings");
-            // Clear all per-paper-size settings as well
-            for (let i = 0; i < localStorage.length; i++) {
-              const key = localStorage.key(i);
-              if (key && key.startsWith("barcodeWizardSettings_")) {
-                localStorage.removeItem(key);
-                i--;
-              }
-            }
-            hasSavedSettings.current = false;
-            setBcH(8); setLineSpacing(1); setMarginT(2); setMarginL(2); setBcTextSize(1);
-            setLabelW(100); setLabelH(25); setColumns(2);
-            toast.success("Design settings reset to defaults!");
-          }}><i className="fa fa-refresh me-1" />Reset to Defaults</button>
-        </div>
-        <p className="text-muted small mb-3">Fine-tune the design of a single sticker. These settings will apply to all your labels.</p>
-        
-        {isWarningOverflow && (
-          <div className="alert alert-danger p-2 small mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-            <div>
-              <i className="fa fa-exclamation-triangle me-2" />
-              <strong>Warning:</strong> Your content ({Math.round(totalHdots / dots)}mm) is very close to or exceeds the sticker height ({labelH}mm). The barcode number or MRP may get cut off on the physical print!
-            </div>
-            <button className="btn btn-sm btn-danger fw-bold" onClick={autoFitLayout}>
-              <i className="fa fa-magic me-1" /> Auto-Fit Layout
-            </button>
+      <div className="designer-tab">
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h5 className="fw-bold mb-0"><i className="fa fa-paint-brush text-primary me-2" />Visual Barcode Designer</h5>
+          <div className="d-flex gap-2">
+            <button className="btn btn-sm btn-outline-primary" onClick={handleExportLayout}><i className="fa fa-copy me-1" />Export JSON</button>
+            <button className="btn btn-sm btn-outline-info" onClick={handleImportLayout}><i className="fa fa-download me-1" />Import JSON</button>
           </div>
-        )}
+        </div>
 
         <div className="row">
-          <div className="col-md-7">
-            <div className="bg-light p-3 border rounded mb-3">
-              <label className="fw-bold small d-block mb-3 text-primary"><i className="fa fa-sliders me-1" />Sticker Dimensions & Margins</label>
-              
-              <label className="small d-flex justify-content-between mb-0"><span>Sticker Width: <strong>{Math.round(labelW / columns * 10) / 10} mm</strong></span></label>
-              <input type="range" className="form-range mb-2" min="10" max="150" step="1" value={labelW / columns} onChange={e => setLabelW(Number(e.target.value) * columns)} />
-              
-              <label className="small d-flex justify-content-between mb-0"><span>Sticker Height: <strong>{labelH} mm</strong></span></label>
-              <input type="range" className="form-range mb-2" min="10" max="200" step="1" value={labelH} onChange={e => setLabelH(Number(e.target.value))} />
+          {/* Design Controls (Left Column) */}
+          <div className="col-md-6">
+            {/* Template Selector & General CRUD */}
+            <div className="card p-3 mb-3 bg-light border">
+              <label className="fw-bold small text-muted mb-1">1. Active Barcode Template</label>
+              <div className="d-flex gap-2 mb-2">
+                <select className="form-select text-dark fw-bold border-secondary-subtle" value={selectedTemplateId} onChange={e => setSelectedTemplateId(e.target.value)}>
+                  {templates.map(t => <option key={t.id} value={t.id}>{t.name} ({t.labelW}x{t.labelH}mm)</option>)}
+                </select>
+                <button className="btn btn-success btn-sm text-nowrap" onClick={handleCreateTemplate} title="Save current layout as a new template"><i className="fa fa-plus me-1" />Save As</button>
+                <button className="btn btn-danger btn-sm text-nowrap" onClick={handleDeleteTemplate} disabled={["std_50_25_double", "std_50_25_single", "std_triple", "jewelry_dumbbell", "jewelry_small", "apparel", "warehouse"].includes(selectedTemplateId)}><i className="fa fa-trash" /></button>
+              </div>
+            </div>
 
-              <div className="row">
+            {/* Sticker Dimensions */}
+            <div className="card p-3 mb-3 bg-light border">
+              <label className="fw-bold small text-muted mb-3"><i className="fa fa-arrows me-1 text-primary" />2. Sticker Page Setup</label>
+              
+              <div className="row g-2 mb-2">
                 <div className="col-6">
-                  <label className="small d-flex justify-content-between mb-0"><span>Top/Bottom Margin: <strong>{marginT} mm</strong></span></label>
-                  <input type="range" className="form-range" min="0" max="20" step="0.5" value={marginT} onChange={e => setMarginT(Number(e.target.value))} />
+                  <label className="small mb-1">Page Width: <strong>{labelW} mm</strong></label>
+                  <input type="number" className="form-control form-control-sm" value={labelW} onChange={e => setLabelW(Number(e.target.value) || 10)} />
                 </div>
                 <div className="col-6">
-                  <label className="small d-flex justify-content-between mb-0"><span>Left/Right Margin: <strong>{marginL} mm</strong></span></label>
-                  <input type="range" className="form-range" min="0" max="20" step="0.5" value={marginL} onChange={e => setMarginL(Number(e.target.value))} />
+                  <label className="small mb-1">Sticker Height: <strong>{labelH} mm</strong></label>
+                  <input type="number" className="form-control form-control-sm" value={labelH} onChange={e => setLabelH(Number(e.target.value) || 10)} />
+                </div>
+              </div>
+
+              <div className="row g-2">
+                <div className="col-4">
+                  <label className="small mb-1">Cols per row:</label>
+                  <select className="form-select form-select-sm" value={columns} onChange={e => setColumns(Number(e.target.value))}>
+                    <option value={1}>1 Column</option>
+                    <option value={2}>2 Columns</option>
+                    <option value={3}>3 Columns</option>
+                  </select>
+                </div>
+                <div className="col-4">
+                  <label className="small mb-1">Col Gap (mm):</label>
+                  <input type="number" className="form-control form-control-sm" value={colGap} disabled={columns === 1} onChange={e => setColGap(Number(e.target.value) || 0)} />
+                </div>
+                <div className="col-4">
+                  <label className="small mb-1">Row Gap (mm):</label>
+                  <input type="number" className="form-control form-control-sm" value={rowGap} onChange={e => setRowGap(Number(e.target.value) || 0)} />
                 </div>
               </div>
             </div>
 
-            <div className="bg-light p-3 border rounded">
-              <label className="fw-bold small d-block mb-3 text-primary"><i className="fa fa-text-height me-1" />Content Spacing & Sizes</label>
-              
-              <label className="small d-flex justify-content-between mb-0"><span>Line Spacing (Gap): <strong>{lineSpacing} mm</strong></span></label>
-              <input type="range" className="form-range mb-2" min="0" max="15" step="0.5" value={lineSpacing} onChange={e => setLineSpacing(Number(e.target.value))} />
-              
-              <label className="small d-flex justify-content-between mb-0"><span>Barcode Height: <strong>{bcH} mm</strong></span></label>
-              <input type="range" className="form-range mb-2" min="5" max="100" step="1" value={bcH} onChange={e => setBcH(Number(e.target.value))} />
-
-              <label className="small d-flex justify-content-between mb-0"><span>Code Text Size: <strong>{bcTextSize}</strong></span></label>
-              <input type="range" className="form-range" min="1" max="5" step="1" value={bcTextSize} onChange={e => setBcTextSize(Number(e.target.value))} />
+            {/* Elements toolbox */}
+            <div className="card p-3 mb-3 bg-light border">
+              <label className="fw-bold small text-muted mb-2"><i className="fa fa-cubes me-1 text-primary" />3. Add Elements</label>
+              <div className="d-flex gap-2">
+                <button className="btn btn-sm btn-outline-dark flex-fill" onClick={() => handleAddElement("text")}><i className="fa fa-font me-1" />Text Field</button>
+                <button className="btn btn-sm btn-outline-dark flex-fill" onClick={() => handleAddElement("barcode")}><i className="fa fa-barcode me-1" />Barcode Graphic</button>
+                <button className="btn btn-sm btn-outline-dark flex-fill" onClick={() => handleAddElement("logo")}><i className="fa fa-certificate me-1" />Logo/Icon</button>
+              </div>
             </div>
+
+            {/* Element Properties */}
+            {selEl ? (
+              <div className="card p-3 bg-white border border-primary">
+                <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                  <strong className="text-primary small fw-bold">Edit Element: {selEl.type.toUpperCase()}</strong>
+                  <button className="btn btn-xs btn-outline-danger py-0 px-2" onClick={() => handleDeleteElement(selEl.id)}><i className="fa fa-times me-1" />Delete</button>
+                </div>
+
+                <div className="row g-2 mb-2">
+                  <div className="col-6">
+                    <label className="small mb-0">Pos X (mm):</label>
+                    <input type="number" step="0.5" className="form-control form-control-sm" value={selEl.x} onChange={e => handleUpdateElement({ ...selEl, x: parseFloat(e.target.value) || 0 })} />
+                  </div>
+                  <div className="col-6">
+                    <label className="small mb-0">Pos Y (mm):</label>
+                    <input type="number" step="0.5" className="form-control form-control-sm" value={selEl.y} onChange={e => handleUpdateElement({ ...selEl, y: parseFloat(e.target.value) || 0 })} />
+                  </div>
+                </div>
+
+                <div className="row g-2 mb-2">
+                  <div className="col-6">
+                    <label className="small mb-0">Width (mm):</label>
+                    <input type="number" step="0.5" className="form-control form-control-sm" value={selEl.w} onChange={e => handleUpdateElement({ ...selEl, w: parseFloat(e.target.value) || 1 })} />
+                  </div>
+                  <div className="col-6">
+                    <label className="small mb-0">Height (mm):</label>
+                    <input type="number" step="0.5" className="form-control form-control-sm" value={selEl.h} onChange={e => handleUpdateElement({ ...selEl, h: parseFloat(e.target.value) || 1 })} />
+                  </div>
+                </div>
+
+                <div className="row g-2 mb-2">
+                  <div className="col-6">
+                    <label className="small mb-0">Rotation:</label>
+                    <select className="form-select form-select-sm" value={selEl.rotation} onChange={e => handleUpdateElement({ ...selEl, rotation: parseInt(e.target.value) as any })}>
+                      <option value={0}>0°</option>
+                      <option value={90}>90°</option>
+                      <option value={180}>180°</option>
+                      <option value={270}>270°</option>
+                    </select>
+                  </div>
+                  <div className="col-6">
+                    {selEl.type === "text" ? (
+                      <>
+                        <label className="small mb-0">Text Alignment:</label>
+                        <select className="form-select form-select-sm" value={selEl.alignment} onChange={e => handleUpdateElement({ ...selEl, alignment: parseInt(e.target.value) as any })}>
+                          <option value={1}>Left</option>
+                          <option value={2}>Center</option>
+                          <option value={3}>Right</option>
+                        </select>
+                      </>
+                    ) : selEl.type === "barcode" ? (
+                      <>
+                        <label className="small mb-0">Bar Width (Scale):</label>
+                        <input type="number" step="0.1" min="0.5" max="3" className="form-control form-control-sm" value={selEl.barcodeScale} onChange={e => handleUpdateElement({ ...selEl, barcodeScale: parseFloat(e.target.value) || 1 })} />
+                      </>
+                    ) : selEl.type === "logo" ? (
+                      <>
+                        <label className="small mb-0">Logo Type:</label>
+                        <select className="form-select form-select-sm" value={selEl.logoType} onChange={e => handleUpdateElement({ ...selEl, logoType: e.target.value as any })}>
+                          <option value="hallmark">Hallmark 916</option>
+                          <option value="diamond">Diamond Symbol</option>
+                          <option value="ring">Ring Icon</option>
+                          <option value="tag">Tag Icon</option>
+                          <option value="box">Box Icon</option>
+                        </select>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+
+                {selEl.type === "text" && (
+                  <div className="row g-2 mb-2">
+                    <div className="col-6">
+                      <label className="small mb-0">Font Index (1-5):</label>
+                      <select className="form-select form-select-sm" value={selEl.fontSize} onChange={e => handleUpdateElement({ ...selEl, fontSize: parseInt(e.target.value) })}>
+                        <option value={1}>1 (Micro)</option>
+                        <option value={2}>2 (Small)</option>
+                        <option value={3}>3 (Normal)</option>
+                        <option value={4}>4 (Medium)</option>
+                        <option value={5}>5 (Large)</option>
+                      </select>
+                    </div>
+                    <div className="col-6 pt-3">
+                      <label className="form-check-label small"><input type="checkbox" className="form-check-input me-1" checked={selEl.fontWeight === "bold"} onChange={e => handleUpdateElement({ ...selEl, fontWeight: e.target.checked ? "bold" : "normal" })} />Bold text</label>
+                    </div>
+                  </div>
+                )}
+
+                {selEl.type === "barcode" && (
+                  <div className="mb-2">
+                    <label className="form-check-label small"><input type="checkbox" className="form-check-input me-1" checked={selEl.showText} onChange={e => handleUpdateElement({ ...selEl, showText: e.target.checked })} />Show Barcode Value Text</label>
+                  </div>
+                )}
+
+                {selEl.type !== "line" && selEl.type !== "logo" && (
+                  <div className="mb-1">
+                    <label className="small mb-0 d-block">Dynamic Content / Value Expression:</label>
+                    <input type="text" className="form-control form-control-sm" value={selEl.value} onChange={e => handleUpdateElement({ ...selEl, value: e.target.value })} />
+                  </div>
+                )}
+                
+                {/* Variable inserters */}
+                {selEl.type !== "line" && selEl.type !== "logo" && (
+                  <div className="mt-1 d-flex flex-wrap gap-1">
+                    <span className="badge bg-secondary cursor-pointer" style={{ cursor: "pointer" }} onClick={() => handleUpdateElement({ ...selEl, value: selEl.value + "{{FirmName}}" })}>+ FirmName</span>
+                    <span className="badge bg-secondary cursor-pointer" style={{ cursor: "pointer" }} onClick={() => handleUpdateElement({ ...selEl, value: selEl.value + "{{ItemName}}" })}>+ ItemName</span>
+                    <span className="badge bg-secondary cursor-pointer" style={{ cursor: "pointer" }} onClick={() => handleUpdateElement({ ...selEl, value: selEl.value + "{{SalePrice}}" })}>+ SalePrice</span>
+                    <span className="badge bg-secondary cursor-pointer" style={{ cursor: "pointer" }} onClick={() => handleUpdateElement({ ...selEl, value: selEl.value + "{{Barcode}}" })}>+ Barcode</span>
+                    <span className="badge bg-secondary cursor-pointer" style={{ cursor: "pointer" }} onClick={() => handleUpdateElement({ ...selEl, value: selEl.value + "{{SizeName}}" })}>+ SizeName</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-4 border rounded border-dashed text-muted bg-light">
+                <i className="fa fa-info-circle fa-lg mb-2" />
+                <p className="small mb-0">Click any element on the visual preview sticker (to the right) to configure its position, text, variables, and rotation details.</p>
+              </div>
+            )}
           </div>
-          
-          <div className="col-md-5 d-flex flex-column align-items-center justify-content-center bg-white border rounded shadow-sm p-4" style={{ minHeight: 400, overflow: "auto" }}>
-            <span className="badge bg-secondary mb-3">Live Preview</span>
-            <div style={{ width: singleWpx, height: hPx, border: "2px dashed #0d6efd", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", background: "#fff", overflow: "hidden", padding: `${mTPx}px ${mLPx}px`, gap: lineSpacing * PX_PER_MM, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
-              {showFirm && <div style={{ fontWeight: 700, fontSize: Math.max(singleWpx * 0.07, 8), textAlign: "center", lineHeight: 1, width: "100%" }}>{firmName}</div>}
-              {showItem && <div style={{ fontSize: Math.max(singleWpx * 0.06, 7), textAlign: "left", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", width: "100%", lineHeight: 1 }}>{dummyLabel.name}</div>}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: bcHpx }}>
-                <Barcode value={dummyLabel.barcode} height={Math.max(bcHpx, 10)} width={Math.max((singleWpx - mLPx * 2) / 70, 0.8)} displayValue={false} margin={0} background="transparent" />
-              </div>
-              <div style={{ fontWeight: 600, fontSize: Math.max(singleWpx * 0.045, 9), textAlign: "center", lineHeight: 1, width: "100%", letterSpacing: 1 }}>{dummyLabel.barcode}</div>
-              {showCode && dummyLabel.code && <div style={{ fontWeight: 700, fontSize: Math.max(singleWpx * 0.03 * bcTextSize, 8), textAlign: "center", lineHeight: 1, width: "100%", letterSpacing: 2 }}>{dummyLabel.code}</div>}
-            </div>
+
+          {/* Sticker Live Canvas Preview (Right Column) */}
+          <div className="col-md-6 d-flex flex-column align-items-center justify-content-center p-3 border rounded bg-dark border-secondary position-relative" style={{ minHeight: 460 }}>
+            <span className="badge bg-light text-dark mb-3"><i className="fa fa-eye me-1" />Interactive Label Design Canvas</span>
+            
+            {(() => {
+              const isJewelry = selectedTemplateId === "jewelry_dumbbell" || selectedTemplateId === "jewelry_small" || selectedTemplateId === "jewelry_asym" || selectedTemplateId === "jewelry_81_12" || selectedTemplateId === "jewelry_100_13" || selectedTemplateId === "jewelry_100_15" || selectedTemplateId.toLowerCase().includes("jewelry") || selectedTemplateId.toLowerCase().includes("dumbbell");
+              const isApparel = (selectedTemplateId === "apparel" || selectedTemplateId.toLowerCase().includes("apparel") || selectedTemplateId.toLowerCase().includes("hang")) && labelH > 40;
+              
+              const canvasStyle: React.CSSProperties = isJewelry ? {
+                width: `${singleWpx}px`,
+                height: `${hPx}px`,
+                position: "relative",
+                background: "transparent",
+                border: "none",
+                boxShadow: "none"
+              } : {
+                width: `${singleWpx}px`,
+                height: `${hPx}px`,
+                background: "#fff",
+                border: "3px dashed #0d6efd",
+                position: "relative",
+                overflow: "hidden",
+                boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
+                borderRadius: isApparel ? "12px" : "0px"
+              };
+
+              const getDumbbellDimensions = (w: number, h: number) => {
+                let tailL = w * 0.2; // default 20%
+                const nameLower = (selectedTemplateId || "").toLowerCase();
+                
+                if (w === 76 && h === 25) tailL = 8;
+                else if (w === 50 && h === 12) tailL = 8;
+                else if (w === 80 && h === 20) tailL = 20;
+                else if (w === 81 && h === 12) tailL = 27;
+                else if (w === 100 && h === 13) {
+                  tailL = nameLower.includes("35") ? 35 : 45;
+                } else if (w === 100 && h === 15) {
+                  tailL = nameLower.includes("30") ? 30 : 45;
+                }
+                
+                const leftBound = (w - tailL) / 2;
+                const rightBound = leftBound + tailL;
+                
+                // Tail height (centered)
+                let tailH = Math.max(3, h * 0.25);
+                if (w === 76 && h === 25) tailH = 6;
+                if (w === 50 && h === 12) tailH = 3;
+                if (w === 80 && h === 20) tailH = 4;
+                if (w === 81 && h === 12) tailH = 3.5;
+                if (w === 100 && h === 13) tailH = 4;
+                if (w === 100 && h === 15) tailH = 4.5;
+                
+                const tailY = (h - tailH) / 2;
+                
+                // Right flap height (centered)
+                let rightH = h;
+                if (w === 80 && h === 20) rightH = 10; // asymmetrical
+                
+                const rightY = (h - rightH) / 2;
+                
+                return { leftBound, rightBound, tailL, tailH, tailY, rightH, rightY };
+              };
+
+              return (
+                <div style={canvasStyle} onClick={() => setSelectedElementId("")}>
+                  {/* Jewelry Dumbbell realistic backing card flaps */}
+                  {isJewelry && (() => {
+                    const { leftBound, rightBound, tailL, tailH, tailY, rightH, rightY } = getDumbbellDimensions(labelW, labelH);
+                    return (
+                      <>
+                        {/* Left Flap */}
+                        <div style={{ position: "absolute", left: 0, top: 0, width: `${leftBound * PX_PER_MM}px`, height: `${labelH * PX_PER_MM}px`, background: "#fff", border: "1.5px solid #cbd5e1", borderRight: "none", borderRadius: "6px 0 0 6px", boxShadow: "-4px 4px 8px rgba(0,0,0,0.15)", pointerEvents: "none" }} />
+                        {/* Tail */}
+                        <div style={{ position: "absolute", left: `${leftBound * PX_PER_MM}px`, top: `${tailY * PX_PER_MM}px`, width: `${tailL * PX_PER_MM}px`, height: `${tailH * PX_PER_MM}px`, background: "#f8fafc", borderTop: "1.5px solid #cbd5e1", borderBottom: "1.5px solid #cbd5e1", pointerEvents: "none" }} />
+                        {/* Right Flap */}
+                        <div style={{ position: "absolute", left: `${rightBound * PX_PER_MM}px`, top: `${rightY * PX_PER_MM}px`, width: `${(labelW - rightBound) * PX_PER_MM}px`, height: `${rightH * PX_PER_MM}px`, background: "#fff", border: "1.5px solid #cbd5e1", borderLeft: "none", borderRadius: "0 6px 6px 0", boxShadow: "4px 4px 8px rgba(0,0,0,0.15)", pointerEvents: "none" }} />
+                      </>
+                    );
+                  })()}
+
+                  {/* Apparel card thread hole */}
+                  {isApparel && (
+                    <div style={{ position: "absolute", left: `${(labelW / 2 - 2) * PX_PER_MM}px`, top: `${4 * PX_PER_MM}px`, width: `${4 * PX_PER_MM}px`, height: `${4 * PX_PER_MM}px`, backgroundColor: "#212529", borderRadius: "50%", border: "1.5px solid #cbd5e1", pointerEvents: "none", zIndex: 10 }} />
+                  )}
+
+                  {/* Elements rendering */}
+                  {elements.map(el => {
+                    const isSel = selectedElementId === el.id;
+                    const val = interpolateSample(el.value);
+
+                    if (el.type === "text") {
+                      return (
+                        <div key={el.id} onClick={(e) => { e.stopPropagation(); setSelectedElementId(el.id); }} style={getElementStyle(el)}>
+                          {val}
+                        </div>
+                      );
+                    } else if (el.type === "barcode") {
+                      return (
+                        <div key={el.id} onClick={(e) => { e.stopPropagation(); setSelectedElementId(el.id); }} style={getElementStyle(el)}>
+                          <Barcode value={val} height={Math.max(el.h * PX_PER_MM - 12, 10)} width={Math.max((el.w * PX_PER_MM) / 100 * el.barcodeScale, 0.5)} displayValue={el.showText} fontSize={8} margin={0} background="transparent" />
+                        </div>
+                      );
+                    } else if (el.type === "logo") {
+                      return (
+                        <div key={el.id} onClick={(e) => { e.stopPropagation(); setSelectedElementId(el.id); }} style={getElementStyle(el)}>
+                          {el.logoType === "hallmark" && <HallmarkIcon />}
+                          {el.logoType === "diamond" && <DiamondIcon />}
+                          {el.logoType === "ring" && <RingIcon />}
+                          {el.logoType === "tag" && <TagIcon />}
+                          {el.logoType === "box" && <BoxIcon />}
+                        </div>
+                      );
+                    } else if (el.type === "line") {
+                      return (
+                        <div key={el.id} onClick={(e) => { e.stopPropagation(); setSelectedElementId(el.id); }} style={{
+                          position: "absolute",
+                          left: `${el.x * PX_PER_MM}px`,
+                          top: `${el.y * PX_PER_MM}px`,
+                          width: `${el.w * PX_PER_MM}px`,
+                          height: `${el.h * PX_PER_MM}px`,
+                          backgroundColor: "#000",
+                          cursor: "pointer",
+                          border: isSel ? "1.5px solid #0d6efd" : "none",
+                          boxSizing: "border-box"
+                        }} />
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+              );
+            })()}
+            
+            <p className="text-white-50 small mt-3 text-center mb-0">
+              Dimensions: {Math.round(singleLabelW * 10) / 10}mm × {labelH}mm.<br />
+              {selectedTemplateId === "jewelry_dumbbell" && <span className="text-warning small"><i className="fa fa-info-circle me-1" />Jewelry Tag detected: Left flap (0-34mm), Right flap (42-76mm). Elements on Right are rotated 180° for folded alignment.</span>}
+            </p>
           </div>
         </div>
       </div>
     );
   };
 
-  // ── STEP 4 UI (PREVIEW & PRINT) ────────────────────────────────────────────
+  // ── STEP 4 UI: Print Previews & Actions ────────────────────────────────────────────
   const Step4 = () => {
-    const PX_PER_MM = 3.2;
-    const totalWpx = labelW * PX_PER_MM;
-    const singleWpx = totalWpx / columns;
+    const singleLabelW = labelW / columns;
+    const singleWpx = singleLabelW * PX_PER_MM;
     const hPx = labelH * PX_PER_MM;
-    const mTPx = marginT * PX_PER_MM;
-    const mLPx = marginL * PX_PER_MM;
-    const bcHpx = bcH * PX_PER_MM;
 
     return (
       <div>
         <h5 className="fw-bold mb-1">Print Preview &amp; Actions</h5>
         <p className="text-muted small mb-3">Verify the print job preview and click <strong>Print Now</strong>.</p>
 
-        {isWarningOverflow && (
-          <div className="alert alert-danger p-2 small mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-            <div>
-              <i className="fa fa-exclamation-triangle me-2" />
-              <strong>Layout Warning:</strong> Your content ({Math.round(totalHdots / dots)}mm) is very close to or exceeds the sticker height ({labelH}mm). The barcode number or MRP may get cut off on the physical print!
-            </div>
-            <button className="btn btn-sm btn-danger fw-bold" onClick={autoFitLayout}>
-              <i className="fa fa-magic me-1" /> Auto-Fit Layout
-            </button>
+        {isOverflowing && (
+          <div className="alert alert-danger p-2 small mb-3">
+            <i className="fa fa-exclamation-triangle me-2" />
+            <strong>Layout Warning:</strong> Some barcode elements in your template exceed label width or height bounds.
           </div>
         )}
 
         <div className="d-flex align-items-center gap-3 mb-3 p-3 bg-light border rounded flex-wrap">
           <div><strong>Printer:</strong> {printerName || <span className="text-danger">Not selected</span>}</div>
-          <div><strong>Paper:</strong> {selectedPaper || `${labelW}×${labelH}mm`}</div>
+          <div><strong>Template:</strong> {templates.find(t => t.id === selectedTemplateId)?.name || "Default"}</div>
           <div><strong>Labels:</strong> {printQueue.length}</div>
           <div><strong>DPI:</strong> {dpi}</div>
           <button className="btn btn-success ms-auto px-4 py-2 fw-bold" onClick={handlePrint} disabled={printing || printQueue.length === 0 || !printerName}>
@@ -723,27 +1357,139 @@ export default function BarcodePrintWizard() {
         </div>
 
         {/* Label previews - each row = one physical print strip */}
-        <div className="mb-2"><small className="text-muted"><i className="fa fa-info-circle me-1" />Each dashed box = 1 print strip ({columns} label{columns > 1 ? "s" : ""} side-by-side). Paper width: <strong>{labelW}mm</strong>, per-label: <strong>{Math.round(labelW / columns * 10) / 10}mm</strong></small></div>
+        <div className="mb-2"><small className="text-muted"><i className="fa fa-info-circle me-1" />Each dashed box = 1 print strip ({columns} label{columns > 1 ? "s" : ""} side-by-side). Page width: <strong>{labelW}mm</strong>, per-label: <strong>{Math.round(singleLabelW * 10) / 10}mm</strong></small></div>
         <div ref={previewRef} style={{ display: "flex", flexDirection: "column", gap: 10, padding: 8 }}>
           {Array.from({ length: Math.ceil(Math.min(printQueue.length, 20) / columns) }).map((_, rowIdx) => {
             const rowLabels = (printQueue as any[]).slice(rowIdx * columns, rowIdx * columns + columns);
             return (
               <div key={rowIdx} style={{ display: "inline-flex", gap: 0, alignItems: "flex-start", border: "2px dashed #0d6efd", borderRadius: 6, padding: 4, background: "#f0f4ff", width: "fit-content" }}>
-                {rowLabels.map((label: any, colIdx: number) => (
-                  <div key={colIdx} style={{ width: singleWpx, height: hPx, borderLeft: colIdx > 0 ? "1px dashed #aaa" : "none", border: "1.5px solid #333", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", background: "#fff", overflow: "hidden", padding: `${mTPx}px ${mLPx}px`, gap: lineSpacing * PX_PER_MM, flexShrink: 0 }}>
-                    {showFirm && <div style={{ fontWeight: 700, fontSize: Math.max(singleWpx * 0.07, 8), textAlign: "center", lineHeight: 1, width: "100%" }}>{firmName}</div>}
-                    {showItem && <div style={{ fontSize: Math.max(singleWpx * 0.06, 7), textAlign: "left", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", width: "100%", lineHeight: 1 }}>{label.name}</div>}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: bcHpx }}>
-                      <Barcode value={label.barcode} height={Math.max(bcHpx, 10)} width={Math.max((singleWpx - mLPx * 2) / 70, 0.8)} displayValue={false} margin={0} background="transparent" />
+                {rowLabels.map((label: any, colIdx: number) => {
+                  const isJewelry = selectedTemplateId === "jewelry_dumbbell" || selectedTemplateId === "jewelry_small" || selectedTemplateId === "jewelry_asym" || selectedTemplateId === "jewelry_81_12" || selectedTemplateId === "jewelry_100_13" || selectedTemplateId === "jewelry_100_15" || selectedTemplateId.toLowerCase().includes("jewelry") || selectedTemplateId.toLowerCase().includes("dumbbell");
+                  const isApparel = (selectedTemplateId === "apparel" || selectedTemplateId.toLowerCase().includes("apparel") || selectedTemplateId.toLowerCase().includes("hang")) && labelH > 40;
+
+                  const labelStyle: React.CSSProperties = isJewelry ? {
+                    width: `${singleWpx}px`,
+                    height: `${hPx}px`,
+                    position: "relative",
+                    background: "transparent",
+                    flexShrink: 0
+                  } : {
+                    width: `${singleWpx}px`,
+                    height: `${hPx}px`,
+                    borderLeft: colIdx > 0 && !isApparel ? "1px dashed #aaa" : "none",
+                    border: "1.5px solid #333",
+                    position: "relative",
+                    background: "#fff",
+                    overflow: "hidden",
+                    flexShrink: 0,
+                    borderRadius: isApparel ? "8px" : "0px"
+                  };
+
+                  const getDumbbellDimensions = (w: number, h: number) => {
+                    let tailL = w * 0.2; // default 20%
+                    const nameLower = (selectedTemplateId || "").toLowerCase();
+                    
+                    if (w === 76 && h === 25) tailL = 8;
+                    else if (w === 50 && h === 12) tailL = 8;
+                    else if (w === 80 && h === 20) tailL = 20;
+                    else if (w === 81 && h === 12) tailL = 27;
+                    else if (w === 100 && h === 13) {
+                      tailL = nameLower.includes("35") ? 35 : 45;
+                    } else if (w === 100 && h === 15) {
+                      tailL = nameLower.includes("30") ? 30 : 45;
+                    }
+                    
+                    const leftBound = (w - tailL) / 2;
+                    const rightBound = leftBound + tailL;
+                    
+                    // Tail height (centered)
+                    let tailH = Math.max(3, h * 0.25);
+                    if (w === 76 && h === 25) tailH = 6;
+                    if (w === 50 && h === 12) tailH = 3;
+                    if (w === 80 && h === 20) tailH = 4;
+                    if (w === 81 && h === 12) tailH = 3.5;
+                    if (w === 100 && h === 13) tailH = 4;
+                    if (w === 100 && h === 15) tailH = 4.5;
+                    
+                    const tailY = (h - tailH) / 2;
+                    
+                    // Right flap height (centered)
+                    let rightH = h;
+                    if (w === 80 && h === 20) rightH = 10; // asymmetrical
+                    
+                    const rightY = (h - rightH) / 2;
+                    
+                    return { leftBound, rightBound, tailL, tailH, tailY, rightH, rightY };
+                  };
+
+                  return (
+                    <div key={colIdx} style={labelStyle}>
+                      {/* Jewelry Dumbbell realistic backing card flaps */}
+                      {isJewelry && (() => {
+                        const { leftBound, rightBound, tailL, tailH, tailY, rightH, rightY } = getDumbbellDimensions(labelW, labelH);
+                        return (
+                          <>
+                            {/* Left Flap */}
+                            <div style={{ position: "absolute", left: 0, top: 0, width: `${leftBound * PX_PER_MM}px`, height: `${labelH * PX_PER_MM}px`, background: "#fff", border: "1px solid #cbd5e1", borderRight: "none", borderRadius: "4px 0 0 4px", pointerEvents: "none" }} />
+                            {/* Tail */}
+                            <div style={{ position: "absolute", left: `${leftBound * PX_PER_MM}px`, top: `${tailY * PX_PER_MM}px`, width: `${tailL * PX_PER_MM}px`, height: `${tailH * PX_PER_MM}px`, background: "#f8fafc", borderTop: "1px solid #cbd5e1", borderBottom: "1px solid #cbd5e1", pointerEvents: "none" }} />
+                            {/* Right Flap */}
+                            <div style={{ position: "absolute", left: `${rightBound * PX_PER_MM}px`, top: `${rightY * PX_PER_MM}px`, width: `${(labelW - rightBound) * PX_PER_MM}px`, height: `${rightH * PX_PER_MM}px`, background: "#fff", border: "1px solid #cbd5e1", borderLeft: "none", borderRadius: "0 4px 4px 0", pointerEvents: "none" }} />
+                          </>
+                        );
+                      })()}
+
+                      {/* Apparel thread hole */}
+                      {isApparel && (
+                        <div style={{ position: "absolute", left: `${(labelW / 2 - 2) * PX_PER_MM}px`, top: `${4 * PX_PER_MM}px`, width: `${4 * PX_PER_MM}px`, height: `${4 * PX_PER_MM}px`, backgroundColor: "#f0f4ff", borderRadius: "50%", border: "1.5px solid #cbd5e1", pointerEvents: "none", zIndex: 10 }} />
+                      )}
+
+                      {elements.map(el => {
+                        const val = interpolate(el.value, label);
+
+                        if (el.type === "text") {
+                          return (
+                            <div key={el.id} style={getElementStyle(el)}>
+                              {val}
+                            </div>
+                          );
+                        } else if (el.type === "barcode") {
+                          return (
+                            <div key={el.id} style={getElementStyle(el)}>
+                              <Barcode value={val} height={Math.max(el.h * PX_PER_MM - 12, 10)} width={Math.max((el.w * PX_PER_MM) / 100 * el.barcodeScale, 0.5)} displayValue={el.showText} fontSize={8} margin={0} background="transparent" />
+                            </div>
+                          );
+                        } else if (el.type === "logo") {
+                          return (
+                            <div key={el.id} style={getElementStyle(el)}>
+                              {el.logoType === "hallmark" && <HallmarkIcon />}
+                              {el.logoType === "diamond" && <DiamondIcon />}
+                              {el.logoType === "ring" && <RingIcon />}
+                              {el.logoType === "tag" && <TagIcon />}
+                              {el.logoType === "box" && <BoxIcon />}
+                            </div>
+                          );
+                        } else if (el.type === "line") {
+                          return (
+                            <div key={el.id} style={{
+                              position: "absolute",
+                              left: `${el.x * PX_PER_MM}px`,
+                              top: `${el.y * PX_PER_MM}px`,
+                              width: `${el.w * PX_PER_MM}px`,
+                              height: `${el.h * PX_PER_MM}px`,
+                              backgroundColor: "#000"
+                            }} />
+                          );
+                        }
+                        return null;
+                      })}
                     </div>
-                    <div style={{ fontWeight: 600, fontSize: Math.max(singleWpx * 0.045, 9), textAlign: "center", lineHeight: 1, width: "100%", letterSpacing: 1 }}>{label.barcode}</div>
-                    {showCode && label.code && <div style={{ fontWeight: 700, fontSize: Math.max(singleWpx * 0.03 * bcTextSize, 8), textAlign: "center", lineHeight: 1, width: "100%", letterSpacing: 2 }}>{label.code}</div>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             );
           })}
-          {printQueue.length > 20 && <div style={{ color: "#6c757d", fontWeight: 600, padding: 8 }}>+{printQueue.length - 20} more labels ({Math.ceil((printQueue.length - 20) / columns)} more rows)</div>}
+          {printQueue.length > 20 && <div style={{ color: "#6c757d", fontWeight: 600, padding: 8 }}>+{printQueue.length - 20} more labels ({Math.ceil((printQueue.length - 20) / columns) - 10} more rows)</div>}
         </div>
         {printQueue.length === 0 && <div className="text-center py-5 text-muted"><i className="fa fa-exclamation-circle fa-2x mb-3 d-block" />No labels queued. Go back and set quantities.</div>}
       </div>

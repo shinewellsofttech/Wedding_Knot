@@ -42,6 +42,13 @@ export const MenuList: MenuItem[] = [
 
       },
       {
+        id: 99, title: "Barcode Templates",
+        path: `${process.env.PUBLIC_URL}/barcodeTemplate`,
+        icon: "Barcode",
+        type: "link",
+        bookmark: true
+      },
+      {
         id: 4, title: "User Master",
         path: `${process.env.PUBLIC_URL}/userMaster`,
         icon: "User",
