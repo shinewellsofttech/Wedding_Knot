@@ -196,20 +196,14 @@ const PageList_BarcodeTemplate = () => {
     } catch (e) {}
 
     if (window.confirm(`Are you sure you want to delete '${name}'?`)) {
-      Fn_DeleteData(dispatch, () => {}, Number(id), DELETE_API_URL).catch(() => {
-        setState((prev) => {
-          if (!itemToDelete) return prev;
-          const newList = [...prev.BarcodeTemplateList, itemToDelete].sort((a, b) => a.Id - b.Id);
-          return { ...prev, BarcodeTemplateList: newList };
+      Fn_DeleteData(dispatch, setState as any, Number(id), DELETE_API_URL, LIST_API_URL)
+        .then(() => {
+          loadData();
+        })
+        .catch((error) => {
+          console.error("Failed to delete barcode template:", error);
+          toast.error("Failed to delete barcode template from database.");
         });
-      });
-
-      setState((prev) => ({
-        ...prev,
-        BarcodeTemplateList: prev.BarcodeTemplateList.filter(
-          (item) => String(item?.Id) !== String(id)
-        ),
-      }));
     }
   };
 
