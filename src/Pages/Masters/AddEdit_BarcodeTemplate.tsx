@@ -222,6 +222,24 @@ const AddEdit_BarcodeTemplate = () => {
     setSelectedElementId("");
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = document.activeElement?.tagName?.toLowerCase();
+      if (activeTag === "input" || activeTag === "select" || activeTag === "textarea") {
+        return;
+      }
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedElementId) {
+        e.preventDefault();
+        handleDeleteElement(selectedElementId);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedElementId]);
+
   const handleUpdateElement = (updated: Element) => {
     setElements((prev) => prev.map((el) => (el.id === updated.id ? updated : el)));
   };
