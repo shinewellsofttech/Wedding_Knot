@@ -448,6 +448,14 @@ const AddEdit_ItemMaster = () => {
   const handlePhoto = useCallback((secIdx: number, rowIdx: number, slotIdx: number, files: FileList | null) => {
     if (!files || files.length === 0) return;
     
+    const MAX_IMAGE_SIZE = 500 * 1024; // 500 KB
+    const oversizedFiles = Array.from(files).filter(f => f.size > MAX_IMAGE_SIZE);
+    if (oversizedFiles.length > 0) {
+      toast.warning("Image size must be equal to or less than 500 KB.");
+      alert("Warning: Image size must be equal to or less than 500 KB. Selected file is too large.");
+      return;
+    }
+
     const newFiles = Array.from(files).filter(f => f.type.startsWith("image/")).slice(0, 5);
     if (newFiles.length === 0) { toast.error("Only images allowed"); return; }
     

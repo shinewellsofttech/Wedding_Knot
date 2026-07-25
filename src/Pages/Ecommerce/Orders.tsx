@@ -17,6 +17,15 @@ interface OrderItem {
   Barcode: string;
   ItemName: string;
   DesignPhoto: string;
+  DesignPhoto2?: string;
+  DesignPhoto3?: string;
+  DesignPhoto4?: string;
+  DesignPhoto5?: string;
+  DesignPhoto_Thumb?: string;
+  DesignPhoto2_Thumb?: string;
+  DesignPhoto3_Thumb?: string;
+  DesignPhoto4_Thumb?: string;
+  DesignPhoto5_Thumb?: string;
   Qty: number;
   Rate: number;
   Amount: number;
@@ -25,8 +34,6 @@ interface OrderItem {
   IGST: number;
   F_StatusMaster: number;
   SizeName: string;
-  DesignPhoto2?: string;
-  DesignPhoto3?: string;
   VideoLink?: string;
   Length?: string;
   Width?: string;
@@ -87,16 +94,33 @@ const Orders = () => {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_WEB_URLS.BASE}EccomOrder/AdminGetOrders/0/token`);
+      const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");
+      const userToken = authUser?.Token ?? authUser?.token ?? "token";
+
+      const payload = new FormData();
+      payload.append("UserId", "0");
+
+      const response = await fetch(`${API_WEB_URLS.BASE}EccomOrder/AdminGetOrders/0/${userToken}`, {
+        method: "POST",
+        body: payload
+      });
       const data = await response.json();
       
-      if (data.success && data.data && data.data.orders) {
-        setOrders(data.data.orders);
+      if (data.success && data.data) {
+        if (Array.isArray(data.data.orders)) {
+          setOrders(data.data.orders);
+        } else if (Array.isArray(data.data)) {
+          setOrders(data.data);
+        } else {
+          setOrders([]);
+        }
       } else {
         console.error("Failed to fetch orders or no orders found.");
+        setOrders([]);
       }
     } catch (error) {
       console.error("Error fetching orders:", error);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -347,9 +371,9 @@ const Orders = () => {
                       selectedOrder.Items.map((item) => (
                         <tr key={item.Id}>
                           <td className="text-center">
-                            {item.DesignPhoto ? (
+                            {(item.DesignPhoto_Thumb || item.DesignPhoto) ? (
                               <img 
-                                src={cleanUrl(item.DesignPhoto)} 
+                                src={cleanUrl(item.DesignPhoto_Thumb || item.DesignPhoto)} 
                                 alt={item.ItemName} 
                                 style={{ width: "50px", height: "50px", objectFit: "cover", borderRadius: "5px" }} 
                               />

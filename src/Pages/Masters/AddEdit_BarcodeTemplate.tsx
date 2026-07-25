@@ -94,15 +94,19 @@ const AddEdit_BarcodeTemplate = () => {
   });
 
   // Template states
-  const [name, setName] = useState("");
-  const [labelW, setLabelW] = useState(100);
-  const [labelH, setLabelH] = useState(25);
+  const [name, setName] = useState("Double Column (70x15mm)");
+  const [labelW, setLabelW] = useState(70);
+  const [labelH, setLabelH] = useState(15);
   const [columns, setColumns] = useState(2);
   const [colGap, setColGap] = useState(2);
   const [rowGap, setRowGap] = useState(2);
-  const [marginT, setMarginT] = useState(1.5);
-  const [marginL, setMarginL] = useState(2);
-  const [elements, setElements] = useState<Element[]>([]);
+  const [marginT, setMarginT] = useState(1);
+  const [marginL, setMarginL] = useState(1);
+  const [elements, setElements] = useState<Element[]>([
+    { id: "d70_1", type: "text", value: "{{FirmName}}", x: 1, y: 0.8, w: 33, h: 3, fontSize: 2, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 1, showText: true },
+    { id: "d70_2", type: "barcode", value: "{{Barcode}}", x: 1.5, y: 4.0, w: 32, h: 6.5, fontSize: 1, fontWeight: "normal", rotation: 0, alignment: 2, barcodeScale: 0.9, showText: true },
+    { id: "d70_3", type: "text", value: "MRP: ₹{{SalePrice}}", x: 1, y: 11.2, w: 33, h: 2.8, fontSize: 2, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 1, showText: true }
+  ]);
   const [selectedElementId, setSelectedElementId] = useState<string>("");
 
   // Dragging states
@@ -222,12 +226,8 @@ const AddEdit_BarcodeTemplate = () => {
     setElements((prev) => prev.map((el) => (el.id === updated.id ? updated : el)));
   };
 
-  const handleSave = async () => {
-    if (!name.trim()) {
-      toast.error("Template Name is required.");
-      return;
-    }
-    const templateData = {
+  const handleSave = async (overrideData?: any) => {
+    const dataToSave = overrideData || {
       name,
       labelW,
       labelH,
@@ -239,10 +239,15 @@ const AddEdit_BarcodeTemplate = () => {
       elements,
     };
 
+    if (!dataToSave.name || !dataToSave.name.trim()) {
+      toast.error("Template Name is required.");
+      return;
+    }
+
     try {
       const formData = new FormData();
       formData.append("Id", String(templateState.id ?? 0));
-      formData.append("Name", JSON.stringify(templateData));
+      formData.append("Name", JSON.stringify(dataToSave));
       formData.append("UserId", getCurrentUserId());
       formData.append(
         "F_CompanyMaster",
@@ -269,6 +274,35 @@ const AddEdit_BarcodeTemplate = () => {
     } catch (err) {
       console.error("Save failed:", err);
     }
+  };
+
+  const handleAutoSave70x15 = () => {
+    const preset70x15 = {
+      name: "Double Column (70x15mm)",
+      labelW: 70,
+      labelH: 15,
+      columns: 2,
+      colGap: 2,
+      rowGap: 2,
+      marginT: 1,
+      marginL: 1,
+      elements: [
+        { id: "d70_1", type: "text", value: "{{FirmName}}", x: 1, y: 0.8, w: 33, h: 3, fontSize: 2, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 1, showText: true },
+        { id: "d70_2", type: "barcode", value: "{{Barcode}}", x: 1.5, y: 4.0, w: 32, h: 6.5, fontSize: 1, fontWeight: "normal", rotation: 0, alignment: 2, barcodeScale: 0.9, showText: true },
+        { id: "d70_3", type: "text", value: "MRP: ₹{{SalePrice}}", x: 1, y: 11.2, w: 33, h: 2.8, fontSize: 2, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 1, showText: true }
+      ]
+    };
+    setName(preset70x15.name);
+    setLabelW(preset70x15.labelW);
+    setLabelH(preset70x15.labelH);
+    setColumns(preset70x15.columns);
+    setColGap(preset70x15.colGap);
+    setRowGap(preset70x15.rowGap);
+    setMarginT(preset70x15.marginT);
+    setMarginL(preset70x15.marginL);
+    setElements(preset70x15.elements as Element[]);
+
+    handleSave(preset70x15);
   };
 
   const selEl = elements.find((el) => el.id === selectedElementId);
@@ -304,7 +338,17 @@ const AddEdit_BarcodeTemplate = () => {
   // Preset Layout Templates mapping
   const loadPreset = (presetId: string) => {
     let preset: Partial<typeof labelW & any> = {};
-    if (presetId === "std_double") {
+    if (presetId === "double_70x15") {
+      setName("Double Column (70x15mm)");
+      preset = {
+        labelW: 70, labelH: 15, columns: 2, colGap: 2, rowGap: 2, marginT: 1, marginL: 1,
+        elements: [
+          { id: "d70_1", type: "text", value: "{{FirmName}}", x: 1, y: 0.8, w: 33, h: 3, fontSize: 2, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 1, showText: true },
+          { id: "d70_2", type: "barcode", value: "{{Barcode}}", x: 1.5, y: 4.0, w: 32, h: 6.5, fontSize: 1, fontWeight: "normal", rotation: 0, alignment: 2, barcodeScale: 0.9, showText: true },
+          { id: "d70_3", type: "text", value: "MRP: ₹{{SalePrice}}", x: 1, y: 11.2, w: 33, h: 2.8, fontSize: 2, fontWeight: "bold", rotation: 0, alignment: 2, barcodeScale: 1, showText: true }
+        ]
+      };
+    } else if (presetId === "std_double") {
       setName("Standard Double Column (50x25mm)");
       preset = {
         labelW: 102, labelH: 25, columns: 2, colGap: 2, rowGap: 2, marginT: 1.5, marginL: 2,
@@ -426,6 +470,7 @@ const AddEdit_BarcodeTemplate = () => {
                       <Label className="fw-bold small">Load Starting Preset Layout</Label>
                       <select className="form-select border-primary" onChange={(e) => loadPreset(e.target.value)} defaultValue="">
                         <option value="" disabled>-- Select Preset --</option>
+                        <option value="double_70x15">Double Column (70x15mm) - 2 Cols</option>
                         <option value="std_double">Standard Double Column (50x25mm)</option>
                         <option value="std_single">Standard Single Column (50x25mm)</option>
                         <option value="std_triple">Standard Triple Column (33x25mm)</option>
@@ -435,6 +480,11 @@ const AddEdit_BarcodeTemplate = () => {
                         <option value="warehouse">Warehouse Logistics Label (100x100mm)</option>
                       </select>
                     </FormGroup>
+                  </Col>
+                  <Col md="4" className="d-flex align-items-end mb-3">
+                    <Btn color="success" className="w-100 fw-bold" onClick={handleAutoSave70x15}>
+                      <i className="fa fa-magic me-1" /> Auto Save 70x15mm Template
+                    </Btn>
                   </Col>
                 </Row>
 
@@ -750,7 +800,8 @@ const AddEdit_BarcodeTemplate = () => {
               </CardBody>
               <CardFooter className="d-flex justify-content-end gap-2 border-top">
                 <Btn color="secondary" className="px-4 fw-bold" onClick={() => navigate("/barcodeTemplate")}>Cancel</Btn>
-                <Btn color="primary" className="px-4 fw-bold" onClick={handleSave}>Save Template</Btn>
+                <Btn color="success" className="px-4 fw-bold" onClick={handleAutoSave70x15}><i className="fa fa-magic me-1" /> Auto Save 70x15mm</Btn>
+                <Btn color="primary" className="px-4 fw-bold" onClick={() => handleSave()}>Save Template</Btn>
               </CardFooter>
             </Card>
           </Col>
