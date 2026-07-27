@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Formik, Form, ErrorMessage } from "formik";
 import type { FormikHelpers, FormikProps } from "formik";
 import * as Yup from "yup";
-import { Card, CardBody, CardFooter, Col, Container, FormGroup, Input, Label, Row } from "reactstrap";
+import { Card, CardBody, CardFooter, Col, Container, FormGroup, Input, Label, Nav, NavItem, NavLink, Row, TabContent, TabPane } from "reactstrap";
 import { Btn } from "../../AbstractElements";
 import Breadcrumbs from "../../CommonElements/Breadcrumbs/Breadcrumbs";
 import CardHeaderCommon from "../../CommonElements/CardHeaderCommon/CardHeaderCommon";
@@ -30,6 +30,12 @@ interface FormValues {
   FirmAddress: string;
   GSTNo: string;
   F_GSTGroupMaster_ServiceTax: string;
+  ContactAddress: string;
+  ContactPhone: string;
+  ContactEmail: string;
+  ContactWorkingHours: string;
+  Latitude: string;
+  Longitude: string;
 }
 
 const initialValues: FormValues = {
@@ -49,6 +55,12 @@ const initialValues: FormValues = {
   FirmAddress: "",
   GSTNo: "",
   F_GSTGroupMaster_ServiceTax: "",
+  ContactAddress: "",
+  ContactPhone: "",
+  ContactEmail: "",
+  ContactWorkingHours: "",
+  Latitude: "",
+  Longitude: "",
 };
 
 interface DropdownState {
@@ -79,6 +91,7 @@ const API_URL_FETCH = `${API_WEB_URLS.MASTER}/0/token/GlobalOptions/Id/0`;
 const GlobalOptions: React.FC = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("1");
   const [globalOptionsState, setGlobalOptionsState] = useState<GlobalOptionsState>({
     formData: { ...initialValues },
     isProgress: false,
@@ -115,6 +128,12 @@ const GlobalOptions: React.FC = () => {
     FirmAddress: toStringOrEmpty(globalOptionsState.formData.FirmAddress),
     GSTNo: toStringOrEmpty(globalOptionsState.formData.GSTNo),
     F_GSTGroupMaster_ServiceTax: toStringOrEmpty(globalOptionsState.formData.F_GSTGroupMaster_ServiceTax),
+    ContactAddress: toStringOrEmpty(globalOptionsState.formData.ContactAddress),
+    ContactPhone: toStringOrEmpty(globalOptionsState.formData.ContactPhone),
+    ContactEmail: toStringOrEmpty(globalOptionsState.formData.ContactEmail),
+    ContactWorkingHours: toStringOrEmpty(globalOptionsState.formData.ContactWorkingHours),
+    Latitude: toStringOrEmpty(globalOptionsState.formData.Latitude),
+    Longitude: toStringOrEmpty(globalOptionsState.formData.Longitude),
   };
 
   // Load dropdown data on component mount
@@ -243,6 +262,12 @@ const GlobalOptions: React.FC = () => {
               FirmAddress: globalOptionsRecord.FirmAddress || "",
               GSTNo: globalOptionsRecord.GSTNo || "",
               F_GSTGroupMaster_ServiceTax: String(globalOptionsRecord.F_GSTGroupMaster || globalOptionsRecord.F_GSTGroupMaster_ServiceTax || globalOptionsRecord.F_ServiceTaxGroup || ""),
+              ContactAddress: globalOptionsRecord.ContactAddress || "",
+              ContactPhone: globalOptionsRecord.ContactPhone || "",
+              ContactEmail: globalOptionsRecord.ContactEmail || "",
+              ContactWorkingHours: globalOptionsRecord.ContactWorkingHours || "",
+              Latitude: globalOptionsRecord.Latitude || "",
+              Longitude: globalOptionsRecord.Longitude || "",
             },
             isProgress: false,
           }));
@@ -272,6 +297,12 @@ const GlobalOptions: React.FC = () => {
       formData.append("MobileNo", values.MobileNo || "");
       formData.append("EmailId", values.EmailId || "");
       formData.append("UserId", userId);
+      formData.append("ContactAddress", values.ContactAddress || "");
+      formData.append("ContactPhone", values.ContactPhone || "");
+      formData.append("ContactEmail", values.ContactEmail || "");
+      formData.append("ContactWorkingHours", values.ContactWorkingHours || "");
+      formData.append("Latitude", values.Latitude || "");
+      formData.append("Longitude", values.Longitude || "");
 
       const requestData = {
         arguList: { id: 0, formData },
@@ -318,191 +349,307 @@ const GlobalOptions: React.FC = () => {
                         tagClass="card-title mb-0"
                       />
                       <CardBody>
-                        <Row className="gy-3">
-                          <Col md="6">
-                            <FormGroup>
-                              <Label>
-                                Firm Name <span className="text-danger">*</span>
-                              </Label>
-                              <Input
-                                name="FirmName"
-                                type="text"
-                                placeholder="Enter firm name"
-                                value={values.FirmName}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                                invalid={touched.FirmName && !!errors.FirmName}
-                              />
-                              <ErrorMessage name="FirmName" component="div" className="text-danger small" />
-                            </FormGroup>
-                          </Col>
-                          <Col md="6">
-                            <FormGroup>
-                              <Label>
-                                Financial Year <span className="text-danger">*</span>
-                              </Label>
-                              <Input
-                                name="F_FinancialYearMaster"
-                                type="select"
-                                value={values.F_FinancialYearMaster}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                                invalid={touched.F_FinancialYearMaster && !!errors.F_FinancialYearMaster}
-                              >
-                                <option value="">Select Financial Year</option>
-                                {dropdowns.financialYearList.map((item: any) => {
-                                  const fromDate = new Date(item.FinancialYearFrom).toLocaleDateString('en-IN');
-                                  const toDate = new Date(item.FinancialYearTo).toLocaleDateString('en-IN');
-                                  const itemId = String(item.Id ?? item.ID ?? item.id ?? "");
-                                  return (
-                                    <option key={itemId} value={itemId}>
-                                      {`${fromDate} - ${toDate}`}
-                                    </option>
-                                  );
-                                })}
-                              </Input>
-                              <ErrorMessage name="F_FinancialYearMaster" component="div" className="text-danger small" />
-                            </FormGroup>
-                          </Col>
+                        <Nav tabs className="nav-tabs border-tab mb-4">
+                          <NavItem>
+                            <NavLink
+                              className={`py-2 px-3 ${activeTab === "1" ? "active fw-bold border-bottom border-primary" : ""}`}
+                              style={{ cursor: "pointer" }}
+                              onClick={() => setActiveTab("1")}
+                            >
+                              <i className="fa fa-cogs me-2" /> General Options
+                            </NavLink>
+                          </NavItem>
+                          <NavItem>
+                            <NavLink
+                              className={`py-2 px-3 ${activeTab === "2" ? "active fw-bold border-bottom border-primary" : ""}`}
+                              style={{ cursor: "pointer" }}
+                              onClick={() => setActiveTab("2")}
+                            >
+                              <i className="fa fa-globe me-2" /> WebsiteContactUs
+                            </NavLink>
+                          </NavItem>
+                        </Nav>
 
-                          <Col md="6">
-                            <FormGroup>
-                              <Label>
-                                State <span className="text-danger">*</span>
-                              </Label>
-                              <Input
-                                name="F_StateMaster"
-                                type="select"
-                                value={values.F_StateMaster}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                                invalid={touched.F_StateMaster && !!errors.F_StateMaster}
-                              >
-                                <option value="">Select State</option>
-                                {dropdowns.stateList.map((item: any) => (
-                                  <option key={item.Id} value={item.Id}>
-                                    {item.StateName || item.Name}
-                                  </option>
-                                ))}
-                              </Input>
-                              <ErrorMessage name="F_StateMaster" component="div" className="text-danger small" />
-                            </FormGroup>
-                          </Col>
+                        <TabContent activeTab={activeTab}>
+                          <TabPane tabId="1">
+                            <Row className="gy-3">
+                              <Col md="6">
+                                <FormGroup>
+                                  <Label>
+                                    Firm Name <span className="text-danger">*</span>
+                                  </Label>
+                                  <Input
+                                    name="FirmName"
+                                    type="text"
+                                    placeholder="Enter firm name"
+                                    value={values.FirmName}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    invalid={touched.FirmName && !!errors.FirmName}
+                                  />
+                                  <ErrorMessage name="FirmName" component="div" className="text-danger small" />
+                                </FormGroup>
+                              </Col>
+                              <Col md="6">
+                                <FormGroup>
+                                  <Label>
+                                    Financial Year <span className="text-danger">*</span>
+                                  </Label>
+                                  <Input
+                                    name="F_FinancialYearMaster"
+                                    type="select"
+                                    value={values.F_FinancialYearMaster}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    invalid={touched.F_FinancialYearMaster && !!errors.F_FinancialYearMaster}
+                                  >
+                                    <option value="">Select Financial Year</option>
+                                    {dropdowns.financialYearList.map((item: any) => {
+                                      const fromDate = new Date(item.FinancialYearFrom).toLocaleDateString('en-IN');
+                                      const toDate = new Date(item.FinancialYearTo).toLocaleDateString('en-IN');
+                                      const itemId = String(item.Id ?? item.ID ?? item.id ?? "");
+                                      return (
+                                        <option key={itemId} value={itemId}>
+                                          {`${fromDate} - ${toDate}`}
+                                        </option>
+                                      );
+                                    })}
+                                  </Input>
+                                  <ErrorMessage name="F_FinancialYearMaster" component="div" className="text-danger small" />
+                                </FormGroup>
+                              </Col>
 
-                          <Col md="6">
-                            <FormGroup>
-                              <Label>
-                                City <span className="text-danger">*</span>
-                              </Label>
-                              <Input
-                                name="F_CityMaster"
-                                type="select"
-                                value={values.F_CityMaster}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                                invalid={touched.F_CityMaster && !!errors.F_CityMaster}
-                              >
-                                <option value="">Select City</option>
-                                {dropdowns.cityList.map((item: any) => (
-                                  <option key={item.Id} value={item.Id}>
-                                    {item.CityName || item.Name}
-                                  </option>
-                                ))}
-                              </Input>
-                              <ErrorMessage name="F_CityMaster" component="div" className="text-danger small" />
-                            </FormGroup>
-                          </Col>
+                              <Col md="6">
+                                <FormGroup>
+                                  <Label>
+                                    State <span className="text-danger">*</span>
+                                  </Label>
+                                  <Input
+                                    name="F_StateMaster"
+                                    type="select"
+                                    value={values.F_StateMaster}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    invalid={touched.F_StateMaster && !!errors.F_StateMaster}
+                                  >
+                                    <option value="">Select State</option>
+                                    {dropdowns.stateList.map((item: any) => (
+                                      <option key={item.Id} value={item.Id}>
+                                        {item.StateName || item.Name}
+                                      </option>
+                                    ))}
+                                  </Input>
+                                  <ErrorMessage name="F_StateMaster" component="div" className="text-danger small" />
+                                </FormGroup>
+                              </Col>
 
-                          <Col md="6">
-                            <FormGroup>
-                              <Label>Firm Address</Label>
-                              <Input
-                                name="FirmAddress"
-                                type="text"
-                                placeholder="Enter firm address"
-                                value={values.FirmAddress}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                              />
-                            </FormGroup>
-                          </Col>
+                              <Col md="6">
+                                <FormGroup>
+                                  <Label>
+                                    City <span className="text-danger">*</span>
+                                  </Label>
+                                  <Input
+                                    name="F_CityMaster"
+                                    type="select"
+                                    value={values.F_CityMaster}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    invalid={touched.F_CityMaster && !!errors.F_CityMaster}
+                                  >
+                                    <option value="">Select City</option>
+                                    {dropdowns.cityList.map((item: any) => (
+                                      <option key={item.Id} value={item.Id}>
+                                        {item.CityName || item.Name}
+                                      </option>
+                                    ))}
+                                  </Input>
+                                  <ErrorMessage name="F_CityMaster" component="div" className="text-danger small" />
+                                </FormGroup>
+                              </Col>
 
-                          <Col md="6">
-                            <FormGroup>
-                              <Label>GST No</Label>
-                              <Input
-                                name="GSTNo"
-                                type="text"
-                                placeholder="Enter GST No"
-                                value={values.GSTNo}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                              />
-                            </FormGroup>
-                          </Col>
+                              <Col md="6">
+                                <FormGroup>
+                                  <Label>Firm Address</Label>
+                                  <Input
+                                    name="FirmAddress"
+                                    type="text"
+                                    placeholder="Enter firm address"
+                                    value={values.FirmAddress}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                  />
+                                </FormGroup>
+                              </Col>
 
-                          <Col md="6">
-                            <FormGroup>
-                              <Label>Service Tax Group</Label>
-                              <Input
-                                name="F_GSTGroupMaster_ServiceTax"
-                                type="select"
-                                value={values.F_GSTGroupMaster_ServiceTax}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                              >
-                                <option value="">Select Service Tax</option>
-                                {dropdowns.gstGroupList.map((item: any) => (
-                                  <option key={item.Id} value={item.Id}>
-                                    {item.GSTGroupName || item.Name}
-                                  </option>
-                                ))}
-                              </Input>
-                            </FormGroup>
-                          </Col>
+                              <Col md="6">
+                                <FormGroup>
+                                  <Label>GST No</Label>
+                                  <Input
+                                    name="GSTNo"
+                                    type="text"
+                                    placeholder="Enter GST No"
+                                    value={values.GSTNo}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                  />
+                                </FormGroup>
+                              </Col>
 
-                          <Col md="6">
-                            <FormGroup>
-                              <Label>Mobile No</Label>
-                              <Input
-                                name="MobileNo"
-                                type="text"
-                                placeholder="Enter mobile no"
-                                value={values.MobileNo}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                              />
-                            </FormGroup>
-                          </Col>
+                              <Col md="6">
+                                <FormGroup>
+                                  <Label>Service Tax Group</Label>
+                                  <Input
+                                    name="F_GSTGroupMaster_ServiceTax"
+                                    type="select"
+                                    value={values.F_GSTGroupMaster_ServiceTax}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                  >
+                                    <option value="">Select Service Tax</option>
+                                    {dropdowns.gstGroupList.map((item: any) => (
+                                      <option key={item.Id} value={item.Id}>
+                                        {item.GSTGroupName || item.Name}
+                                      </option>
+                                    ))}
+                                  </Input>
+                                </FormGroup>
+                              </Col>
 
-                          <Col md="6">
-                            <FormGroup>
-                              <Label>PAN No</Label>
-                              <Input
-                                name="PANNo"
-                                type="text"
-                                placeholder="Enter PAN no"
-                                value={values.PANNo}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                              />
-                            </FormGroup>
-                          </Col>
+                              <Col md="6">
+                                <FormGroup>
+                                  <Label>Mobile No</Label>
+                                  <Input
+                                    name="MobileNo"
+                                    type="text"
+                                    placeholder="Enter mobile no"
+                                    value={values.MobileNo}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                  />
+                                </FormGroup>
+                              </Col>
 
-                          <Col md="6">
-                            <FormGroup>
-                              <Label>Email</Label>
-                              <Input
-                                name="EmailId"
-                                type="email"
-                                placeholder="Enter email address"
-                                value={values.EmailId}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                              />
-                            </FormGroup>
-                          </Col>
-                        </Row>
+                              <Col md="6">
+                                <FormGroup>
+                                  <Label>PAN No</Label>
+                                  <Input
+                                    name="PANNo"
+                                    type="text"
+                                    placeholder="Enter PAN no"
+                                    value={values.PANNo}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                  />
+                                </FormGroup>
+                              </Col>
+
+                              <Col md="6">
+                                <FormGroup>
+                                  <Label>Email</Label>
+                                  <Input
+                                    name="EmailId"
+                                    type="email"
+                                    placeholder="Enter email address"
+                                    value={values.EmailId}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                  />
+                                </FormGroup>
+                              </Col>
+                            </Row>
+                          </TabPane>
+
+                          <TabPane tabId="2">
+                            <Row className="gy-3">
+                              <Col md="12">
+                                <FormGroup>
+                                  <Label className="fw-bold">Website Contact Address</Label>
+                                  <Input
+                                    name="ContactAddress"
+                                    type="textarea"
+                                    rows={2}
+                                    placeholder="Enter full contact address to display on website"
+                                    value={values.ContactAddress}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                  />
+                                </FormGroup>
+                              </Col>
+
+                              <Col md="6">
+                                <FormGroup>
+                                  <Label className="fw-bold">Website Contact Phone / Mobile</Label>
+                                  <Input
+                                    name="ContactPhone"
+                                    type="text"
+                                    placeholder="e.g. +91 8955524448 / +91 9828121300"
+                                    value={values.ContactPhone}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                  />
+                                </FormGroup>
+                              </Col>
+
+                              <Col md="6">
+                                <FormGroup>
+                                  <Label className="fw-bold">Website Contact Email</Label>
+                                  <Input
+                                    name="ContactEmail"
+                                    type="email"
+                                    placeholder="e.g. weddingknot007@gmail.com"
+                                    value={values.ContactEmail}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                  />
+                                </FormGroup>
+                              </Col>
+
+                              <Col md="6">
+                                <FormGroup>
+                                  <Label className="fw-bold">Working Hours / Timings</Label>
+                                  <Input
+                                    name="ContactWorkingHours"
+                                    type="text"
+                                    placeholder="e.g. Mon - Sat: 10:00 AM - 8:00 PM"
+                                    value={values.ContactWorkingHours}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                  />
+                                </FormGroup>
+                              </Col>
+
+                              <Col md="3">
+                                <FormGroup>
+                                  <Label className="fw-bold">Map Latitude</Label>
+                                  <Input
+                                    name="Latitude"
+                                    type="text"
+                                    placeholder="e.g. 26.250597"
+                                    value={values.Latitude}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                  />
+                                  <small className="text-muted">Used for Google Maps pin on Contact page</small>
+                                </FormGroup>
+                              </Col>
+
+                              <Col md="3">
+                                <FormGroup>
+                                  <Label className="fw-bold">Map Longitude</Label>
+                                  <Input
+                                    name="Longitude"
+                                    type="text"
+                                    placeholder="e.g. 72.9798217"
+                                    value={values.Longitude}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                  />
+                                  <small className="text-muted">Used for Google Maps pin on Contact page</small>
+                                </FormGroup>
+                              </Col>
+                            </Row>
+                          </TabPane>
+                        </TabContent>
                       </CardBody>
                       <CardFooter className="text-end">
                         <Btn
