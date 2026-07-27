@@ -48,6 +48,7 @@ export const API_WEB_URLS = {
   FirmMaster: "FirmMaster",
   BranchMaster: "BranchMaster",
   UserMaster: "UserMaster",
+  WebsiteLeads: "WebsiteLeads",
   AdminMaster: "AdminMaster",
   CourseMasterH: "CourseMasterH",
   CourseMasterL: "CourseMasterL",

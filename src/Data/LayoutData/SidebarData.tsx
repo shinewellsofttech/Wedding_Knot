@@ -57,6 +57,13 @@ export const MenuList: MenuItem[] = [
 
       },
       {
+        id: 400, title: "Website Leads",
+        path: `${process.env.PUBLIC_URL}/websiteLeads`,
+        icon: "UserCheck",
+        type: "link",
+        bookmark: true
+      },
+      {
         id: 1,
         title: "Material Master",
         path: `${process.env.PUBLIC_URL}/materialMaster`,
