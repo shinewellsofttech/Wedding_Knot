@@ -340,6 +340,26 @@ const PageList_ItemMaster = () => {
     setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const cleanUrl = (url?: string) => {
+    if (!url || typeof url !== "string" || url.trim() === "") return "";
+    let cleaned = url.trim();
+    if (cleaned.startsWith("data:") || cleaned.startsWith("blob:")) return cleaned;
+    if (cleaned.includes("https://") && cleaned.lastIndexOf("https://") > 0) {
+      return cleaned.substring(cleaned.lastIndexOf("https://"));
+    } else if (cleaned.includes("http://") && cleaned.lastIndexOf("http://") > 0) {
+      return cleaned.substring(cleaned.lastIndexOf("http://"));
+    }
+    if (!cleaned.startsWith("http://") && !cleaned.startsWith("https://")) {
+      const baseUrl = API_WEB_URLS.BASE.replace("api/V1/", "");
+      const cleanPath = cleaned.startsWith("/") ? cleaned.substring(1) : cleaned;
+      if (cleanPath.startsWith("ItemImages/")) {
+        return `${baseUrl}${cleanPath}`;
+      }
+      return `${baseUrl}ItemImages/${cleanPath}`;
+    }
+    return cleaned;
+  };
+
   const getEmbedUrl = (url: string) => {
     if (!url) return url;
     try {
@@ -454,8 +474,8 @@ const PageList_ItemMaster = () => {
     navigate("/addEditItemMaster", { state: { Id: 0 } });
   };
 
-  const handleEdit = (id: number | string) => {
-    navigate("/addEditItemMaster", { state: { Id: id } });
+  const handleEdit = (id: number | string, variantId?: number | string) => {
+    navigate("/addEditItemMaster", { state: { Id: id, variantId: variantId } });
   };
 
   const handleDelete = (id: number | string) => {
@@ -819,16 +839,30 @@ const PageList_ItemMaster = () => {
                                       >
                                         <i className={`fa ${isRowExpanded ? "fa-chevron-down" : "fa-chevron-right"}`} />
                                       </Btn>
-                                      {item?.CoverImage && (
-                                        <a href={item.CoverImage} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '8px' }}>
-                                          <img
-                                            src={item.CoverImage_Thumb || item.CoverImage}
-                                            alt="Cover"
-                                            style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }}
-                                            title="Cover Image - Click to view"
-                                          />
-                                        </a>
-                                      )}
+                                                             {(() => {
+                                         const rawCover = item?.iCoverImage || item?.CoverImage || item?.icoverimage || item?.coverImage || item?.ICoverImage || item?.ItemCoverImage || item?.CoverPhoto || item?.coverPhoto || "";
+                                         const coverFull = cleanUrl(rawCover);
+                                         if (!coverFull) return null;
+                                         return (
+                                           <a href={coverFull} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '8px' }}>
+                                             <img
+                                               src={coverFull}
+                                               alt="Cover"
+                                               style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }}
+                                               title="Cover Image - Click to view"
+                                               onMouseEnter={(e) => {
+                                                 const rect = e.currentTarget.getBoundingClientRect();
+                                                 setHoveredImage({
+                                                   url: coverFull,
+                                                   x: rect.left + rect.width / 2,
+                                                   y: rect.top
+                                                 });
+                                               }}
+                                               onMouseLeave={() => setHoveredImage(null)}
+                                             />
+                                           </a>
+                                         );
+                                       })()}
                                       <strong>#{absoluteIndex + 1} - {item?.ItemName || "-"}</strong>
                                       <span className="mx-2">|</span>
                                       <strong>HSN:</strong> {item?.HSNCode || "-"}
@@ -875,11 +909,11 @@ const PageList_ItemMaster = () => {
                                     ) : (
                                       filteredDesign.map((d: any, dIdx: number) => {
                                       const images = [
-                                        { full: d.DesignPhoto, thumb: d.DesignPhoto_Thumb },
-                                        { full: d.DesignPhoto2, thumb: d.DesignPhoto2_Thumb },
-                                        { full: d.DesignPhoto3, thumb: d.DesignPhoto3_Thumb },
-                                        { full: d.DesignPhoto4, thumb: d.DesignPhoto4_Thumb },
-                                        { full: d.DesignPhoto5, thumb: d.DesignPhoto5_Thumb }
+                                        { full: cleanUrl(d.DesignPhoto), thumb: cleanUrl(d.DesignPhoto_Thumb) || cleanUrl(d.DesignPhoto) },
+                                        { full: cleanUrl(d.DesignPhoto2), thumb: cleanUrl(d.DesignPhoto2_Thumb) || cleanUrl(d.DesignPhoto2) },
+                                        { full: cleanUrl(d.DesignPhoto3), thumb: cleanUrl(d.DesignPhoto3_Thumb) || cleanUrl(d.DesignPhoto3) },
+                                        { full: cleanUrl(d.DesignPhoto4), thumb: cleanUrl(d.DesignPhoto4_Thumb) || cleanUrl(d.DesignPhoto4) },
+                                        { full: cleanUrl(d.DesignPhoto5), thumb: cleanUrl(d.DesignPhoto5_Thumb) || cleanUrl(d.DesignPhoto5) }
                                       ].filter(img => img.full && img.full.trim() !== "");
 
                                       return (
@@ -969,9 +1003,14 @@ const PageList_ItemMaster = () => {
                                             )}
                                           </td>
                                           <td>
-                                            <Btn color="info" size="sm" onClick={() => handlePrintBarcodes(item, d)} title="Print Variant Barcode">
-                                              <i className="fa fa-print" />
-                                            </Btn>
+                                            <div className="d-flex gap-1 justify-content-center">
+                                              <Btn color="primary" size="sm" onClick={() => handleEdit(item?.Id, d?.Id)} title="Edit Variant">
+                                                <i className="fa fa-edit" />
+                                              </Btn>
+                                              <Btn color="info" size="sm" onClick={() => handlePrintBarcodes(item, d)} title="Print Variant Barcode">
+                                                <i className="fa fa-print" />
+                                              </Btn>
+                                            </div>
                                           </td>
                                         </tr>
                                       );
