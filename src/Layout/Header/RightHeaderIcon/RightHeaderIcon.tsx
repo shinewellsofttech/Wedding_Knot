@@ -4,7 +4,7 @@ import ResponsiveSearchInput from './ResponsiveSearchInput/ResponsiveSearchInput
 import HeaderFYCompany from '../HeaderFYCompany'
 import ZoomInOut from './ZoomInOut/ZoomInOut'
 // import Language from './Language/Language'
-// import Notifications from './Notifications/Notifications'
+import Notifications from './Notifications/Notifications'
 // import HeaderBookmark from './HeaderBookmark/HeaderBookmark'
 import DarkMode from './DarkMode/DarkMode'
 // import HeaderMessage from './HeaderMessage/HeaderMessage'
@@ -20,7 +20,7 @@ const RightHeaderIcon = () => {
         <ResponsiveSearchInput />
         <ZoomInOut />
         {/* <Language /> */}
-        {/* <Notifications /> */}
+        <Notifications />
         {/* <HeaderBookmark /> */}
         <DarkMode />
         {/* <HeaderMessage /> */}

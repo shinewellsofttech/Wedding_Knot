@@ -1,8 +1,8 @@
 export const API_WEB_URLS = {
 
-  // BASE: "https://accountingwkr.shinewellsofttech.co.in/api/V1/",
+  BASE: "https://accountingwkr.shinewellsofttech.co.in/api/V1/",
 
-    BASE: "https://localhost:44379/api/V1/",
+    // BASE: "https://localhost:44379/api/V1/",
 
   // BASE: "http://192.168.31.151:5062/api/V1/",
   BASE_CHAT: "https://apiDemotask.shinewellsofttech.co.in/",

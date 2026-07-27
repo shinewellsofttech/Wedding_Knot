@@ -819,6 +819,16 @@ const PageList_ItemMaster = () => {
                                       >
                                         <i className={`fa ${isRowExpanded ? "fa-chevron-down" : "fa-chevron-right"}`} />
                                       </Btn>
+                                      {item?.CoverImage && (
+                                        <a href={item.CoverImage} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '8px' }}>
+                                          <img
+                                            src={item.CoverImage_Thumb || item.CoverImage}
+                                            alt="Cover"
+                                            style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }}
+                                            title="Cover Image - Click to view"
+                                          />
+                                        </a>
+                                      )}
                                       <strong>#{absoluteIndex + 1} - {item?.ItemName || "-"}</strong>
                                       <span className="mx-2">|</span>
                                       <strong>HSN:</strong> {item?.HSNCode || "-"}

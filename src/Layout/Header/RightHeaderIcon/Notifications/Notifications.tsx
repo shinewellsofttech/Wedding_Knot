@@ -1,16 +1,37 @@
 import { Badges, H6, LI, SVG } from "../../../../AbstractElements";
-import { Notification } from "../../../../utils/Constant";
+import { useOrderNotifications } from "../../../../contexts/OrderNotificationContext";
 import NotificationBox from "./NotificationBox";
 
 const Notifications = () => {
+  const { unreadCount, markAllAsRead } = useOrderNotifications();
+
   return (
-    <LI className="onhover-dropdown">
-      <div className="notification-box">
+    <LI className="onhover-dropdown" onClick={() => { if (unreadCount > 0) markAllAsRead(); }}>
+      <div className="notification-box" style={{ position: "relative" }}>
         <SVG iconId="fill-Bell" />
-        <Badges pill color="primary">3</Badges>
+        {unreadCount > 0 && (
+          <span style={{ position: "absolute", top: "-5px", right: "-5px" }}>
+            <Badges pill color="danger">
+              {unreadCount}
+            </Badges>
+          </span>
+        )}
       </div>
       <div className="onhover-show-div notification-dropdown">
-        <H6 className="f-18 mb-0 dropdown-title">{Notification} </H6>
+        <div className="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
+          <H6 className="f-18 mb-0 dropdown-title">Order Notifications</H6>
+          {unreadCount > 0 && (
+            <span
+              style={{ fontSize: "12px", color: "#007bff", cursor: "pointer", textDecoration: "underline" }}
+              onClick={(e) => {
+                e.stopPropagation();
+                markAllAsRead();
+              }}
+            >
+              Mark all as read
+            </span>
+          )}
+        </div>
         <NotificationBox />
       </div>
     </LI>

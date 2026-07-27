@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { UserRightsProvider } from './contexts/UserRightsContext';
+import { OrderNotificationProvider } from './contexts/OrderNotificationContext';
 import RouterData from './Routes';
 
 function App() {
@@ -38,8 +40,10 @@ function App() {
 
   return (
     <UserRightsProvider>
-      <RouterData />
-      <ToastContainer />
+      <OrderNotificationProvider>
+        <RouterData />
+        <ToastContainer />
+      </OrderNotificationProvider>
     </UserRightsProvider>
   );
 }

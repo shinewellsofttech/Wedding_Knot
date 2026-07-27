@@ -37,6 +37,7 @@ interface ItemRow {
 interface ItemSection {
   id: string;
   itemName: string;
+  coverImage?: ItemPhoto | null;
   shortDescription: string;
   fullDescription: string;
   hasSize: string; // "Yes" or "No"
@@ -61,6 +62,7 @@ const makeRow = (): ItemRow => ({
 const makeSection = (): ItemSection => ({
   id: uid(),
   itemName: "",
+  coverImage: null,
   shortDescription: "",
   fullDescription: "",
   hasSize: "Yes",
@@ -262,6 +264,7 @@ const AddEdit_ItemMaster = () => {
              return {
                 id: String(item.Id || uid()),
                 itemName: item.ItemName || "",
+                coverImage: item.CoverImage ? { file: null, preview: item.CoverImage_Thumb && item.CoverImage_Thumb.trim() !== "" ? item.CoverImage_Thumb : item.CoverImage, fullUrl: item.CoverImage } : null,
                 shortDescription: item.ShortDescription || "",
                 fullDescription: item.FullDescription || "",
                 hasSize: item.HasSize ? "Yes" : "No",
@@ -705,6 +708,65 @@ const AddEdit_ItemMaster = () => {
                                     handleFieldUpdate(section.id, "ItemMaster", "ItemName", e.target.value);
                                   }}
                                 />
+                              </div>
+
+                              <div className="im-section-info-field">
+                                <label>Cover Image</label>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                  {section.coverImage?.preview ? (
+                                    <div style={{ position: "relative", width: "40px", height: "40px" }}>
+                                      <img
+                                        src={section.coverImage.preview}
+                                        alt="Cover"
+                                        style={{ width: "40px", height: "40px", objectFit: "cover", borderRadius: "4px", border: "1px solid #ccc" }}
+                                        onMouseEnter={(e) => {
+                                          const rect = e.currentTarget.getBoundingClientRect();
+                                          setHoveredImage({ url: section.coverImage?.fullUrl || section.coverImage?.preview || "", x: rect.right + 10, y: rect.top });
+                                        }}
+                                        onMouseLeave={() => setHoveredImage(null)}
+                                      />
+                                      <button
+                                        type="button"
+                                        style={{
+                                          position: "absolute",
+                                          top: "-6px",
+                                          right: "-6px",
+                                          background: "#dc3545",
+                                          color: "#fff",
+                                          border: "none",
+                                          borderRadius: "50%",
+                                          width: "16px",
+                                          height: "16px",
+                                          fontSize: "10px",
+                                          cursor: "pointer",
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center"
+                                        }}
+                                        onClick={() => {
+                                          updateSectionField(secIdx, 'coverImage', null);
+                                          handleFieldUpdate(section.id, "ItemMaster", "CoverImage", "", undefined, true);
+                                        }}
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      style={{ fontSize: "11px", width: "160px" }}
+                                      onChange={e => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                          const preview = URL.createObjectURL(file);
+                                          updateSectionField(secIdx, 'coverImage', { file, preview });
+                                          handleFieldUpdate(section.id, "ItemMaster", "CoverImage", "", { CoverImage: file }, true);
+                                        }
+                                      }}
+                                    />
+                                  )}
+                                </div>
                               </div>
 
                               <div className="im-section-info-field">

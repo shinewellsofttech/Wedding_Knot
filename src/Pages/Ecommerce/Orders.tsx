@@ -77,6 +77,15 @@ const Orders = () => {
   useEffect(() => {
     fetchOrders();
     fetchStatuses();
+
+    const handleNewOrder = () => {
+      fetchOrders();
+    };
+
+    window.addEventListener("eccom_new_order_received", handleNewOrder);
+    return () => {
+      window.removeEventListener("eccom_new_order_received", handleNewOrder);
+    };
   }, []);
 
   const fetchStatuses = async () => {
