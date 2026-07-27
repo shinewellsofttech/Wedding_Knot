@@ -270,14 +270,8 @@ export const OrderNotificationProvider: React.FC<{ children: ReactNode }> = ({ c
       fetchOrdersCheck();
     });
 
-    // Backup polling timer (every 10 seconds) in case network drops WebSocket
-    const intervalId = setInterval(() => {
-      fetchOrdersCheck();
-    }, 10000);
-
     return () => {
       connection.stop().catch(() => {});
-      clearInterval(intervalId);
     };
   }, []);
 
