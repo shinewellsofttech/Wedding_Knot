@@ -205,14 +205,14 @@ export const generateInvoiceHTML = (
   if (isInState) {
     igstOrCgstSgstRows = `
       <tr>
-        <td colspan="4" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 6px; text-align: right;"><em>OUTPUT CGST</em></td>
+        <td colspan="5" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 6px; text-align: right;"><em>OUTPUT CGST</em></td>
         <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
         <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
         <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
         <td style="padding: 2px 6px; border-bottom: 1px solid #000; text-align: right; font-weight: bold;">${finalCGST.toFixed(2)}</td>
       </tr>
       <tr>
-        <td colspan="4" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 6px; text-align: right;"><em>OUTPUT SGST</em></td>
+        <td colspan="5" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 6px; text-align: right;"><em>OUTPUT SGST</em></td>
         <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
         <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
         <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
@@ -222,7 +222,7 @@ export const generateInvoiceHTML = (
   } else {
     igstOrCgstSgstRows = `
       <tr>
-        <td colspan="4" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 6px; text-align: right;"><em>OUTPUT IGST</em></td>
+        <td colspan="5" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 6px; text-align: right;"><em>OUTPUT IGST</em></td>
         <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
         <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
         <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
@@ -238,7 +238,7 @@ export const generateInvoiceHTML = (
     if (amount === 0) return "";
     return `
       <tr>
-        <td colspan="4" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 6px; text-align: right;"><em>${chargeName}</em></td>
+        <td colspan="5" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 6px; text-align: right;"><em>${chargeName}</em></td>
         <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
         <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
         <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
@@ -315,6 +315,7 @@ export const generateInvoiceHTML = (
               <th style="padding: 4px; border-right: 1px solid #000; text-align: center; width: 50px; font-size: 11px;">GST Rate</th>
               <th style="padding: 4px; border-right: 1px solid #000; text-align: center; width: 60px; font-size: 11px;">Quantity</th>
               <th style="padding: 4px; border-right: 1px solid #000; text-align: right; width: 70px; font-size: 11px;">Rate</th>
+              <th style="padding: 4px; border-right: 1px solid #000; text-align: right; width: 70px; font-size: 11px;">GST Amount</th>
               <th style="padding: 4px; border-right: 1px solid #000; text-align: center; width: 40px; font-size: 11px;">per</th>
               <th style="padding: 4px; text-align: right; width: 90px; font-size: 11px;">Amount</th>
             </tr>
@@ -330,6 +331,8 @@ export const generateInvoiceHTML = (
               const gstGroupId = row.F_GSTGroupMaster || itemObj?.F_GSTGroupMaster || itemObj?.GSTGroupMasterId || itemObj?.GSTGroupId;
               const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
               let gstPercent = gstGroup ? parseFloat(gstGroup.GSTPercent) || 0 : (row.GSTPercent || 0);
+              const gstAmount = (amount * gstPercent) / 100;
+              const lineTotal = amount + gstAmount;
               const hsnCode = gstGroup?.HSN_SAC_Code || itemObj?.HSNCode || itemObj?.HSN || row.HSNCode || row.HSN || "";
               const uom = itemObj?.UOMName || itemObj?.UOM || "PCS";
               return `
@@ -342,8 +345,9 @@ export const generateInvoiceHTML = (
                   <td style="padding: 2px 4px; border-right: 1px solid #000; border-bottom: 1px solid #000; text-align: center; font-size: 11px; vertical-align: top;">${gstPercent}%</td>
                   <td style="padding: 2px 4px; border-right: 1px solid #000; border-bottom: 1px solid #000; text-align: center; font-size: 11px; vertical-align: top; font-weight: bold;">${qty} ${uom}</td>
                   <td style="padding: 2px 4px; border-right: 1px solid #000; border-bottom: 1px solid #000; text-align: right; font-size: 11px; vertical-align: top;">${rate.toFixed(2)}</td>
+                  <td style="padding: 2px 4px; border-right: 1px solid #000; border-bottom: 1px solid #000; text-align: right; font-size: 11px; vertical-align: top;">${gstAmount.toFixed(2)}</td>
                   <td style="padding: 2px 4px; border-right: 1px solid #000; border-bottom: 1px solid #000; text-align: center; font-size: 11px; vertical-align: top;">${uom}</td>
-                  <td style="padding: 2px 4px; border-bottom: 1px solid #000; text-align: right; font-size: 11px; vertical-align: top; font-weight: bold;">${amount.toFixed(2)}</td>
+                  <td style="padding: 2px 4px; border-bottom: 1px solid #000; text-align: right; font-size: 11px; vertical-align: top; font-weight: bold;">${lineTotal.toFixed(2)}</td>
                 </tr>
               `;
             }).join("")}
@@ -358,6 +362,7 @@ export const generateInvoiceHTML = (
               <td style="border-right: 1px solid #000;"></td>
               <td style="border-right: 1px solid #000;"></td>
               <td style="border-right: 1px solid #000;"></td>
+              <td style="border-right: 1px solid #000;"></td>
               <td></td>
             </tr>
           </tbody>
@@ -365,7 +370,7 @@ export const generateInvoiceHTML = (
             <tr>
               <td colspan="4" style="padding: 4px; border-right: 1px solid #000; text-align: right; font-size: 11px;">Total</td>
               <td style="padding: 4px; border-right: 1px solid #000; text-align: center; font-size: 11px; font-weight: bold;">${totalQty}</td>
-              <td colspan="2" style="padding: 4px; border-right: 1px solid #000;"></td>
+              <td colspan="3" style="padding: 4px; border-right: 1px solid #000;"></td>
               <td style="padding: 4px; text-align: right; font-size: 12px; font-weight: bold;">₹ ${grandTotal.toFixed(2)}</td>
             </tr>
           </tfoot>

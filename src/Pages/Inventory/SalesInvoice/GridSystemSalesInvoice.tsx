@@ -9,29 +9,30 @@ const tableStyles = `
     margin-right: -0.25rem;
   }
   .sales-invoice-grid-wrap .po-table {
-    min-width: 950px;
+    min-width: 1050px;
     margin-bottom: 0;
   }
-  .po-table th:nth-child(1), .po-table td:nth-child(1) { width: 5%; min-width: 40px; text-align: center; }
-  .po-table th:nth-child(2), .po-table td:nth-child(2) { width: 12%; min-width: 90px; }
-  .po-table th:nth-child(3), .po-table td:nth-child(3) { width: 15%; min-width: 100px; }
-  .po-table th:nth-child(4), .po-table td:nth-child(4) { width: 20%; min-width: 140px; }
-  .po-table th:nth-child(5), .po-table td:nth-child(5) { width: 15%; min-width: 100px; }
-  .po-table th:nth-child(6), .po-table td:nth-child(6) { width: 8%; min-width: 80px; text-align: right; }
-  .po-table th:nth-child(7), .po-table td:nth-child(7) { width: 8%; min-width: 80px; text-align: center; }
-  .po-table th:nth-child(8), .po-table td:nth-child(8) { width: 10%; min-width: 90px; text-align: right; }
-  .po-table th:nth-child(9), .po-table td:nth-child(9) { width: 10%; min-width: 90px; text-align: center; }
-  .po-table th:nth-child(10), .po-table td:nth-child(10) { width: 12%; min-width: 90px; text-align: center; }
-  .po-table th:nth-child(11), .po-table td:nth-child(11) { width: 10%; min-width: 90px; text-align: center; }
+  .po-table th:nth-child(1), .po-table td:nth-child(1) { width: 4%; min-width: 35px; text-align: center; }
+  .po-table th:nth-child(2), .po-table td:nth-child(2) { width: 11%; min-width: 90px; }
+  .po-table th:nth-child(3), .po-table td:nth-child(3) { width: 12%; min-width: 95px; }
+  .po-table th:nth-child(4), .po-table td:nth-child(4) { width: 16%; min-width: 120px; }
+  .po-table th:nth-child(5), .po-table td:nth-child(5) { width: 7%; min-width: 65px; text-align: right; }
+  .po-table th:nth-child(6), .po-table td:nth-child(6) { width: 7%; min-width: 65px; text-align: center; }
+  .po-table th:nth-child(7), .po-table td:nth-child(7) { width: 7%; min-width: 65px; text-align: center; }
+  .po-table th:nth-child(8), .po-table td:nth-child(8) { width: 8%; min-width: 75px; text-align: right; }
+  .po-table th:nth-child(9), .po-table td:nth-child(9) { width: 9%; min-width: 80px; text-align: right; }
+  .po-table th:nth-child(10), .po-table td:nth-child(10) { width: 9%; min-width: 80px; text-align: right; }
+  .po-table th:nth-child(11), .po-table td:nth-child(11) { width: 10%; min-width: 85px; text-align: right; }
+  .po-table th:nth-child(12), .po-table td:nth-child(12) { width: 7%; min-width: 75px; text-align: center; }
   
   @media (max-width: 991.98px) {
-    .sales-invoice-grid-wrap .po-table { min-width: 900px; }
+    .sales-invoice-grid-wrap .po-table { min-width: 950px; }
     .po-table th, .po-table td { padding: 0.28rem 0.2rem; font-size: 0.8rem; }
     .po-table .form-control { font-size: 0.8rem; padding: 0.22rem 0.3rem; min-height: 26px; height: auto; }
     .po-table .btn-sm { padding: 0.2rem 0.35rem; min-width: 28px; font-size: 0.75rem; }
   }
   @media (max-width: 767.98px) {
-    .sales-invoice-grid-wrap .po-table { min-width: 850px; }
+    .sales-invoice-grid-wrap .po-table { min-width: 900px; }
     .po-table th, .po-table td { padding: 0.2rem 0.15rem; font-size: 0.7rem; }
     .po-table .form-control { font-size: 0.7rem; padding: 0.15rem 0.25rem; min-height: 22px; height: auto; }
     .po-table .btn-sm { padding: 0.15rem 0.28rem; min-width: 26px; font-size: 0.7rem; }
@@ -52,6 +53,8 @@ interface GridRow {
   ItemData: any[] | null;
   AvailableQty?: number;
   UnitValue?: number;
+  GSTPercent?: number;
+  F_GSTGroupMaster?: string;
 }
 
 interface GridSystemSalesInvoiceProps {
@@ -277,19 +280,20 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
           <div className="table-responsive sales-invoice-grid-wrap">
             <table className="table table-bordered table-striped po-table">
               <thead>
-                <tr>
-                  <th>Sr.No.</th>
-                  <th>Barcode</th>
-                  <th>Category</th>
-                  <th>Item</th>
-                  <th>Unit Val</th>
-                  <th>Varient</th>
-                  <th>Available Qty</th>
-                  <th>Quantity</th>
-                  <th>Rate</th>
-                  <th>Amount</th>
-                  <th>Action</th>
-                </tr> 
+                  <tr>
+                    <th>Sr.No.</th>
+                    <th>Barcode</th>
+                    <th>Category</th>
+                    <th>Item</th>
+                    <th>Unit Val</th>
+                    <th>Varient</th>
+                    <th>Available Qty</th>
+                    <th>Quantity</th>
+                    <th>Rate</th>
+                    <th>GST Amount</th>
+                    <th>Amount</th>
+                    <th>Action</th>
+                  </tr> 
               </thead>
               <tbody>
                 {gridRows.map((row, index) => (
@@ -428,7 +432,22 @@ const GridSystemSalesInvoice: React.FC<GridSystemSalesInvoiceProps> = ({
                         type="text"
                         className="form-control"
                         style={{ textAlign: 'right', width: '100%', minWidth: '80px', backgroundColor: '#e9ecef' }}
-                        value={((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)).toFixed(2)}
+                        value={((((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)) * (row.GSTPercent || 0)) / 100).toFixed(2)}
+                        disabled
+                        readOnly
+                        placeholder="GST Amt"
+                      />
+                    </td>
+
+                    <td className="py-0" style={{ textAlign: 'right' }}>
+                      <input
+                        type="text"
+                        className="form-control"
+                        style={{ textAlign: 'right', width: '100%', minWidth: '80px', backgroundColor: '#e9ecef' }}
+                        value={(
+                          (parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0) +
+                          (((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0) * (row.GSTPercent || 0)) / 100)
+                        ).toFixed(2)}
                         disabled
                         readOnly
                         placeholder="Amount"

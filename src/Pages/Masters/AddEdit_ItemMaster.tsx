@@ -100,6 +100,7 @@ const AddEdit_ItemMaster = () => {
   const [schemeModalOpen, setSchemeModalOpen] = useState(false);
   const [activeDesignId, setActiveDesignId] = useState("");
   const [schemeRows, setSchemeRows] = useState([{ FromRange: "", ToRange: "", Rate: "" }]);
+  const [hoveredImage, setHoveredImage] = useState<{ url: string; x: number; y: number } | null>(null);
 
   /* Ref for focus tracking */
   const tableRef = useRef<HTMLDivElement>(null);
@@ -494,6 +495,8 @@ const AddEdit_ItemMaster = () => {
   }, [handleFieldUpdate]);
 
   const removePhoto = useCallback((secIdx: number, rowIdx: number, slotIdx: number) => {
+    if (!window.confirm("Are you sure you want to delete this image?")) return;
+
     setSections(prev => {
       const s = prev[secIdx];
       if (!s) return prev;
@@ -863,7 +866,19 @@ const AddEdit_ItemMaster = () => {
                                       {photo ? (
                                         <>
                                           <a href={photo.fullUrl || photo.preview} target="_blank" rel="noopener noreferrer">
-                                            <img src={photo.preview} alt={`ph${pIdx}`} />
+                                            <img 
+                                              src={photo.preview} 
+                                              alt={`ph${pIdx}`} 
+                                              onMouseEnter={(e) => {
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                setHoveredImage({
+                                                  url: photo.fullUrl || photo.preview,
+                                                  x: rect.left + rect.width / 2,
+                                                  y: rect.top
+                                                });
+                                              }}
+                                              onMouseLeave={() => setHoveredImage(null)}
+                                            />
                                           </a>
                                           <button
                                             type="button"
@@ -1164,6 +1179,37 @@ const AddEdit_ItemMaster = () => {
           <Button color="secondary" onClick={closeSchemeModal}>Cancel</Button>
         </ModalFooter>
       </Modal>
+
+      {hoveredImage && (
+        <div
+          style={{
+            position: "fixed",
+            top: hoveredImage.y - 215 < 10 ? hoveredImage.y + 50 : hoveredImage.y - 215,
+            left: Math.min(window.innerWidth - 220, Math.max(10, hoveredImage.x - 100)),
+            zIndex: 99999,
+            background: "#ffffff",
+            padding: "6px",
+            borderRadius: "8px",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.15)",
+            border: "1px solid #cbd5e1",
+            pointerEvents: "none"
+          }}
+        >
+          <img
+            src={hoveredImage.url}
+            alt="Preview"
+            style={{
+              maxWidth: "200px",
+              maxHeight: "200px",
+              width: "auto",
+              height: "auto",
+              objectFit: "contain",
+              borderRadius: "6px",
+              display: "block"
+            }}
+          />
+        </div>
+      )}
 
     </div>
   );

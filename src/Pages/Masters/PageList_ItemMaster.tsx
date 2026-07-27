@@ -330,6 +330,7 @@ const PageList_ItemMaster = () => {
     return localStorage.getItem("barcodePrinterName") || "";
   });
   const [printingDirectly, setPrintingDirectly] = useState(false);
+  const [hoveredImage, setHoveredImage] = useState<{ url: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -763,6 +764,7 @@ const PageList_ItemMaster = () => {
                             <th>Weight</th>
                             <th>Unit Val</th>
                             <th>Price</th>
+                            <th>Available Qty</th>
                             <th>Barcode</th>
                             <th>IsEcommerce</th>
                             <th>Photos</th>
@@ -773,7 +775,7 @@ const PageList_ItemMaster = () => {
                         <tbody>
                           {filteredList.length === 0 ? (
                             <tr>
-                              <td colSpan={12} className="text-center py-4">
+                              <td colSpan={13} className="text-center py-4">
                                 No records found.
                               </td>
                             </tr>
@@ -805,7 +807,7 @@ const PageList_ItemMaster = () => {
                                 <React.Fragment key={item?.Id ?? index}>
                                   {/* Item Master Header Row */}
                                   <tr className="table-primary">
-                                    <td colSpan={11}>
+                                    <td colSpan={12}>
                                       <Btn 
                                         color="primary" 
                                         outline 
@@ -856,7 +858,7 @@ const PageList_ItemMaster = () => {
                                   {isRowExpanded && (
                                     filteredDesign.length === 0 ? (
                                       <tr>
-                                        <td colSpan={12} className="text-center text-muted py-2">
+                                        <td colSpan={13} className="text-center text-muted py-2">
                                           No variants available for this item.
                                         </td>
                                       </tr>
@@ -879,6 +881,11 @@ const PageList_ItemMaster = () => {
                                           <td>{d.Weight || "-"}</td>
                                           <td>{d.UnitConversion || "-"}</td>
                                           <td>₹{d.SalePrice || "0"}</td>
+                                          <td>
+                                            <Badge color={Number(d.AvailableQty) > 0 ? "success" : "secondary"}>
+                                              {d.AvailableQty !== undefined && d.AvailableQty !== null ? d.AvailableQty : 0}
+                                            </Badge>
+                                          </td>
                                           <td>
                                             {d.Barcode && d.Barcode.trim() !== "" ? (
                                               <div style={{ width: '100%', minWidth: '120px' }}>
@@ -907,6 +914,15 @@ const PageList_ItemMaster = () => {
                                                     alt={`img-${i}`} 
                                                     style={{ width: 45, height: 45, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd', cursor: 'pointer' }} 
                                                     title="Click to view full size"
+                                                    onMouseEnter={(e) => {
+                                                      const rect = e.currentTarget.getBoundingClientRect();
+                                                      setHoveredImage({
+                                                        url: img.full || img.thumb,
+                                                        x: rect.left + rect.width / 2,
+                                                        y: rect.top
+                                                      });
+                                                    }}
+                                                    onMouseLeave={() => setHoveredImage(null)}
                                                   />
                                                 </a>
                                               ))}
@@ -1251,6 +1267,37 @@ const PageList_ItemMaster = () => {
           </div>
         </ModalFooter>
       </Modal>
+
+      {hoveredImage && (
+        <div
+          style={{
+            position: "fixed",
+            top: hoveredImage.y - 215 < 10 ? hoveredImage.y + 50 : hoveredImage.y - 215,
+            left: Math.min(window.innerWidth - 220, Math.max(10, hoveredImage.x - 100)),
+            zIndex: 99999,
+            background: "#ffffff",
+            padding: "6px",
+            borderRadius: "8px",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.15)",
+            border: "1px solid #cbd5e1",
+            pointerEvents: "none"
+          }}
+        >
+          <img
+            src={hoveredImage.url}
+            alt="Preview"
+            style={{
+              maxWidth: "200px",
+              maxHeight: "200px",
+              width: "auto",
+              height: "auto",
+              objectFit: "contain",
+              borderRadius: "6px",
+              display: "block"
+            }}
+          />
+        </div>
+      )}
     </>
   );
 };
