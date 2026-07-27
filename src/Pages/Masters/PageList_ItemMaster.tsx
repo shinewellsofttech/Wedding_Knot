@@ -15,6 +15,13 @@ const LIST_API_URL = `${API_WEB_URLS.MASTER}/0/token/ItemMasterData/Id/0`;
 const DELETE_API_URL = `${API_WEB_URLS.MASTER}/0/token/${API_WEB_URLS.ItemMaster}`;
 const CATEGORY_LIST_URL = `${API_WEB_URLS.MASTER}/0/token/CategoryMaster/Id/0`;
 
+const getFullImageUrl = (img: string | null | undefined) => {
+  if (!img || typeof img !== "string" || img.trim() === "") return "";
+  const trimmed = img.trim();
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  return `${API_WEB_URLS.IMAGEURL}${trimmed.startsWith("/") ? "" : "/"}${trimmed}`;
+};
+
 interface Element {
   id: string;
   type: "text" | "barcode" | "logo" | "line";
@@ -820,9 +827,9 @@ const PageList_ItemMaster = () => {
                                         <i className={`fa ${isRowExpanded ? "fa-chevron-down" : "fa-chevron-right"}`} />
                                       </Btn>
                                       {item?.CoverImage && (
-                                        <a href={item.CoverImage} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '8px' }}>
+                                        <a href={getFullImageUrl(item.CoverImage)} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '8px' }}>
                                           <img
-                                            src={item.CoverImage_Thumb || item.CoverImage}
+                                            src={getFullImageUrl(item.CoverImage_Thumb || item.CoverImage)}
                                             alt="Cover"
                                             style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }}
                                             title="Cover Image - Click to view"

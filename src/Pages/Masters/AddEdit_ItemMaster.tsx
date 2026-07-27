@@ -261,10 +261,17 @@ const AddEdit_ItemMaster = () => {
                 }
              } catch (e) { console.error("Parse Error Scheme:", e); }
 
+             const getFullImageUrl = (img: string | null | undefined) => {
+               if (!img || typeof img !== "string" || img.trim() === "") return "";
+               const trimmed = img.trim();
+               if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+               return `${API_WEB_URLS.IMAGEURL}${trimmed.startsWith("/") ? "" : "/"}${trimmed}`;
+             };
+
              return {
                 id: String(item.Id || uid()),
                 itemName: item.ItemName || "",
-                coverImage: item.CoverImage ? { file: null, preview: item.CoverImage_Thumb && item.CoverImage_Thumb.trim() !== "" ? item.CoverImage_Thumb : item.CoverImage, fullUrl: item.CoverImage } : null,
+                coverImage: item.CoverImage ? { file: null, preview: getFullImageUrl(item.CoverImage_Thumb && item.CoverImage_Thumb.trim() !== "" ? item.CoverImage_Thumb : item.CoverImage), fullUrl: getFullImageUrl(item.CoverImage) } : null,
                 shortDescription: item.ShortDescription || "",
                 fullDescription: item.FullDescription || "",
                 hasSize: item.HasSize ? "Yes" : "No",
@@ -285,11 +292,11 @@ const AddEdit_ItemMaster = () => {
                     return {
                     id: String(d.Id || uid()),
                     photos: [
-                        d.DesignPhoto ? { file: null, preview: d.DesignPhoto_Thumb && d.DesignPhoto_Thumb.trim() !== "" ? d.DesignPhoto_Thumb : d.DesignPhoto, fullUrl: d.DesignPhoto } : null,
-                        d.DesignPhoto2 ? { file: null, preview: d.DesignPhoto2_Thumb && d.DesignPhoto2_Thumb.trim() !== "" ? d.DesignPhoto2_Thumb : d.DesignPhoto2, fullUrl: d.DesignPhoto2 } : null,
-                        d.DesignPhoto3 ? { file: null, preview: d.DesignPhoto3_Thumb && d.DesignPhoto3_Thumb.trim() !== "" ? d.DesignPhoto3_Thumb : d.DesignPhoto3, fullUrl: d.DesignPhoto3 } : null,
-                        d.DesignPhoto4 ? { file: null, preview: d.DesignPhoto4_Thumb && d.DesignPhoto4_Thumb.trim() !== "" ? d.DesignPhoto4_Thumb : d.DesignPhoto4, fullUrl: d.DesignPhoto4 } : null,
-                        d.DesignPhoto5 ? { file: null, preview: d.DesignPhoto5_Thumb && d.DesignPhoto5_Thumb.trim() !== "" ? d.DesignPhoto5_Thumb : d.DesignPhoto5, fullUrl: d.DesignPhoto5 } : null,
+                        d.DesignPhoto ? { file: null, preview: getFullImageUrl(d.DesignPhoto_Thumb && d.DesignPhoto_Thumb.trim() !== "" ? d.DesignPhoto_Thumb : d.DesignPhoto), fullUrl: getFullImageUrl(d.DesignPhoto) } : null,
+                        d.DesignPhoto2 ? { file: null, preview: getFullImageUrl(d.DesignPhoto2_Thumb && d.DesignPhoto2_Thumb.trim() !== "" ? d.DesignPhoto2_Thumb : d.DesignPhoto2), fullUrl: getFullImageUrl(d.DesignPhoto2) } : null,
+                        d.DesignPhoto3 ? { file: null, preview: getFullImageUrl(d.DesignPhoto3_Thumb && d.DesignPhoto3_Thumb.trim() !== "" ? d.DesignPhoto3_Thumb : d.DesignPhoto3), fullUrl: getFullImageUrl(d.DesignPhoto3) } : null,
+                        d.DesignPhoto4 ? { file: null, preview: getFullImageUrl(d.DesignPhoto4_Thumb && d.DesignPhoto4_Thumb.trim() !== "" ? d.DesignPhoto4_Thumb : d.DesignPhoto4), fullUrl: getFullImageUrl(d.DesignPhoto4) } : null,
+                        d.DesignPhoto5 ? { file: null, preview: getFullImageUrl(d.DesignPhoto5_Thumb && d.DesignPhoto5_Thumb.trim() !== "" ? d.DesignPhoto5_Thumb : d.DesignPhoto5), fullUrl: getFullImageUrl(d.DesignPhoto5) } : null,
                     ],
                     videoFile: null,
                     videoName: d.VideoLink || "",
