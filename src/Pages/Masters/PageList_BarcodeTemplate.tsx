@@ -202,19 +202,8 @@ const PageList_BarcodeTemplate = () => {
         })
         .catch((error) => {
           console.error("Failed to delete barcode template:", error);
-          setState((prev) => {
-            if (!itemToDelete) return prev;
-            const newList = [...prev.BarcodeTemplateList, itemToDelete].sort((a, b) => a.Id - b.Id);
-            return { ...prev, BarcodeTemplateList: newList };
-          });
+          toast.error("Failed to delete barcode template from database.");
         });
-
-      setState((prev) => ({
-        ...prev,
-        BarcodeTemplateList: prev.BarcodeTemplateList.filter(
-          (item) => String(item?.Id) !== String(id)
-        ),
-      }));
     }
   };
 
