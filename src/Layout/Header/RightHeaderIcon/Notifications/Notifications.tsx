@@ -6,7 +6,7 @@ const Notifications = () => {
   const { unreadCount, markAllAsRead } = useOrderNotifications();
 
   return (
-    <LI className="onhover-dropdown" onClick={() => { if (unreadCount > 0) markAllAsRead(); }}>
+    <LI className="onhover-dropdown">
       <div className="notification-box" style={{ position: "relative" }}>
         <SVG iconId="fill-Bell" />
         {unreadCount > 0 && (

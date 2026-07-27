@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { toast } from "react-toastify";
+import * as signalR from "@microsoft/signalr";
 import { API_WEB_URLS } from "../constants/constAPI";
 
 export interface OrderNotificationItem {
@@ -84,8 +85,7 @@ export const OrderNotificationProvider: React.FC<{ children: ReactNode }> = ({ c
   const fetchOrdersCheck = async () => {
     try {
       const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");
-      const userToken = authUser?.Token ?? authUser?.token;
-      if (!userToken) return;
+      const userToken = authUser?.Token ?? authUser?.token ?? authUser?.UserToken ?? "token";
 
       const payload = new FormData();
       payload.append("UserId", "0");
@@ -102,42 +102,86 @@ export const OrderNotificationProvider: React.FC<{ children: ReactNode }> = ({ c
 
       const rawOrders: any[] = Array.isArray(data.data.orders)
         ? data.data.orders
+        : Array.isArray(data.data.Orders)
+        ? data.data.Orders
         : Array.isArray(data.data)
         ? data.data
         : [];
 
+      if (rawOrders.length === 0) return;
+
+      const getOrderId = (o: any) => Number(o.Id ?? o.id ?? o.ID ?? 0);
+
       if (!isInitializedRef.current) {
-        // Initial run: record existing order IDs as baseline without alerting
-        rawOrders.forEach(o => {
-          if (o.Id) knownOrderIdsRef.current.add(Number(o.Id));
+        // Initial run: record baseline and populate initial notifications list with pending order status
+        const initialNotifs: OrderNotificationItem[] = [];
+        let unread = 0;
+
+        rawOrders.forEach(order => {
+          const orderId = getOrderId(order);
+          if (orderId) {
+            knownOrderIdsRef.current.add(orderId);
+
+            const customerName = order.CustomerName || order.customerName || "Guest Customer";
+            const entryNo = order.EntryNo || order.entryNo || `#${orderId}`;
+            const items = Array.isArray(order.Items) ? order.Items : Array.isArray(order.items) ? order.items : [];
+            const itemsCount = items.length;
+            const statusId = Number(order.F_StatusMaster ?? order.f_StatusMaster ?? 1);
+            const statusName = order.OrderStatus || order.orderStatus || "";
+            const isPending = statusId === 1 || statusName.toLowerCase() === "pending";
+
+            initialNotifs.push({
+              id: `order_${orderId}_${Date.now()}`,
+              orderId,
+              entryNo,
+              customerName,
+              contactMobile: order.ContactMobile || order.contactMobile || "",
+              totalTax: order.TotalTax || order.totalTax || 0,
+              itemCount: itemsCount,
+              entryDate: order.EntryDate || order.entryDate || new Date().toISOString(),
+              timestamp: new Date(order.EntryDate || Date.now()),
+              read: !isPending
+            });
+
+            if (isPending) {
+              unread++;
+            }
+          }
         });
+
         isInitializedRef.current = true;
+        setNotifications(initialNotifs);
+        setUnreadCount(unread);
         return;
       }
 
-      // Check for new orders
-      const newOrders = rawOrders.filter(o => o.Id && !knownOrderIdsRef.current.has(Number(o.Id)));
+      // Check for new orders that arrived after app initialization
+      const newOrders = rawOrders.filter(o => {
+        const id = getOrderId(o);
+        return id > 0 && !knownOrderIdsRef.current.has(id);
+      });
 
       if (newOrders.length > 0) {
         const newNotifs: OrderNotificationItem[] = [];
 
         newOrders.forEach(order => {
-          const orderId = Number(order.Id);
+          const orderId = getOrderId(order);
           knownOrderIdsRef.current.add(orderId);
 
-          const customerName = order.CustomerName || "Guest Customer";
-          const entryNo = order.EntryNo || `#${orderId}`;
-          const itemsCount = Array.isArray(order.Items) ? order.Items.length : 0;
+          const customerName = order.CustomerName || order.customerName || "Guest Customer";
+          const entryNo = order.EntryNo || order.entryNo || `#${orderId}`;
+          const items = Array.isArray(order.Items) ? order.Items : Array.isArray(order.items) ? order.items : [];
+          const itemsCount = items.length;
 
           const notifItem: OrderNotificationItem = {
             id: `order_${orderId}_${Date.now()}`,
             orderId,
             entryNo,
             customerName,
-            contactMobile: order.ContactMobile || "",
-            totalTax: order.TotalTax || 0,
+            contactMobile: order.ContactMobile || order.contactMobile || "",
+            totalTax: order.TotalTax || order.totalTax || 0,
             itemCount: itemsCount,
-            entryDate: order.EntryDate || new Date().toISOString(),
+            entryDate: order.EntryDate || order.entryDate || new Date().toISOString(),
             timestamp: new Date(),
             read: false
           };
@@ -199,16 +243,42 @@ export const OrderNotificationProvider: React.FC<{ children: ReactNode }> = ({ c
     }
   };
 
-  // Background Polling Effect (runs every 10 seconds)
+  // SignalR Real-Time Connection & Backup Polling Effect
   useEffect(() => {
-    // Initial fetch to populate baseline
+    // Initial fetch to populate baseline & existing pending orders
     fetchOrdersCheck();
 
+    // Setup SignalR Hub Connection to backend
+    const hubUrl = API_WEB_URLS.BASE.replace("/api/V1/", "/") + "hubs/orderHub";
+    const connection = new signalR.HubConnectionBuilder()
+      .withUrl(hubUrl)
+      .withAutomaticReconnect()
+      .build();
+
+    connection
+      .start()
+      .then(() => {
+        console.log("SignalR successfully connected to OrderHub");
+      })
+      .catch((err) => {
+        console.error("SignalR Connection Error: ", err);
+      });
+
+    // Real-time listener: Triggered instantly when server pushes new order notification
+    connection.on("ReceiveNewOrder", (data) => {
+      console.log("⚡ SignalR Real-Time Order Received:", data);
+      fetchOrdersCheck();
+    });
+
+    // Backup polling timer (every 10 seconds) in case network drops WebSocket
     const intervalId = setInterval(() => {
       fetchOrdersCheck();
     }, 10000);
 
-    return () => clearInterval(intervalId);
+    return () => {
+      connection.stop().catch(() => {});
+      clearInterval(intervalId);
+    };
   }, []);
 
   const markAllAsRead = () => {

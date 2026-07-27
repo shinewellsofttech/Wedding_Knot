@@ -118,6 +118,8 @@ const Orders = () => {
       if (data.success && data.data) {
         if (Array.isArray(data.data.orders)) {
           setOrders(data.data.orders);
+        } else if (Array.isArray(data.data.Orders)) {
+          setOrders(data.data.Orders);
         } else if (Array.isArray(data.data)) {
           setOrders(data.data);
         } else {
