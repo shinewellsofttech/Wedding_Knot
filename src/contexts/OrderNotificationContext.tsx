@@ -199,7 +199,7 @@ export const OrderNotificationProvider: React.FC<{ children: ReactNode }> = ({ c
               </div>
               <div style={{ fontSize: "12px", color: "#007bff", marginTop: "4px", textDecoration: "underline", cursor: "pointer" }}
                 onClick={() => {
-                  window.location.href = `${process.env.PUBLIC_URL || ""}/ecommerce/orders`;
+                  window.location.href = `${process.env.PUBLIC_URL || ""}/orders`;
                 }}
               >
                 Click here to view Order Details →

@@ -29,7 +29,7 @@ const NotificationBox = () => {
             <ShoppingBag size={18} />
           </div>
           <div className="flex-grow-1 ms-2" style={{ overflow: "hidden" }}>
-            <Link to={`${process.env.PUBLIC_URL || ""}/ecommerce/orders`} style={{ textDecoration: "none", color: "inherit" }}>
+            <Link to={`${process.env.PUBLIC_URL || ""}/orders`} style={{ textDecoration: "none", color: "inherit" }}>
               <h5 style={{ fontSize: "14px", fontWeight: !item.read ? "bold" : "normal", margin: 0 }}>
                 Order {item.entryNo}
               </h5>
