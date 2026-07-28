@@ -30,6 +30,14 @@
 }
 .im-table tbody tr { transition: background .15s; }
 .im-table tbody tr:hover { background: #eff6ff; }
+.im-table tbody tr.im-row-highlight {
+  animation: imGlow 2.5s ease-in-out;
+}
+@keyframes imGlow {
+  0% { background-color: #fef08a; }
+  50% { background-color: #bfdbfe; }
+  100% { background-color: transparent; }
+}
 .im-table tbody td {
   padding: 4px 6px; border-bottom: 1px solid #e5e7eb; vertical-align: middle; text-align: center;
 }

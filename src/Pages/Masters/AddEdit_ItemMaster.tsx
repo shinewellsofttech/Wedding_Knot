@@ -79,6 +79,26 @@ const genBarcode = () => String(Date.now());
 
 const stockColor = (v: number) => (v <= 0 ? "red" : v <= 5 ? "yellow" : "green");
 
+const cleanUrl = (url?: string) => {
+  if (!url || typeof url !== "string" || url.trim() === "") return "";
+  let cleaned = url.trim();
+  if (cleaned.startsWith("data:") || cleaned.startsWith("blob:")) return cleaned;
+  if (cleaned.includes("https://") && cleaned.lastIndexOf("https://") > 0) {
+    return cleaned.substring(cleaned.lastIndexOf("https://"));
+  } else if (cleaned.includes("http://") && cleaned.lastIndexOf("http://") > 0) {
+    return cleaned.substring(cleaned.lastIndexOf("http://"));
+  }
+  if (!cleaned.startsWith("http://") && !cleaned.startsWith("https://")) {
+    const baseUrl = API_WEB_URLS.BASE.replace("api/V1/", "");
+    const cleanPath = cleaned.startsWith("/") ? cleaned.substring(1) : cleaned;
+    if (cleanPath.startsWith("ItemImages/")) {
+      return `${baseUrl}${cleanPath}`;
+    }
+    return `${baseUrl}ItemImages/${cleanPath}`;
+  }
+  return cleaned;
+};
+
 
 /* ───── Component ───── */
 const AddEdit_ItemMaster = () => {
@@ -261,17 +281,15 @@ const AddEdit_ItemMaster = () => {
                 }
              } catch (e) { console.error("Parse Error Scheme:", e); }
 
-             const getFullImageUrl = (img: string | null | undefined) => {
-               if (!img || typeof img !== "string" || img.trim() === "") return "";
-               const trimmed = img.trim();
-               if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
-               return `${API_WEB_URLS.IMAGEURL}${trimmed.startsWith("/") ? "" : "/"}${trimmed}`;
-             };
+             const rawCover = item.iCoverImage || item.CoverImage || item.icoverimage || item.coverImage || item.ICoverImage || item.ItemCoverImage || item.CoverPhoto || item.coverPhoto || "";
+             const rawCoverThumb = item.CoverImage_Thumb || item.coverImage_Thumb || item.icoverimage_thumb || item.coverImage_thumb || "";
+             const coverFull = cleanUrl(rawCover);
+             const coverThumb = cleanUrl(rawCoverThumb) || coverFull;
 
              return {
                 id: String(item.Id || uid()),
                 itemName: item.ItemName || "",
-                coverImage: item.CoverImage ? { file: null, preview: getFullImageUrl(item.CoverImage_Thumb && item.CoverImage_Thumb.trim() !== "" ? item.CoverImage_Thumb : item.CoverImage), fullUrl: getFullImageUrl(item.CoverImage) } : null,
+                coverImage: coverFull ? { file: null, preview: coverThumb, fullUrl: coverFull } : null,
                 shortDescription: item.ShortDescription || "",
                 fullDescription: item.FullDescription || "",
                 hasSize: item.HasSize ? "Yes" : "No",
@@ -292,11 +310,11 @@ const AddEdit_ItemMaster = () => {
                     return {
                     id: String(d.Id || uid()),
                     photos: [
-                        d.DesignPhoto ? { file: null, preview: getFullImageUrl(d.DesignPhoto_Thumb && d.DesignPhoto_Thumb.trim() !== "" ? d.DesignPhoto_Thumb : d.DesignPhoto), fullUrl: getFullImageUrl(d.DesignPhoto) } : null,
-                        d.DesignPhoto2 ? { file: null, preview: getFullImageUrl(d.DesignPhoto2_Thumb && d.DesignPhoto2_Thumb.trim() !== "" ? d.DesignPhoto2_Thumb : d.DesignPhoto2), fullUrl: getFullImageUrl(d.DesignPhoto2) } : null,
-                        d.DesignPhoto3 ? { file: null, preview: getFullImageUrl(d.DesignPhoto3_Thumb && d.DesignPhoto3_Thumb.trim() !== "" ? d.DesignPhoto3_Thumb : d.DesignPhoto3), fullUrl: getFullImageUrl(d.DesignPhoto3) } : null,
-                        d.DesignPhoto4 ? { file: null, preview: getFullImageUrl(d.DesignPhoto4_Thumb && d.DesignPhoto4_Thumb.trim() !== "" ? d.DesignPhoto4_Thumb : d.DesignPhoto4), fullUrl: getFullImageUrl(d.DesignPhoto4) } : null,
-                        d.DesignPhoto5 ? { file: null, preview: getFullImageUrl(d.DesignPhoto5_Thumb && d.DesignPhoto5_Thumb.trim() !== "" ? d.DesignPhoto5_Thumb : d.DesignPhoto5), fullUrl: getFullImageUrl(d.DesignPhoto5) } : null,
+                        d.DesignPhoto ? { file: null, preview: cleanUrl(d.DesignPhoto_Thumb) || cleanUrl(d.DesignPhoto), fullUrl: cleanUrl(d.DesignPhoto) } : null,
+                        d.DesignPhoto2 ? { file: null, preview: cleanUrl(d.DesignPhoto2_Thumb) || cleanUrl(d.DesignPhoto2), fullUrl: cleanUrl(d.DesignPhoto2) } : null,
+                        d.DesignPhoto3 ? { file: null, preview: cleanUrl(d.DesignPhoto3_Thumb) || cleanUrl(d.DesignPhoto3), fullUrl: cleanUrl(d.DesignPhoto3) } : null,
+                        d.DesignPhoto4 ? { file: null, preview: cleanUrl(d.DesignPhoto4_Thumb) || cleanUrl(d.DesignPhoto4), fullUrl: cleanUrl(d.DesignPhoto4) } : null,
+                        d.DesignPhoto5 ? { file: null, preview: cleanUrl(d.DesignPhoto5_Thumb) || cleanUrl(d.DesignPhoto5), fullUrl: cleanUrl(d.DesignPhoto5) } : null,
                     ],
                     videoFile: null,
                     videoName: d.VideoLink || "",
@@ -329,6 +347,28 @@ const AddEdit_ItemMaster = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  /* ── Auto-scroll & focus target variant ── */
+  useEffect(() => {
+    const targetVariantId = location.state?.variantId;
+    if (targetVariantId && sections.length > 0) {
+      const timer = setTimeout(() => {
+        const rowElem = document.getElementById(`variant-row-${targetVariantId}`);
+        if (rowElem) {
+          rowElem.scrollIntoView({ behavior: "smooth", block: "center" });
+          const inputElem = rowElem.querySelector<HTMLInputElement>("input:not([type='file']):not([disabled])");
+          if (inputElem) {
+            inputElem.focus();
+          }
+          rowElem.classList.add("im-row-highlight");
+          setTimeout(() => {
+            rowElem.classList.remove("im-row-highlight");
+          }, 2500);
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [sections, location.state?.variantId]);
 
   /* ── Section / Row Helpers ── */
   const updateSectionField = useCallback((secIdx: number, field: keyof Omit<ItemSection, "rows" | "id">, value: any) => {
@@ -923,7 +963,7 @@ const AddEdit_ItemMaster = () => {
                         {!section.isMinimized && section.rows.map((row, rowIdx) => {
                           globalRow++;
                           return (
-                            <tr key={row.id}>
+                            <tr key={row.id} id={`variant-row-${row.id}`}>
                               {/* # */}
                               <td className="im-row-num">{globalRow}</td>
 
