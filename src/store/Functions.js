@@ -23,9 +23,9 @@ export const Fn_FillListData = (
     const request = {
       apiURL: apiURL,
       callback: response => {
-        const hasData = response && (response.status === 200 || response.success === true) && (response.data || response.dataList)
+        const hasData = response && (response.status === 200 || response.success === true) && (response.data || response.dataList || response.response)
         if (hasData) {
-          const dataList = response.data?.dataList ?? response.data?.data?.dataList ?? response.data?.[gridName] ?? (Array.isArray(response.data) ? response.data : []) ?? (Array.isArray(response.dataList) ? response.dataList : [])
+          const dataList = response.data?.dataList ?? response.data?.data?.dataList ?? response.data?.DataList ?? response.data?.data?.DataList ?? response.data?.response ?? response.data?.data?.response ?? response.response ?? response.data?.[gridName] ?? (Array.isArray(response.data) ? response.data : []) ?? (Array.isArray(response.dataList) ? response.dataList : [])
           const list = Array.isArray(dataList) ? dataList : []
           if (gridName == "gridDataSearch") {
             const firstObject = list[0]

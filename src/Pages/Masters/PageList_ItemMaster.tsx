@@ -332,6 +332,9 @@ const PageList_ItemMaster = () => {
   const [selectedPrintTemplateId, setSelectedPrintTemplateId] = useState("");
   const [printQty, setPrintQty] = useState(1);
   const [dbTemplates, setDbTemplates] = useState<Template[]>([]);
+  const allTemplates = useMemo(() => {
+    return dbTemplates.length > 0 ? dbTemplates : DEFAULT_TEMPLATES;
+  }, [dbTemplates]);
   const [localPrinters, setLocalPrinters] = useState<string[]>([]);
   const [selectedLocalPrinter, setSelectedLocalPrinter] = useState(() => {
     return localStorage.getItem("barcodePrinterName") || "";
@@ -435,25 +438,33 @@ const PageList_ItemMaster = () => {
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
-        const url = `${API_WEB_URLS.BASE}Masters/0/token/BarcodeTemplateMaster/Id/0`;
-        const r = await fetch(url);
-        if (r.ok) {
-          const d = await r.json();
-          const rawList = d?.data?.dataList || d?.data?.DataList || d?.response || [];
-          if (Array.isArray(rawList)) {
-            const parsed = rawList.map((item: any) => {
-              try {
-                return { ...JSON.parse(item.Name), id: String(item.Id), dbId: item.Id };
-              } catch (e) {
-                return null;
+        Fn_FillListData(dispatch, () => {}, "barcodeTemplates", "Masters/0/token/BarcodeTemplateMaster/Id/0")
+          .then((data: any) => {
+            let rawList: any[] = [];
+            if (Array.isArray(data)) rawList = data;
+            else if (data?.data?.response && Array.isArray(data.data.response)) rawList = data.data.response;
+            else if (data?.response && Array.isArray(data.response)) rawList = data.response;
+            else if (data?.dataList && Array.isArray(data.dataList)) rawList = data.dataList;
+            else if (data?.DataList && Array.isArray(data.DataList)) rawList = data.DataList;
+            else if (data?.data?.dataList && Array.isArray(data.data.dataList)) rawList = data.data.dataList;
+            else if (data?.data?.DataList && Array.isArray(data.data.DataList)) rawList = data.data.DataList;
+
+            if (Array.isArray(rawList)) {
+              const parsed = rawList.map((item: any) => {
+                try {
+                  const dataObj = typeof item.Name === "string" ? JSON.parse(item.Name) : (item.Name || {});
+                  return { ...dataObj, id: String(item.Id), dbId: item.Id };
+                } catch (e) {
+                  return null;
+                }
+              }).filter(Boolean);
+              setDbTemplates(parsed);
+              if (parsed.length > 0) {
+                setSelectedPrintTemplateId(parsed[0].id);
               }
-            }).filter(Boolean);
-            setDbTemplates(parsed);
-            if (parsed.length > 0) {
-              setSelectedPrintTemplateId(parsed[0].id);
             }
-          }
-        }
+          })
+          .catch((e) => console.error("Failed to load barcode templates", e));
       } catch (e) {
         console.error("Failed to load barcode templates", e);
       }
@@ -512,7 +523,7 @@ const PageList_ItemMaster = () => {
       setPrintVariant(variant);
       setPrintQty(1);
       // Select the first template as default
-      const all = dbTemplates;
+      const all = allTemplates;
       if (all.length > 0) {
         setSelectedPrintTemplateId(all[0].id);
       } else {
@@ -595,7 +606,7 @@ const PageList_ItemMaster = () => {
       toast.error("Please select a printer first.");
       return;
     }
-    const all = dbTemplates;
+    const all = allTemplates;
     const template = all.find(t => t.id === selectedPrintTemplateId);
     if (!template) {
       toast.error("Selected template layout not found.");
@@ -691,10 +702,6 @@ const PageList_ItemMaster = () => {
 
     return result;
   }, [state.ItemMasterList, state.filterText, filterCategory, filterGstGroup]);
-
-  const allTemplates = useMemo(() => {
-    return dbTemplates;
-  }, [dbTemplates]);
 
   return (
     <>

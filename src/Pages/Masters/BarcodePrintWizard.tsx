@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
+import { useDispatch } from "react-redux";
 import Barcode from "react-barcode";
 import { toast } from "react-toastify";
 import { API_WEB_URLS } from "../../constants/constAPI";
+import { Fn_FillListData } from "../../store/Functions";
 
 interface Variant {
   Id: number | string;
@@ -309,6 +311,7 @@ function parseVariants(item: Item): Variant[] {
 }
 
 export default function BarcodePrintWizard() {
+  const dispatch = useDispatch();
   const [activeTab, setActiveTab] = useState("print"); // "print", "hardware", "designer"
   const [item, setItem] = useState<Item | null>(null);
   const [variants, setVariants] = useState<Variant[]>([]);
@@ -362,33 +365,40 @@ export default function BarcodePrintWizard() {
   useEffect(() => {
     const loadDbTemplates = async () => {
       try {
-        const url = `${API_WEB_URLS.BASE}Masters/0/token/BarcodeTemplateMaster/Id/0`;
-        const r = await fetch(url);
-        if (r.ok) {
-          const d = await r.json();
-          const rawList = d?.data?.DataList || d?.response || [];
-          if (Array.isArray(rawList) && rawList.length > 0) {
-            const parsedList = rawList.map((item: any) => {
-              try {
-                const parsed = JSON.parse(item.Name);
-                return { ...parsed, id: String(item.Id), dbId: item.Id };
-              } catch (e) {
-                return null;
-              }
-            }).filter(Boolean) as Template[];
-            
-            setTemplates(prev => {
-              const customOnly = parsedList.filter(t => !DEFAULT_TEMPLATES.some(d => d.id === t.id));
-              return [...DEFAULT_TEMPLATES, ...customOnly];
-            });
-          }
-        }
+        Fn_FillListData(dispatch, () => {}, "dbTemplates", "Masters/0/token/BarcodeTemplateMaster/Id/0")
+          .then((data: any) => {
+            let rawList: any[] = [];
+            if (Array.isArray(data)) rawList = data;
+            else if (data?.data?.response && Array.isArray(data.data.response)) rawList = data.data.response;
+            else if (data?.response && Array.isArray(data.response)) rawList = data.response;
+            else if (data?.dataList && Array.isArray(data.dataList)) rawList = data.dataList;
+            else if (data?.DataList && Array.isArray(data.DataList)) rawList = data.DataList;
+            else if (data?.data?.dataList && Array.isArray(data.data.dataList)) rawList = data.data.dataList;
+            else if (data?.data?.DataList && Array.isArray(data.data.DataList)) rawList = data.data.DataList;
+
+            if (Array.isArray(rawList) && rawList.length > 0) {
+              const parsedList = rawList.map((item: any) => {
+                try {
+                  const parsed = typeof item.Name === "string" ? JSON.parse(item.Name) : (item.Name || {});
+                  return { ...parsed, id: String(item.Id), dbId: item.Id };
+                } catch (e) {
+                  return null;
+                }
+              }).filter(Boolean) as Template[];
+              
+              setTemplates(prev => {
+                const customOnly = parsedList.filter(t => !DEFAULT_TEMPLATES.some(d => d.id === t.id));
+                return [...DEFAULT_TEMPLATES, ...customOnly];
+              });
+            }
+          })
+          .catch((e) => console.error("Failed to load database templates:", e));
       } catch (e) {
         console.error("Failed to load database templates:", e);
       }
     };
     loadDbTemplates();
-  }, []);
+  }, [dispatch]);
 
   // Load custom template details when selection changes
   useEffect(() => {

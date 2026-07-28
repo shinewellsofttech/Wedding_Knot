@@ -36,10 +36,11 @@ const PageList_BarcodeTemplate = () => {
 
   const loadData = useCallback(() => {
     setState((prev) => ({ ...prev, isProgress: true }));
-    Fn_FillListData(dispatch, setState, "BarcodeTemplateList", LIST_API_URL).catch((error) => {
-      console.error("Failed to load barcode templates:", error);
-      setState((prev) => ({ ...prev, isProgress: false }));
-    });
+    Fn_FillListData(dispatch, setState as any, "BarcodeTemplateList", LIST_API_URL)
+      .catch((error) => {
+        console.error("Failed to load barcode templates:", error);
+        setState((prev) => ({ ...prev, BarcodeTemplateList: [], isProgress: false }));
+      });
   }, [dispatch]);
 
   useEffect(() => {
@@ -190,7 +191,7 @@ const PageList_BarcodeTemplate = () => {
     let name = "this template";
     try {
       if (itemToDelete) {
-        const parsed = JSON.parse(itemToDelete.Name);
+        const parsed = typeof itemToDelete.Name === "string" ? JSON.parse(itemToDelete.Name) : (itemToDelete.Name || {});
         name = parsed.name || name;
       }
     } catch (e) {}
@@ -226,7 +227,7 @@ const PageList_BarcodeTemplate = () => {
         elementsCount: 0,
       };
       try {
-        const data = JSON.parse(record.Name);
+        const data = typeof record.Name === "string" ? JSON.parse(record.Name) : (record.Name || {});
         parsed = {
           name: data.name || parsed.name,
           labelW: data.labelW || parsed.labelW,

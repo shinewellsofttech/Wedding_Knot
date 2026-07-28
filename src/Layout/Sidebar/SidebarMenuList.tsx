@@ -21,7 +21,7 @@ const SidebarMenuList = () => {
   }, [isLoaded, permissions]);
 
   const filteredMenuList = useMemo(() => {
-    if (isLoaded && (!permissions || permissions.length === 0)) return [];
+    if (isLoaded && (!permissions || permissions.length === 0)) return MenuList;
     if (!isLoaded) return MenuList;
 
     const filtered = MenuList.map((mainMenu) => {
@@ -34,7 +34,7 @@ const SidebarMenuList = () => {
           if (!modulePath.startsWith("/")) modulePath = "/" + modulePath;
           return modulePath.toLowerCase() === cleanPath.toLowerCase();
         });
-        return permission ? permission.IsView === true : false;
+        return permission ? permission.IsView === true : true;
       });
       return { ...mainMenu, Items: filteredItems };
     }).filter((mainMenu) => mainMenu.Items && mainMenu.Items.length > 0);
