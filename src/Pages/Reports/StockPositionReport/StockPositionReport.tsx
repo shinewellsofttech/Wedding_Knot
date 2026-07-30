@@ -7,6 +7,7 @@ import CardHeaderCommon from "../../../CommonElements/CardHeaderCommon/CardHeade
 import { useDispatch } from "react-redux";
 import { Fn_FillListData, Fn_GetReport } from "../../../store/Functions";
 import { API_WEB_URLS } from "../../../constants/constAPI";
+import { exportDataToExcel } from "../../../utils/excelExportHelper";
 
 interface CategoryMaster {
   Id: number;
@@ -238,6 +239,21 @@ const StockPositionReport: React.FC = () => {
     if (fromDate && toDate) fetchReport();
   }, [fromDate, toDate, categoryId]);
 
+  const handleExportExcel = () => {
+    if (!reportData || reportData.length === 0) return;
+    const exportData = reportData.map((row) => ({
+      Barcode: row.Barcode || "",
+      Category: row.CategoryName || row.Category || "",
+      Item: row.ItemName || row.Item || "",
+      Variant: row.Variant || "",
+      "Op. Bal": Number(row.OpeningBalance ?? row.OpBal ?? 0),
+      In: Number(row.InAmount ?? row.Inward ?? row.In ?? 0),
+      Out: Number(row.OutAmount ?? row.Outward ?? row.Out ?? 0),
+      "Cl. Bal": Number(row.ClosingBalance ?? row.ClBal ?? 0),
+    }));
+    exportDataToExcel(exportData, `Stock_Position_Report_${fromDate}_to_${toDate}`);
+  };
+
   const handlePrint = () => window.print();
   const handleClose = () => window.history.back();
 
@@ -357,6 +373,9 @@ const StockPositionReport: React.FC = () => {
                 </div>
               </CardBody>
               <CardFooter className="text-end">
+                <Btn color="primary" type="button" className="me-2" onClick={handleExportExcel} disabled={reportData.length === 0}>
+                  <i className="fa fa-file-excel-o me-1" /> Export Excel
+                </Btn>
                 <Btn color="success" type="button" className="me-2" onClick={handlePrint}>
                   Print
                 </Btn>

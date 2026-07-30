@@ -25,7 +25,7 @@ const RightHeaderIcon = () => {
         <DarkMode />
         {/* <HeaderMessage /> */}
         {/* <HeaderCart /> */}
-        <ThemeCustomizerToggle />
+        {/* <ThemeCustomizerToggle /> */}
         
         <UserProfile />
         

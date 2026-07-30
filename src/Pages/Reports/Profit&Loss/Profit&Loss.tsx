@@ -8,6 +8,7 @@ import CardHeaderCommon from "../../../CommonElements/CardHeaderCommon/CardHeade
 import { useDispatch } from "react-redux";
 import { Fn_FillListData, Fn_GetReport } from "../../../store/Functions";
 import { API_WEB_URLS } from "../../../constants/constAPI";
+import { exportDataToExcel } from "../../../utils/excelExportHelper";
 
 interface TradingPLRow {
   SNo?: number;
@@ -208,6 +209,18 @@ const ProfitAndLoss: React.FC = () => {
       pnlTotalCr: sumCr(pnlList),
     };
   }, [reportData]);
+
+  const handleExportExcel = () => {
+    if (!pnlRows || pnlRows.length === 0) return;
+    const exportData = pnlRows.map((r, idx) => ({
+      SNo: r.sno || idx + 1,
+      "Dr Particular": r.drParticular || "",
+      "Dr Amount": r.drAmount ? Number(r.drAmount) || 0 : "",
+      "Cr Particular": r.crParticular || "",
+      "Cr Amount": r.crAmount ? Number(r.crAmount) || 0 : "",
+    }));
+    exportDataToExcel(exportData, `Profit_And_Loss_${fromDate}_to_${toDate}`);
+  };
 
   const handlePrint = () => window.print();
   const handleClose = () => window.history.back();
@@ -431,6 +444,9 @@ const ProfitAndLoss: React.FC = () => {
                 </div>
               </CardBody>
               <CardFooter className="text-end">
+                <Btn color="primary" type="button" className="me-2" onClick={handleExportExcel} disabled={pnlRows.length === 0}>
+                  <i className="fa fa-file-excel-o me-1" /> Export Excel
+                </Btn>
                 <Btn
                   color={isDetailed ? "warning" : "primary"}
                   type="button"

@@ -330,7 +330,7 @@ const PageList_ItemMaster = () => {
   const [printItem, setPrintItem] = useState<any>(null);
   const [printVariant, setPrintVariant] = useState<any>(null);
   const [selectedPrintTemplateId, setSelectedPrintTemplateId] = useState("");
-  const [printQty, setPrintQty] = useState(1);
+  const [printQty, setPrintQty] = useState<number | string>(1);
   const [dbTemplates, setDbTemplates] = useState<Template[]>([]);
   const allTemplates = useMemo(() => {
     return dbTemplates.length > 0 ? dbTemplates : DEFAULT_TEMPLATES;
@@ -615,7 +615,8 @@ const PageList_ItemMaster = () => {
 
     setPrintingDirectly(true);
     const firm = globalOptions[0]?.FirmName || "FIRM NAME";
-    const tspl = buildTsplForPrint(template, printItem, printVariant, printQty, firm);
+    const numericQty = Math.max(1, Number(printQty) || 1);
+    const tspl = buildTsplForPrint(template, printItem, printVariant, numericQty, firm);
 
     try {
       const response = await fetch("http://127.0.0.1:9187/print", {
@@ -1315,7 +1316,26 @@ const PageList_ItemMaster = () => {
 
               <FormGroup className="mb-3">
                 <Label className="fw-bold small">Print Quantity</Label>
-                <Input type="number" min="1" max="1000" value={printQty} onChange={(e) => setPrintQty(Math.max(1, parseInt(e.target.value) || 1))} />
+                <Input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={printQty}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "") {
+                      setPrintQty("");
+                    } else {
+                      const parsed = parseInt(val, 10);
+                      setPrintQty(isNaN(parsed) ? "" : parsed);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (printQty === "" || Number(printQty) < 1) {
+                      setPrintQty(1);
+                    }
+                  }}
+                />
               </FormGroup>
             </>
           )}
@@ -1337,14 +1357,14 @@ const PageList_ItemMaster = () => {
         <div
           style={{
             position: "fixed",
-            top: hoveredImage.y - 215 < 10 ? hoveredImage.y + 50 : hoveredImage.y - 215,
-            left: Math.min(window.innerWidth - 220, Math.max(10, hoveredImage.x - 100)),
+            top: hoveredImage.y - 355 < 10 ? Math.min(window.innerHeight - 360, Math.max(10, hoveredImage.y + 20)) : hoveredImage.y - 355,
+            left: Math.min(window.innerWidth - 360, Math.max(10, hoveredImage.x - 160)),
             zIndex: 99999,
             background: "#ffffff",
-            padding: "6px",
-            borderRadius: "8px",
-            boxShadow: "0 10px 30px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.15)",
-            border: "1px solid #cbd5e1",
+            padding: "10px",
+            borderRadius: "12px",
+            boxShadow: "0 20px 45px rgba(0,0,0,0.35), 0 6px 16px rgba(0,0,0,0.15)",
+            border: "1.5px solid #cbd5e1",
             pointerEvents: "none"
           }}
         >
@@ -1352,12 +1372,14 @@ const PageList_ItemMaster = () => {
             src={hoveredImage.url}
             alt="Preview"
             style={{
-              maxWidth: "200px",
-              maxHeight: "200px",
+              maxWidth: "340px",
+              maxHeight: "340px",
+              minWidth: "220px",
+              minHeight: "220px",
               width: "auto",
               height: "auto",
               objectFit: "contain",
-              borderRadius: "6px",
+              borderRadius: "8px",
               display: "block"
             }}
           />

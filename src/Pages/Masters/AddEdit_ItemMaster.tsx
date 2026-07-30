@@ -1293,14 +1293,14 @@ const AddEdit_ItemMaster = () => {
         <div
           style={{
             position: "fixed",
-            top: hoveredImage.y - 215 < 10 ? hoveredImage.y + 50 : hoveredImage.y - 215,
-            left: Math.min(window.innerWidth - 220, Math.max(10, hoveredImage.x - 100)),
+            top: hoveredImage.y - 355 < 10 ? Math.min(window.innerHeight - 360, Math.max(10, hoveredImage.y + 20)) : hoveredImage.y - 355,
+            left: Math.min(window.innerWidth - 360, Math.max(10, hoveredImage.x - 160)),
             zIndex: 99999,
             background: "#ffffff",
-            padding: "6px",
-            borderRadius: "8px",
-            boxShadow: "0 10px 30px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.15)",
-            border: "1px solid #cbd5e1",
+            padding: "10px",
+            borderRadius: "12px",
+            boxShadow: "0 20px 45px rgba(0,0,0,0.35), 0 6px 16px rgba(0,0,0,0.15)",
+            border: "1.5px solid #cbd5e1",
             pointerEvents: "none"
           }}
         >
@@ -1308,12 +1308,14 @@ const AddEdit_ItemMaster = () => {
             src={hoveredImage.url}
             alt="Preview"
             style={{
-              maxWidth: "200px",
-              maxHeight: "200px",
+              maxWidth: "340px",
+              maxHeight: "340px",
+              minWidth: "220px",
+              minHeight: "220px",
               width: "auto",
               height: "auto",
               objectFit: "contain",
-              borderRadius: "6px",
+              borderRadius: "8px",
               display: "block"
             }}
           />

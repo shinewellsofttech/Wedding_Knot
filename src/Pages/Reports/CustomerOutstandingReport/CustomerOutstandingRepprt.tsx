@@ -7,6 +7,7 @@ import CardHeaderCommon from "../../../CommonElements/CardHeaderCommon/CardHeade
 import { useDispatch } from "react-redux";
 import { Fn_GetReport } from "../../../store/Functions";
 import { API_WEB_URLS } from "../../../constants/constAPI";
+import { exportDataToExcel } from "../../../utils/excelExportHelper";
 
 interface OutstandingRow {
   CustomerName?: string;
@@ -181,6 +182,22 @@ const CustomerOutstandingReport: React.FC = () => {
     if (fromDate && toDate) fetchReport();
   }, [fromDate, toDate]);
 
+  const handleExportExcel = () => {
+    if (!reportData || reportData.length === 0) return;
+    const exportData = reportData.map((row) => ({
+      "Customer Name": row.CustomerName || row.Name || row.LedgerName || "",
+      City: row.City || row.CityName || "",
+      Mobile: row.Mobile || row.MobileNo || "",
+      "Credit Limit": row.CreditLimit || 0,
+      "Credit Days": row.CreditDays || 0,
+      Outstanding: row.Outstanding || row.ClosingBalance || row.Balance || 0,
+      "Not Due": row.NotDue || 0,
+      "Overdue": row.Overdue || 0,
+      "Last Payment": row.LastPayment || row.LastPaymentDate || "",
+    }));
+    exportDataToExcel(exportData, `Customer_Outstanding_${fromDate}_to_${toDate}`);
+  };
+
   const handlePrint = () => window.print();
   const handleClose = () => window.history.back();
 
@@ -279,6 +296,9 @@ const CustomerOutstandingReport: React.FC = () => {
                 </div>
               </CardBody>
               <CardFooter className="text-end">
+                <Btn color="primary" type="button" className="me-2" onClick={handleExportExcel} disabled={reportData.length === 0}>
+                  <i className="fa fa-file-excel-o me-1" /> Export Excel
+                </Btn>
                 <Btn color="success" type="button" className="me-2" onClick={handlePrint}>
                   Print
                 </Btn>

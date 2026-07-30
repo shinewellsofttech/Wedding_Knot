@@ -11,6 +11,7 @@ import { useDispatch } from "react-redux";
 import { useNavigate } from 'react-router-dom';
 import { Fn_GetReport } from "../../../store/Functions";
 import { API_WEB_URLS } from "../../../constants/constAPI";
+import { exportDataToExcel } from "../../../utils/excelExportHelper";
 
 interface BSStandardRow {
     RowNo?: number;
@@ -226,6 +227,16 @@ const BalanceSheetStandard: React.FC = () => {
         );
     };
 
+    const handleExportExcel = () => {
+        if (!reportData || reportData.length === 0) return;
+        const exportData = reportData.map((row) => ({
+            Particular: row.Particular || "",
+            Amount: row.Amount ?? "",
+            "Net Amount": row.NetAmount ?? "",
+        }));
+        exportDataToExcel(exportData, `Balance_Sheet_${toDate}`);
+    };
+
     return (
         <div className="page-body bs-std-wrap report-page">
             <style>{PAGE_CSS}</style>
@@ -284,6 +295,9 @@ const BalanceSheetStandard: React.FC = () => {
                             </CardBody>
 
                             <CardFooter className="text-end">
+                                <Btn color="primary" type="button" className="me-2" onClick={handleExportExcel} disabled={reportData.length === 0}>
+                                    <i className="fa fa-file-excel-o me-1" /> Export Excel
+                                </Btn>
                                 <Btn color="success" type="button" className="me-2" onClick={() => window.print()}>Print</Btn>
                                 <Btn color="secondary" type="button" onClick={() => window.history.back()}>Close</Btn>
                             </CardFooter>

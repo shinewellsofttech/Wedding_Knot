@@ -8,6 +8,7 @@ import { useDispatch } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Fn_FillListData, Fn_GetReport } from "../../../store/Functions";
 import { API_WEB_URLS } from "../../../constants/constAPI";
+import { exportDataToExcel } from "../../../utils/excelExportHelper";
 
 interface Transaction {
   date?: string;
@@ -348,6 +349,21 @@ const LedgerDetailsReport: React.FC = () => {
 
   const handleNext = () => {
     console.log("Next page...");
+  };
+
+  const handleExportExcel = () => {
+    if (!transactions || transactions.length === 0) return;
+    const exportData = transactions.map((t) => ({
+      Date: t.date || "",
+      Party: t.party || "",
+      "Voucher No": t.voucherNo || "",
+      "Voucher Type": t.voucherType || "",
+      Debit: t.debit || 0,
+      Credit: t.credit || 0,
+      Balance: `${t.balance || 0} ${t.balanceType || ""}`,
+      Narration: t.narration || "",
+    }));
+    exportDataToExcel(exportData, `Ledger_Report_${ledgerName || "Detail"}_${fromDate}_to_${toDate}`);
   };
 
   return (
@@ -713,6 +729,9 @@ const LedgerDetailsReport: React.FC = () => {
                 </Row>
               </CardBody>
               <CardFooter className="text-end d-flex flex-wrap gap-2 justify-content-end">
+                <Btn color="primary" type="button" onClick={handleExportExcel} disabled={transactions.length === 0}>
+                  <i className="fa fa-file-excel-o me-1" /> Export Excel
+                </Btn>
                 <Btn color="primary" type="button" onClick={handleNext}>
                   Next
                 </Btn>

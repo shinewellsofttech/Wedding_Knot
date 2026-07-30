@@ -8,6 +8,7 @@ import { useDispatch } from "react-redux";
 import { Fn_FillListData, Fn_GetReport } from "../../../store/Functions";
 import { useNavigate } from "react-router-dom";
 import { API_WEB_URLS } from "../../../constants/constAPI";
+import { exportDataToExcel } from "../../../utils/excelExportHelper";
 
 interface TrialBalanceItem {
   Id?: number;
@@ -164,10 +165,23 @@ const TrialBalance: React.FC = () => {
     }
   }, []);
 
-  const handlePrint = () => {
-    window.print();
+  const handleExportExcel = () => {
+    if (!reportData || reportData.length === 0) return;
+    const exportData = reportData.map((item) => ({
+      Particular: item.Particular || "",
+      "Ledger Group": item.LedgerGroup || "",
+      "Opening Dr": item.OpeningBalance_Dr || 0,
+      "Opening Cr": item.OpeningBalance_Cr || 0,
+      "Dr Trans": item.DrAmount_Trans || 0,
+      "Cr Trans": item.CrAmount_Trans || 0,
+      "Closing Dr": item.ClosingBalance_Dr || 0,
+      "Closing Cr": item.ClosingBalance_Cr || 0,
+    }));
+    exportDataToExcel(exportData, `Trial_Balance_${fromDate}_to_${toDate}`);
   };
 
+  const handlePrint = () => window.print();
+  
   const handleClose = () => {
     window.history.back();
   };
@@ -490,6 +504,9 @@ const TrialBalance: React.FC = () => {
                 </Row>
               </CardBody>
               <CardFooter className="text-end">
+                <Btn color="primary" type="button" className="me-2" onClick={handleExportExcel} disabled={reportData.length === 0}>
+                  <i className="fa fa-file-excel-o me-1" /> Export Excel
+                </Btn>
                 <Btn color="primary" type="button" className="me-2" onClick={handleNext}>
                   Next
                 </Btn>

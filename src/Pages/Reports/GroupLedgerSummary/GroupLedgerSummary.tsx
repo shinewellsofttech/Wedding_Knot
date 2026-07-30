@@ -9,6 +9,7 @@ import DateInput from "../../../CommonElements/DateInput";
 import CardHeaderCommon from "../../../CommonElements/CardHeaderCommon/CardHeaderCommon";
 import { API_WEB_URLS } from "../../../constants/constAPI";
 import { useNavigate, useLocation } from "react-router-dom";
+import { exportDataToExcel } from "../../../utils/excelExportHelper";
 
 interface LedgerGroupItem {
     Id: number;
@@ -270,6 +271,18 @@ const GroupLedgerSummary: React.FC = () => {
         { openingBalance: 0, totalDebit: 0, totalCredit: 0, closingBalance: 0 }
     );
 
+    const handleExportExcel = () => {
+        if (!reportData || reportData.length === 0) return;
+        const exportData = reportData.map((row) => ({
+            Name: row.Name || "",
+            "Opening Balance": row.OpeningBalance || 0,
+            "Total Debit": row.TotalDebit || 0,
+            "Total Credit": row.TotalCredit || 0,
+            "Closing Balance": row.ClosingBalance || 0,
+        }));
+        exportDataToExcel(exportData, `Group_Ledger_Summary_${fromDate}_to_${toDate}`);
+    };
+
     /* ── JSX ───────────────────────────────────────────────────── */
     return (
         <div className="page-body grp-led-wrap report-page">
@@ -393,6 +406,9 @@ const GroupLedgerSummary: React.FC = () => {
                             </CardBody>
 
                             <CardFooter className="text-end">
+                                <Btn color="primary" type="button" className="me-2" onClick={handleExportExcel} disabled={reportData.length === 0}>
+                                    <i className="fa fa-file-excel-o me-1" /> Export Excel
+                                </Btn>
                                 <Btn color="success" type="button" className="me-2" onClick={() => window.print()}>
                                     Print
                                 </Btn>

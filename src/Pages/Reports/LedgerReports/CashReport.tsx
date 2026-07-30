@@ -8,6 +8,7 @@ import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { Fn_FillListData, Fn_GetReport } from "../../../store/Functions";
 import { API_WEB_URLS } from "../../../constants/constAPI";
+import { exportDataToExcel } from "../../../utils/excelExportHelper";
 
 interface Transaction {
   date?: string;
@@ -273,6 +274,21 @@ const CashReport: React.FC = () => {
     return `${day}-${month}-${year}`;
   };
 
+  const handleExportExcel = () => {
+    if (!transactions || transactions.length === 0) return;
+    const exportData = transactions.map((t) => ({
+      "Voucher No": t.voucherNo || "",
+      Date: t.date || "",
+      Particular: t.party || "",
+      "Voucher Type": t.voucherType || "",
+      Debit: t.debit || 0,
+      Credit: t.credit || 0,
+      Balance: `${t.balance || 0} ${t.balanceType || ""}`,
+      Narration: t.narration || "",
+    }));
+    exportDataToExcel(exportData, `Cash_Report_${selectedLedgerName || "Cash"}_${fromDate}_to_${toDate}`);
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -495,6 +511,9 @@ const CashReport: React.FC = () => {
                 </Row>
               </CardBody>
               <CardFooter className="text-end d-flex justify-content-end gap-2">
+                <Btn color="primary" type="button" onClick={handleExportExcel} disabled={transactions.length === 0}>
+                  <i className="fa fa-file-excel-o me-1" /> Export Excel
+                </Btn>
                 <Btn color="success" type="button" onClick={handlePrint}>
                   <i className="fa fa-print me-1" /> Print
                 </Btn>

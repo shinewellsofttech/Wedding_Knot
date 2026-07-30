@@ -7,6 +7,7 @@ import CardHeaderCommon from "../../../CommonElements/CardHeaderCommon/CardHeade
 import { useDispatch } from "react-redux";
 import { Fn_FillListData, Fn_GetReport } from "../../../store/Functions";
 import { API_WEB_URLS } from "../../../constants/constAPI";
+import { exportDataToExcel } from "../../../utils/excelExportHelper";
 
 interface DropdownMaster {
   Id: number;
@@ -274,6 +275,27 @@ const StockReport: React.FC = () => {
     if (fromDate && toDate) fetchReport();
   }, [fromDate, toDate, categoryId, itemId, gstGroupId]);
 
+  const handleExportExcel = () => {
+    if (!reportData || reportData.length === 0) return;
+    const exportData = reportData.map((row) => ({
+      Barcode: row.Barcode || "",
+      "Item Name": row.ItemName || "",
+      Size: row.SizeName || "",
+      Category: row.CategoryName || "",
+      HSN: row.HSNCode || "",
+      "GST Group": row.GSTGroupName || "",
+      "Purchase Rate": row.PurchaseRate || 0,
+      "Sale Price": row.SalePrice || 0,
+      "Opening Stock": row.OpeningStock || 0,
+      "Purchase Qty": row.PurchaseQty || 0,
+      "Purchase Return": row.PurchaseReturnQty || 0,
+      "Sale Qty": row.SaleQty || 0,
+      "Sale Return": row.SalesReturnQty || 0,
+      "Current Stock": row.CurrentStock || 0,
+    }));
+    exportDataToExcel(exportData, `Stock_Report_${fromDate}_to_${toDate}`);
+  };
+
   const handlePrint = () => window.print();
   const handleClose = () => window.history.back();
 
@@ -434,6 +456,9 @@ const StockReport: React.FC = () => {
                 </div>
               </CardBody>
               <CardFooter className="text-end">
+                <Btn color="primary" type="button" className="me-2" onClick={handleExportExcel} disabled={reportData.length === 0}>
+                  <i className="fa fa-file-excel-o me-1" /> Export Excel
+                </Btn>
                 <Btn color="success" type="button" className="me-2" onClick={handlePrint}>
                   Print
                 </Btn>

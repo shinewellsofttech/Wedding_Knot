@@ -303,6 +303,14 @@ Items:[
         icon: "Box",
         type: "link",
         bookmark: true
+      },
+      {
+        id: 2,
+        title: "Blog Master",
+        path: `${process.env.PUBLIC_URL}/blogMaster`,
+        icon: "Box",
+        type: "link",
+        bookmark: true
       }
     ]
   },

@@ -53,7 +53,7 @@ const PageList_BarcodeTemplate = () => {
   });
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printTemplate, setPrintTemplate] = useState<any>(null);
-  const [printQty, setPrintQty] = useState(1);
+  const [printQty, setPrintQty] = useState<number | string>(1);
   const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
@@ -152,7 +152,8 @@ const PageList_BarcodeTemplate = () => {
     if (!printTemplate) return;
 
     setPrinting(true);
-    const tspl = buildTsplForPrint(printTemplate, printQty);
+    const numericQty = Math.max(1, Number(printQty) || 1);
+    const tspl = buildTsplForPrint(printTemplate, numericQty);
 
     try {
       const response = await fetch("http://127.0.0.1:9187/print", {
@@ -361,7 +362,26 @@ const PageList_BarcodeTemplate = () => {
 
               <FormGroup className="mb-3">
                 <Label className="fw-bold small">Print Quantity</Label>
-                <Input type="number" min="1" max="100" value={printQty} onChange={(e) => setPrintQty(Math.max(1, parseInt(e.target.value) || 1))} />
+                <Input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={printQty}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "") {
+                      setPrintQty("");
+                    } else {
+                      const parsed = parseInt(val, 10);
+                      setPrintQty(isNaN(parsed) ? "" : parsed);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (printQty === "" || Number(printQty) < 1) {
+                      setPrintQty(1);
+                    }
+                  }}
+                />
               </FormGroup>
 
               <div className="d-flex justify-content-end gap-2 mt-4">
