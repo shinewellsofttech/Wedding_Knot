@@ -237,7 +237,7 @@ const GridSystemRentReturn: React.FC<GridSystemRentReturnProps> = ({
                   <th>Varient</th>
                   <th>Quantity</th>
                   <th>Rent Price</th>
-                  <th>Secuety Deposite</th>
+                  <th>Security Deposit</th>
                   <th>Amount</th>
                   <th>Action</th>
                 </tr> 

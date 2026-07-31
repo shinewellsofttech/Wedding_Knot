@@ -127,6 +127,7 @@ const AddEdit_ItemMaster = () => {
   /* Ref for focus tracking */
   const tableRef = useRef<HTMLDivElement>(null);
   const timersRef = useRef<Record<string, NodeJS.Timeout>>({});
+  const scrolledVariantRef = useRef<string | null>(null);
 
   /* ── Load categories ── */
   useEffect(() => {
@@ -351,10 +352,11 @@ const AddEdit_ItemMaster = () => {
   /* ── Auto-scroll & focus target variant ── */
   useEffect(() => {
     const targetVariantId = location.state?.variantId;
-    if (targetVariantId && sections.length > 0) {
+    if (targetVariantId && sections.length > 0 && scrolledVariantRef.current !== String(targetVariantId)) {
       const timer = setTimeout(() => {
         const rowElem = document.getElementById(`variant-row-${targetVariantId}`);
         if (rowElem) {
+          scrolledVariantRef.current = String(targetVariantId);
           rowElem.scrollIntoView({ behavior: "smooth", block: "center" });
           const inputElem = rowElem.querySelector<HTMLInputElement>("input:not([type='file']):not([disabled])");
           if (inputElem) {

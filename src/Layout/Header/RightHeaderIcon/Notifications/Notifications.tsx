@@ -17,8 +17,18 @@ const Notifications = () => {
           </span>
         )}
       </div>
-      <div className="onhover-show-div notification-dropdown">
-        <div className="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
+      <div
+        className="onhover-show-div notification-dropdown"
+        style={{
+          zIndex: 99999,
+          backgroundColor: "#ffffff",
+          boxShadow: "0 10px 35px rgba(0,0,0,0.2)",
+          border: "1px solid #e2e8f0",
+          borderRadius: "10px",
+          overflow: "hidden"
+        }}
+      >
+        <div className="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2 p-3">
           <H6 className="f-18 mb-0 dropdown-title">Order Notifications</H6>
           {unreadCount > 0 && (
             <span
@@ -32,7 +42,9 @@ const Notifications = () => {
             </span>
           )}
         </div>
-        <NotificationBox />
+        <div style={{ padding: "0 12px 12px 12px" }}>
+          <NotificationBox />
+        </div>
       </div>
     </LI>
   );

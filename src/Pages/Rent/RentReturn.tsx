@@ -342,6 +342,7 @@ function RentReturn() {
             Remarks: header.Remarks || "",
             CustomerName: header.CustomerName || "",
             MobileNo: header.MobileNo || "",
+            F_RentEntryH: header.F_RentEntryH || "",
           },
         }));
 
@@ -798,6 +799,7 @@ function RentReturn() {
 
                     const rentWithGST = subTotal + taxAmount;
                     const grandTotal = rentWithGST;
+                    const secDepReturnToCustomer = totalSecDep - grandTotal;
 
                     return (
                       <>
@@ -807,6 +809,15 @@ function RentReturn() {
                               <h6 className="mb-1 text-muted fw-bold">Total Security Deposit</h6>
                               <h4 className="mb-0 text-info">₹ {totalSecDep.toFixed(2)}</h4>
                             </div>
+                            {state.formData.F_RentEntryH && (
+                              <div className="p-3 bg-light border border-success rounded flex-grow-1" style={{ minWidth: "250px", maxWidth: "350px" }}>
+                                <h6 className="mb-1 text-success fw-bold">Security deposit return to customer</h6>
+                                <h4 className="mb-0 text-success">₹ {secDepReturnToCustomer.toFixed(2)}</h4>
+                                <div className="text-muted mt-1" style={{ fontSize: "0.75rem" }}>
+                                  (Security Deposit ₹ {totalSecDep.toFixed(2)} - Grand Total ₹ {grandTotal.toFixed(2)})
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </Col>
                         <Col md="4">
@@ -842,9 +853,15 @@ function RentReturn() {
                                   </tr>
                                 )}
                                 <tr>
-                                  <th className="text-end text-success fs-5 py-3">Grand Total:</th>
-                                  <td className="text-end text-success fw-bold fs-5 py-3">₹ {grandTotal.toFixed(2)}</td>
+                                  <th className="text-end text-primary fs-6 py-2">Grand Total:</th>
+                                  <td className="text-end text-primary fw-bold fs-6 py-2">₹ {grandTotal.toFixed(2)}</td>
                                 </tr>
+                                {state.formData.F_RentEntryH && (
+                                  <tr className="table-success">
+                                    <th className="text-end text-success fs-6 py-2">Security deposit return to customer:</th>
+                                    <td className="text-end text-success fw-bold fs-6 py-2">₹ {secDepReturnToCustomer.toFixed(2)}</td>
+                                  </tr>
+                                )}
                               </tbody>
                             </table>
                           </div>

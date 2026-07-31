@@ -64,3 +64,20 @@ select,
 [role="button"] {
   cursor: pointer !important;
 }
+
+/* Fix header & notification dropdowns overlapping with sticky page/table headers */
+.page-header {
+  z-index: 1000 !important;
+}
+
+.sidebar-wrapper,
+div.sidebar-wrapper {
+  z-index: 999 !important;
+}
+
+.onhover-show-div,
+.notification-dropdown {
+  z-index: 99999 !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.2) !important;
+}

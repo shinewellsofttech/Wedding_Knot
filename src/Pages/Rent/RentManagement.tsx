@@ -458,7 +458,6 @@ function RentManagement() {
         }
 
         let baseSecDep = parseFloat(designItem.SalePrice || item.SalePrice || designItem.SecurityDeposit || item.SecurityDeposit || 0);
-        let secDepWithGST = baseSecDep + (baseSecDep * gstPercent / 100);
 
         const updatedRows = [...gridRows];
         
@@ -470,7 +469,7 @@ function RentManagement() {
           Variant: designItem.SizeName || item.SizeName || "",
           Qty: "1",
           Rate: designItem.RentPrice || item.RentPrice || designItem.Rate || item.Rate || "",
-          SecurityDeposit: String(secDepWithGST.toFixed(2)),
+          SecurityDeposit: baseSecDep > 0 ? String(baseSecDep) : (designItem.SecurityDeposit || item.SecurityDeposit || ""),
           ItemData: [{ Id: itemId, ItemName: item.ItemName || "Scanned Item", F_GSTGroupMaster: gstGroupId }],
           GSTPercent: gstPercent,
           UnitValue: unitVal,
