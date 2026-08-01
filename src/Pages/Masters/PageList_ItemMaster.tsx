@@ -856,14 +856,12 @@ const PageList_ItemMaster = () => {
                                       </Btn>
                                       {(() => {
                                          const rawCover = item?.iCoverImage || item?.CoverImage || item?.icoverimage || item?.coverImage || item?.ICoverImage || item?.ItemCoverImage || item?.CoverPhoto || item?.coverPhoto || "";
-                                         const rawCoverThumb = item?.CoverImage_Thumb || item?.coverImage_Thumb || item?.icoverimage_thumb || item?.coverImage_thumb || "";
                                          const coverFull = cleanUrl(rawCover);
-                                         const coverThumb = cleanUrl(rawCoverThumb) || coverFull;
                                          if (!coverFull) return null;
                                          return (
                                            <a href={coverFull} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '8px' }}>
                                              <img
-                                               src={coverThumb}
+                                               src={coverFull}
                                                alt="Cover"
                                                style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }}
                                                title="Cover Image - Click to view"

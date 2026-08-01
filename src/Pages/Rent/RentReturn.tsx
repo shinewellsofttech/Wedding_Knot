@@ -38,6 +38,7 @@ interface StateData {
     Remarks: string;
     CustomerName?: string;
     MobileNo?: string;
+    PaymentMode?: string;
     F_RentEntryH?: string;
     F_RentReturnH?: string;
     TotalTax?: number;
@@ -52,6 +53,8 @@ interface StateData {
   ItemMaster: any[];
   WarehouseMaster: any[];
   DefaultWarehouse: any | null;
+  GlobalOptions?: any[];
+  GSTGroupMaster?: any[];
   isEditMode: boolean;
   isGridEditable: boolean;
 }
@@ -79,12 +82,15 @@ function RentReturn() {
       Remarks: "",
       CustomerName: "",
       MobileNo: "",
+      PaymentMode: "NEFT / Bank Transfer",
     },
     VendorMaster: [],
     ItemGroupMaster: [],
     ItemMaster: [],
     WarehouseMaster: [],
     DefaultWarehouse: null,
+    GlobalOptions: [],
+    GSTGroupMaster: [],
     isEditMode: false,
     isGridEditable: true,
   });
@@ -118,6 +124,8 @@ function RentReturn() {
         const API_URL_RR_LIST = API_WEB_URLS.MASTER + "/0/token/RentReturnData/Id/0";
         const rrData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_RR_LIST);
         
+        const globalOptions = await Fn_FillListData(dispatch, () => ({}), "ignored", `${API_WEB_URLS.MASTER}/0/token/GlobalOptions/Id/0`);
+
         const extractArray = (data: any) => Array.isArray(data) ? data : (data?.data?.dataList || data?.dataList || data?.data?.response || data?.response || []);
         
         const reDataArray = extractArray(reData);
@@ -129,6 +137,7 @@ function RentReturn() {
           VendorMaster: extractArray(vendors),
           CreatedRentEntries: reDataArray,
           CreatedRentReturns: rrDataArray,
+          GlobalOptions: extractArray(globalOptions),
         }));
 
         const params = new URLSearchParams(location.search);
@@ -197,6 +206,7 @@ function RentReturn() {
         Remarks: rr.Remarks || "",
         CustomerName: rr.CustomerName || "",
         MobileNo: rr.MobileNo || "",
+        PaymentMode: rr.PaymentMode || rr.ModeOfPayment || "NEFT / Bank Transfer",
         F_RentReturnH: rr.Id,
         F_RentEntryH: rr.F_RentEntryH || "",
         TotalTax: Number(rr.TotalTax || rr.TaxAmount || rr.TotalTaxAmount || 0),
@@ -342,6 +352,7 @@ function RentReturn() {
             Remarks: header.Remarks || "",
             CustomerName: header.CustomerName || "",
             MobileNo: header.MobileNo || "",
+            PaymentMode: header.PaymentMode || header.ModeOfPayment || "NEFT / Bank Transfer",
             F_RentEntryH: header.F_RentEntryH || "",
           },
         }));
@@ -584,6 +595,7 @@ function RentReturn() {
       headerFormData.append("Remarks", state.formData.Remarks || "");
       headerFormData.append("CustomerName", state.formData.CustomerName || "");
       headerFormData.append("MobileNo", state.formData.MobileNo || "");
+      headerFormData.append("PaymentMode", state.formData.PaymentMode || "NEFT / Bank Transfer");
       headerFormData.append("TotalRentAmount", subTotal.toString());
       headerFormData.append("TotalSecurityDeposit", totalSecDep.toString());
       
@@ -605,11 +617,49 @@ function RentReturn() {
       headerFormData.append("JsonData", JSON.stringify(jsonDataArray));
       headerFormData.append("F_RentEntryH", state.formData.F_RentEntryH || "0");
       await Fn_AddEditData(dispatch, setState, { arguList: { id: state.id, formData: headerFormData } }, API_URL_SAVE, true, "memberid", navigate, "#");
-      alert("Rent Return saved successfully");
-      window.location.reload();
+      if (window.confirm("Rent Return saved successfully. Do you want to print the return receipt?")) {
+        triggerPaymentModeSelect("print");
+      } else {
+        window.location.reload();
+      }
     } catch (error) {
       console.error("Error saving rent return:", error);
     }
+  };
+
+  const [paymentModeModalOpen, setPaymentModeModalOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"print" | "pdf" | "whatsapp" | null>(null);
+  const [selectedModeForPrint, setSelectedModeForPrint] = useState<string>("NEFT / Bank Transfer");
+
+  const triggerPaymentModeSelect = (action: "print" | "pdf" | "whatsapp") => {
+    setSelectedModeForPrint(state.formData.PaymentMode || "NEFT / Bank Transfer");
+    setPendingAction(action);
+    setPaymentModeModalOpen(true);
+  };
+
+  const confirmPaymentModeAndProceed = () => {
+    const updatedMode = selectedModeForPrint || "NEFT / Bank Transfer";
+    setState((prev) => ({
+      ...prev,
+      formData: {
+        ...prev.formData,
+        PaymentMode: updatedMode
+      }
+    }));
+    setPaymentModeModalOpen(false);
+
+    const action = pendingAction;
+    setPendingAction(null);
+
+    setTimeout(() => {
+      if (action === "print") {
+        executePrint();
+      } else if (action === "pdf") {
+        handlePDFExport(updatedMode);
+      } else if (action === "whatsapp") {
+        handleWhatsAppShare(updatedMode);
+      }
+    }, 150);
   };
 
   const latestBarcodeFetch = useRef(handleBarcodeFetch);
@@ -677,6 +727,115 @@ function RentReturn() {
   }, []);
 
 
+  const executePrint = () => {
+    const oldTitle = document.title;
+    document.title = "";
+    window.print();
+    document.title = oldTitle;
+  };
+
+  const handleDownloadPdf = async (overrideMode?: string) => {
+    const activeState = overrideMode ? { ...state, formData: { ...state.formData, PaymentMode: overrideMode } } : state;
+    const { generateRentReturnReceiptHTML } = require('../../helpers/PDFTemplate');
+    const htmlString = generateRentReturnReceiptHTML("RENT RETURN RECEIPT", activeState, gridRows);
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlString;
+    tempDiv.style.position = 'absolute';
+    tempDiv.style.top = '-9999px';
+    tempDiv.style.left = '-9999px';
+    document.body.appendChild(tempDiv);
+
+    await new Promise(r => setTimeout(r, 1000));
+
+    const safeNo = (activeState.formData.PONo || "ReturnReceipt").replace(/[\\/:*?"<>|]/g, "_");
+
+    const html2pdfModule = require("html2pdf.js");
+    const html2pdf = html2pdfModule.default || html2pdfModule;
+
+    const opt = {
+      margin: 5,
+      filename: `RentReturnReceipt_${safeNo}.pdf`,
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, windowWidth: 800, width: 800 },
+      jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
+    };
+
+    const worker = html2pdf().set(opt).from(tempDiv.firstElementChild);
+    const pdf = await worker.toPdf().get("pdf");
+    const pdfBlob = pdf.output("blob");
+    document.body.removeChild(tempDiv);
+    return pdfBlob;
+  };
+
+  const handlePDFExport = async (overrideMode?: string) => {
+    const activeState = overrideMode ? { ...state, formData: { ...state.formData, PaymentMode: overrideMode } } : state;
+    const safeNo = (activeState.formData.PONo || "ReturnReceipt").replace(/[\\/:*?"<>|]/g, "_");
+    try {
+      const pdfBlob = await handleDownloadPdf(overrideMode);
+      const filename = `RentReturnReceipt_${safeNo}.pdf`;
+      const url = window.URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Error generating PDF. Please try again.');
+    }
+  };
+
+  const handleWhatsAppShare = (overrideMode?: string) => {
+    const activeMode = overrideMode || state.formData.PaymentMode || 'NEFT / Bank Transfer';
+    const customerMobile = state.formData.MobileNo ? state.formData.MobileNo.replace(/[^0-9]/g, "") : "";
+    const firmName = state.GlobalOptions?.[0]?.FirmName || "Our Store";
+    const validRows = gridRows.filter(r => r.ItemCode || r.F_ItemMaster || parseFloat(r.Qty) > 0);
+    const subTotal = validRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
+    const totalSecDep = validRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.SecurityDeposit) || 0)), 0);
+    const taxAmount = state.formData.TotalTax || 0;
+    const totalRentAmount = subTotal + taxAmount;
+    const secDepReturnToCustomer = totalSecDep - totalRentAmount;
+
+    const itemsListStr = validRows
+      .map((r, i) => {
+        const itemObj = r.ItemData?.find((item: any) => String(item.Id) === String(r.F_ItemMaster)) ||
+                        state.ItemMaster?.find((item: any) => String(item.Id) === String(r.F_ItemMaster));
+        const name = r.ItemName || itemObj?.ItemName || itemObj?.Name || "Item";
+        return `${i + 1}. Barcode: ${r.ItemCode || 'N/A'} - ${name} | Returned Qty: ${r.Qty} | Security Dep: ₹${r.SecurityDeposit}`;
+      })
+      .join('\n');
+
+    const text = `*RENT RETURN RECEIPT - ${firmName}*
+----------------------------------
+*Return Voucher No:* ${state.formData.PONo || 'N/A'}
+*Return Date:* ${state.formData.PODate || 'N/A'}
+
+*Customer Name:* ${state.formData.CustomerName || 'Valued Customer'}
+*Mobile No:* ${state.formData.MobileNo || 'N/A'}
+
+*RETURNED PRODUCTS:*
+${itemsListStr}
+
+----------------------------------
+*Total Security Deposit:* ₹${totalSecDep.toFixed(2)}
+*Rent Charges Deducted:* ₹${totalRentAmount.toFixed(2)}
+*Net Refund to Customer:* ₹${secDepReturnToCustomer.toFixed(2)}
+*Refund Payment Mode:* ${activeMode}
+----------------------------------
+✅ Net deposit refund paid to customer via *${activeMode}*.
+Thank you for choosing ${firmName}!`;
+
+    const encodedText = encodeURIComponent(text);
+    const waUrl = customerMobile 
+      ? `https://api.whatsapp.com/send?phone=91${customerMobile}&text=${encodedText}`
+      : `https://api.whatsapp.com/send?text=${encodedText}`;
+
+    window.open(waUrl, "_blank");
+  };
+
   const rentCompactStyles = `
     @media (max-width: 991.98px) {
       .rent-entry-page .container-fluid { padding: 0.4rem !important; }
@@ -693,6 +852,28 @@ function RentReturn() {
       .rent-entry-page .form-label { font-size: 0.7rem; margin-bottom: 0.15rem; }
       .rent-entry-page .form-control { font-size: 0.75rem; height: 24px; padding: 0.15rem 0.28rem; }
       .rent-entry-page .btn { font-size: 0.75rem; padding: 0.18rem 0.35rem; }
+    }
+    .rent-return-print-layout { 
+      position: absolute; 
+      left: -9999px; 
+      top: 0; 
+      display: block; 
+      width: 210mm;
+      background: white; 
+      color: black; 
+    }
+    @media print {
+      @page { margin: 0; }
+      body { margin: 0.2cm; line-height: 1.1; }
+      body * { visibility: hidden; }
+      .rent-return-print-layout, .rent-return-print-layout * { visibility: visible; }
+      .rent-return-print-layout { 
+        display: block !important; 
+        position: absolute !important; 
+        left: 0 !important; 
+        top: 0 !important; 
+        width: 100% !important;
+      }
     }
   `;
 
@@ -765,6 +946,17 @@ function RentReturn() {
                   <Col md="2">
                     <label className="form-label">Mobile No</label>
                     <Input type="text" value={state.formData.MobileNo || ""} onChange={(e) => handleFormFieldChange("MobileNo", e.target.value)} placeholder="Mobile No" disabled={!state.isGridEditable} />
+                  </Col>
+                  <Col md="2">
+                    <label className="form-label">Refund Payment Mode</label>
+                    <select className="form-control" value={state.formData.PaymentMode || "NEFT / Bank Transfer"} onChange={(e) => handleFormFieldChange("PaymentMode", e.target.value)} disabled={!state.isGridEditable}>
+                      <option value="NEFT / Bank Transfer">NEFT / Bank Transfer</option>
+                      <option value="Bank to Bank">Bank to Bank</option>
+                      <option value="UPI / Online">UPI / Online</option>
+                      <option value="Cash">Cash</option>
+                      <option value="Cheque">Cheque</option>
+                      <option value="Credit / Debit Card">Credit / Debit Card</option>
+                    </select>
                   </Col>
                   <Col md="2">
                     <label className="form-label">Remarks</label>
@@ -871,7 +1063,7 @@ function RentReturn() {
                   })()}
                 </Row>
               </CardBody>
-              <CardFooter className="d-flex flex-row flex-nowrap gap-2 justify-content-end p-2 p-sm-3">
+              <CardFooter className="d-flex flex-row flex-wrap gap-2 justify-content-end p-2 p-sm-3">
                 {state.isEditMode && !state.isGridEditable && (
                   <Btn
                     type="button"
@@ -889,6 +1081,15 @@ function RentReturn() {
                 <button ref={saveButtonRef} type="button" className="btn btn-primary m-0" onClick={handleSave} disabled={!state.isGridEditable}>
                   <i className="bx bx-save me-2"></i>Save
                 </button>
+                <Btn color="success" type="button" className="m-0" onClick={() => triggerPaymentModeSelect("print")}>
+                  <i className="bx bx-printer me-2"></i>Print
+                </Btn>
+                <Btn color="danger" type="button" className="m-0" onClick={() => triggerPaymentModeSelect("pdf")}>
+                  <i className="bx bxs-file-pdf me-2"></i>PDF
+                </Btn>
+                <Btn color="success" type="button" className="m-0" style={{ backgroundColor: "#25D366", borderColor: "#25D366" }} onClick={() => triggerPaymentModeSelect("whatsapp")}>
+                  <i className="fa fa-whatsapp me-2"></i>WhatsApp Msg
+                </Btn>
                 <Btn color="dark" type="button" className="m-0" onClick={() => navigate("/dashboard")}>
                   <i className="bx bx-exit me-2"></i>Exit
                 </Btn>
@@ -897,6 +1098,83 @@ function RentReturn() {
           </Col>
         </Row>
       </Container>
+
+      {/* ── SELECT PAYMENT MODE MODAL (BEFORE PRINT / PDF / WHATSAPP) ── */}
+      <Modal isOpen={paymentModeModalOpen} toggle={() => setPaymentModeModalOpen(false)} centered size="md">
+        <ModalHeader toggle={() => setPaymentModeModalOpen(false)} className="bg-success text-white py-2">
+          <span className="text-white fw-bold">Select Refund Payment Mode</span>
+        </ModalHeader>
+        <ModalBody className="p-3">
+          {(() => {
+            const validRows = gridRows.filter(r => r.ItemCode || r.F_ItemMaster || parseFloat(r.Qty) > 0);
+            const subTotal = validRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
+            const totalSecDep = validRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.SecurityDeposit) || 0)), 0);
+            const taxAmount = state.formData.TotalTax || 0;
+            const totalRentAmount = subTotal + taxAmount;
+            const secDepReturnToCustomer = totalSecDep - totalRentAmount;
+
+            return (
+              <div>
+                <div className="alert alert-success p-2 mb-3 small d-flex justify-content-between align-items-center">
+                  <div>
+                    <div className="fw-bold">Net Security Deposit Refund:</div>
+                    <div className="text-muted small">Customer: {state.formData.CustomerName || "Valued Customer"}</div>
+                  </div>
+                  <div className="fs-5 fw-bold text-success">₹ {secDepReturnToCustomer.toFixed(2)}</div>
+                </div>
+
+                <label className="form-label fw-bold mb-2">Select Refund Payment Mode *</label>
+                <div className="d-grid gap-2">
+                  {[
+                    { id: "NEFT / Bank Transfer", label: "NEFT / Bank Transfer", icon: "bx bx-building-house", color: "primary" },
+                    { id: "Bank to Bank", label: "Bank to Bank (Account Transfer)", icon: "bx bx-transfer-alt", color: "info" },
+                    { id: "UPI / Online", label: "UPI / Online (GPay, PhonePe, Paytm)", icon: "bx bx-mobile-alt", color: "success" },
+                    { id: "Cash", label: "Cash", icon: "bx bx-money", color: "warning" },
+                    { id: "Cheque", label: "Cheque", icon: "bx bx-notepad", color: "secondary" },
+                    { id: "Credit / Debit Card", label: "Credit / Debit Card", icon: "bx bx-credit-card", color: "danger" },
+                  ].map((mode) => (
+                    <div 
+                      key={mode.id} 
+                      className={`p-2 border rounded d-flex align-items-center justify-content-between ${selectedModeForPrint === mode.id ? 'border-success bg-light shadow-sm' : ''}`}
+                      style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+                      onClick={() => setSelectedModeForPrint(mode.id)}
+                    >
+                      <div className="d-flex align-items-center gap-2">
+                        <i className={`${mode.icon} fs-5 text-${mode.color}`}></i>
+                        <span className="fw-semibold small">{mode.label}</span>
+                      </div>
+                      <input 
+                        type="radio" 
+                        name="refundPaymentModeSelect" 
+                        checked={selectedModeForPrint === mode.id} 
+                        onChange={() => setSelectedModeForPrint(mode.id)} 
+                        className="form-check-input"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </ModalBody>
+        <ModalFooter className="p-2 border-top-0 d-flex justify-content-end gap-2">
+          <Button color="secondary" className="btn-sm" onClick={() => setPaymentModeModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button color="success" className="btn-sm px-4 fw-bold" onClick={confirmPaymentModeAndProceed}>
+            <i className="bx bx-check-circle me-1"></i>
+            Confirm & Proceed
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* ── RENT RETURN RECEIPT PRINT LAYOUT ── */}
+      <div 
+        className="rent-return-print-layout" 
+        dangerouslySetInnerHTML={{ 
+          __html: require('../../helpers/PDFTemplate').generateRentReturnReceiptHTML("RENT RETURN RECEIPT", state, gridRows) 
+        }} 
+      />
     </div>
   );
 }

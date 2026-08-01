@@ -39,6 +39,7 @@ interface StateData {
     Remarks: string;
     CustomerName?: string;
     MobileNo?: string;
+    PaymentMode?: string;
     F_RentEntryH?: string;
     F_TaxLedger?: string;
     TotalTax?: number;
@@ -79,6 +80,7 @@ function RentManagement() {
       Remarks: "",
       CustomerName: "",
       MobileNo: "",
+      PaymentMode: "Cash",
       F_TaxLedger: "",
       TotalTax: 0,
     },
@@ -209,6 +211,7 @@ function RentManagement() {
         Remarks: re.Remarks || "",
         CustomerName: re.CustomerName || "",
         MobileNo: re.MobileNo || "",
+        PaymentMode: re.PaymentMode || re.ModeOfPayment || "Cash",
         F_TaxLedger: re.F_TaxLedger || re.F_LedgerMasterTax || "",
         F_RentEntryH: re.Id,
         TotalTax: re.TotalTax || 0,
@@ -276,6 +279,7 @@ function RentManagement() {
             Remarks: header.Remarks || "",
             CustomerName: header.CustomerName || "",
             MobileNo: header.MobileNo || "",
+            PaymentMode: header.PaymentMode || header.ModeOfPayment || "Cash",
             F_TaxLedger: header.F_TaxLedger || header.F_LedgerMasterTax || "",
             TotalTax: header.TotalTax || 0,
           },
@@ -596,6 +600,7 @@ function RentManagement() {
       headerFormData.append("Remarks", state.formData.Remarks || "");
       headerFormData.append("CustomerName", state.formData.CustomerName || "");
       headerFormData.append("MobileNo", state.formData.MobileNo || "");
+      headerFormData.append("PaymentMode", state.formData.PaymentMode || "Cash");
       headerFormData.append("TotalRentAmount", subTotal.toString());
       headerFormData.append("TotalSecurityDeposit", totalSecDep.toString());
       headerFormData.append("TaxAmount", taxAmount.toFixed(2));
@@ -612,7 +617,9 @@ function RentManagement() {
       headerFormData.append("JsonData", JSON.stringify(jsonDataArray));
       headerFormData.append("F_RentManagementH", state.formData.F_RentEntryH || "0");
       await Fn_AddEditData(dispatch, setState, { arguList: { id: state.id, formData: headerFormData } }, API_URL_SAVE, true, "memberid", navigate, "#");
-      alert("Rent Entry saved successfully");
+      if (window.confirm("Rent Entry saved successfully. Do you want to print the receipt?")) {
+        executePrint();
+      }
       window.location.reload();
     } catch (error) {
       console.error("Error saving rent entry:", error);
@@ -684,6 +691,111 @@ function RentManagement() {
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, []);
 
+  const executePrint = () => {
+    const oldTitle = document.title;
+    document.title = "";
+    window.print();
+    document.title = oldTitle;
+  };
+
+  const handleDownloadPdf = async () => {
+    const { generateRentReceiptHTML } = require('../../helpers/PDFTemplate');
+    const htmlString = generateRentReceiptHTML("RENT RECEIPT", state, gridRows);
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlString;
+    tempDiv.style.position = 'absolute';
+    tempDiv.style.top = '-9999px';
+    tempDiv.style.left = '-9999px';
+    document.body.appendChild(tempDiv);
+
+    await new Promise(r => setTimeout(r, 1000));
+
+    const safeNo = (state.formData.PONo || "Receipt").replace(/[\\/:*?"<>|]/g, "_");
+
+    const html2pdfModule = require("html2pdf.js");
+    const html2pdf = html2pdfModule.default || html2pdfModule;
+
+    const opt = {
+      margin: 5,
+      filename: `RentReceipt_${safeNo}.pdf`,
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, windowWidth: 800, width: 800 },
+      jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
+    };
+
+    const worker = html2pdf().set(opt).from(tempDiv.firstElementChild);
+    const pdf = await worker.toPdf().get("pdf");
+    const pdfBlob = pdf.output("blob");
+    document.body.removeChild(tempDiv);
+    return pdfBlob;
+  };
+
+  const handlePDFExport = async () => {
+    const safeNo = (state.formData.PONo || "Receipt").replace(/[\\/:*?"<>|]/g, "_");
+    try {
+      const pdfBlob = await handleDownloadPdf();
+      const filename = `RentReceipt_${safeNo}.pdf`;
+      const url = window.URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Error generating PDF. Please try again.');
+    }
+  };
+
+  const handleWhatsAppShare = () => {
+    const customerMobile = state.formData.MobileNo ? state.formData.MobileNo.replace(/[^0-9]/g, "") : "";
+    const firmName = state.GlobalOptions?.[0]?.FirmName || "Our Store";
+    const validRows = gridRows.filter(r => r.ItemCode || r.F_ItemMaster || parseFloat(r.Qty) > 0);
+    const subTotal = validRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
+    const totalSecDep = validRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.SecurityDeposit) || 0)), 0);
+    const totalRentWithTax = subTotal + (state.formData.TotalTax || 0);
+
+    const itemsListStr = validRows
+      .map((r, i) => {
+        const itemObj = r.ItemData?.find((item: any) => String(item.Id) === String(r.F_ItemMaster)) ||
+                        state.ItemMaster?.find((item: any) => String(item.Id) === String(r.F_ItemMaster));
+        const name = r.ItemName || itemObj?.ItemName || itemObj?.Name || "Item";
+        return `${i + 1}. Barcode: ${r.ItemCode || 'N/A'} - ${name} | Qty: ${r.Qty} | Rent: ₹${r.Rate} | Security Dep: ₹${r.SecurityDeposit}`;
+      })
+      .join('\n');
+
+    const text = `*RENT RECEIPT - ${firmName}*
+----------------------------------
+*Voucher No:* ${state.formData.PONo || 'N/A'}
+*Rent Date:* ${state.formData.PODate || 'N/A'}
+*Product Return Deadline:* ${state.formData.TillDate || 'N/A'}
+
+*Customer Name:* ${state.formData.CustomerName || 'Valued Customer'}
+*Mobile No:* ${state.formData.MobileNo || 'N/A'}
+*Payment Mode:* ${state.formData.PaymentMode || 'Cash'}
+
+*ITEMS RENTED:*
+${itemsListStr}
+
+----------------------------------
+*Total Rent Charges:* ₹${totalRentWithTax.toFixed(2)}
+*Total Security Deposit Given:* ₹${totalSecDep.toFixed(2)}
+*Deposit Proof Status:* Paid (${state.formData.PaymentMode || 'Cash'})
+----------------------------------
+📌 *Note:* Please return all rented products on or before *${state.formData.TillDate || 'N/A'}*.
+Thank you for choosing ${firmName}!`;
+
+    const encodedText = encodeURIComponent(text);
+    const waUrl = customerMobile 
+      ? `https://api.whatsapp.com/send?phone=91${customerMobile}&text=${encodedText}`
+      : `https://api.whatsapp.com/send?text=${encodedText}`;
+
+    window.open(waUrl, "_blank");
+  };
+
   const rentCompactStyles = `
     @media (max-width: 991.98px) {
       .rent-entry-page .container-fluid { padding: 0.4rem !important; }
@@ -700,6 +812,28 @@ function RentManagement() {
       .rent-entry-page .form-label { font-size: 0.7rem; margin-bottom: 0.15rem; }
       .rent-entry-page .form-control { font-size: 0.75rem; height: 24px; padding: 0.15rem 0.28rem; }
       .rent-entry-page .btn { font-size: 0.75rem; padding: 0.18rem 0.35rem; }
+    }
+    .rent-print-layout { 
+      position: absolute; 
+      left: -9999px; 
+      top: 0; 
+      display: block; 
+      width: 210mm;
+      background: white; 
+      color: black; 
+    }
+    @media print {
+      @page { margin: 0; }
+      body { margin: 0.2cm; line-height: 1.1; }
+      body * { visibility: hidden; }
+      .rent-print-layout, .rent-print-layout * { visibility: visible; }
+      .rent-print-layout { 
+        display: block !important; 
+        position: absolute !important; 
+        left: 0 !important; 
+        top: 0 !important; 
+        width: 100% !important;
+      }
     }
   `;
 
@@ -761,6 +895,16 @@ function RentManagement() {
                     <Input type="text" value={state.formData.MobileNo || ""} onChange={(e) => handleFormFieldChange("MobileNo", e.target.value)} placeholder="Mobile No" disabled={!state.isGridEditable} />
                   </Col>
 
+                  <Col md="2">
+                    <label className="form-label">Payment Mode</label>
+                    <select className="form-control" value={state.formData.PaymentMode || "Cash"} onChange={(e) => handleFormFieldChange("PaymentMode", e.target.value)} disabled={!state.isGridEditable}>
+                      <option value="Cash">Cash</option>
+                      <option value="UPI / Online">UPI / Online</option>
+                      <option value="Credit / Debit Card">Credit / Debit Card</option>
+                      <option value="Bank Transfer">Bank Transfer</option>
+                      <option value="Cheque">Cheque</option>
+                    </select>
+                  </Col>
                   <Col md="2">
                     <label className="form-label">Remarks</label>
                     <Input type="text" value={state.formData.Remarks} onChange={(e) => handleFormFieldChange("Remarks", e.target.value)} placeholder="Enter remarks" disabled={!state.isGridEditable} />
@@ -868,7 +1012,7 @@ function RentManagement() {
                   })()}
                 </Row>
               </CardBody>
-              <CardFooter className="d-flex flex-row flex-nowrap gap-2 justify-content-end p-2 p-sm-3">
+              <CardFooter className="d-flex flex-row flex-wrap gap-2 justify-content-end p-2 p-sm-3">
                 {state.isEditMode && !state.isGridEditable && (
                   <Btn
                     type="button"
@@ -886,6 +1030,15 @@ function RentManagement() {
                 <button ref={saveButtonRef} type="button" className="btn btn-primary m-0" onClick={handleSave} disabled={!state.isGridEditable}>
                   <i className="bx bx-save me-2"></i>Save
                 </button>
+                <Btn color="success" type="button" className="m-0" onClick={executePrint}>
+                  <i className="bx bx-printer me-2"></i>Print
+                </Btn>
+                <Btn color="danger" type="button" className="m-0" onClick={handlePDFExport}>
+                  <i className="bx bxs-file-pdf me-2"></i>PDF
+                </Btn>
+                <Btn color="success" type="button" className="m-0" style={{ backgroundColor: "#25D366", borderColor: "#25D366" }} onClick={handleWhatsAppShare}>
+                  <i className="fa fa-whatsapp me-2"></i>WhatsApp Msg
+                </Btn>
                 <Btn color="dark" type="button" className="m-0" onClick={() => navigate("/dashboard")}>
                   <i className="bx bx-exit me-2"></i>Exit
                 </Btn>
@@ -894,6 +1047,14 @@ function RentManagement() {
           </Col>
         </Row>
       </Container>
+
+      {/* ── RENT RECEIPT PRINT LAYOUT ── */}
+      <div 
+        className="rent-print-layout" 
+        dangerouslySetInnerHTML={{ 
+          __html: require('../../helpers/PDFTemplate').generateRentReceiptHTML("RENT RECEIPT", state, gridRows) 
+        }} 
+      />
     </div>
   );
 }

@@ -283,14 +283,12 @@ const AddEdit_ItemMaster = () => {
              } catch (e) { console.error("Parse Error Scheme:", e); }
 
              const rawCover = item.iCoverImage || item.CoverImage || item.icoverimage || item.coverImage || item.ICoverImage || item.ItemCoverImage || item.CoverPhoto || item.coverPhoto || "";
-             const rawCoverThumb = item.CoverImage_Thumb || item.coverImage_Thumb || item.icoverimage_thumb || item.coverImage_thumb || "";
              const coverFull = cleanUrl(rawCover);
-             const coverThumb = cleanUrl(rawCoverThumb) || coverFull;
 
              return {
                 id: String(item.Id || uid()),
                 itemName: item.ItemName || "",
-                coverImage: coverFull ? { file: null, preview: coverThumb, fullUrl: coverFull } : null,
+                coverImage: coverFull ? { file: null, preview: coverFull, fullUrl: coverFull } : null,
                 shortDescription: item.ShortDescription || "",
                 fullDescription: item.FullDescription || "",
                 hasSize: item.HasSize ? "Yes" : "No",
