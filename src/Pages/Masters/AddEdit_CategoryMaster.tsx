@@ -20,11 +20,13 @@ const initialValues: FormValues = {
   Name: "",
 };
 
+
 interface CategoryMasterState {
   id: number;
   formData: Partial<FormValues>;
   isProgress?: boolean;
 }
+
 
 const API_URL_SAVE = `CategoryMaster/0/token`;
 const API_URL_EDIT = API_WEB_URLS.MASTER + `/0/token/CategoryMaster/Id`;

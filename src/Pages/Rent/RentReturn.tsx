@@ -39,6 +39,7 @@ interface StateData {
     CustomerName?: string;
     MobileNo?: string;
     PaymentMode?: string;
+    F_RefundPaymentMode?: string | number;
     F_RentEntryH?: string;
     F_RentReturnH?: string;
     TotalTax?: number;
@@ -55,6 +56,7 @@ interface StateData {
   DefaultWarehouse: any | null;
   GlobalOptions?: any[];
   GSTGroupMaster?: any[];
+  RefundPaymentModeList?: any[];
   isEditMode: boolean;
   isGridEditable: boolean;
 }
@@ -67,6 +69,7 @@ function RentReturn() {
   const API_URL_ITEMS = API_WEB_URLS.MASTER + "/0/token/ItemMaster/Id";
   const API_URL_VENDOR = API_WEB_URLS.MASTER + "/0/token/SalesPartyLedgerMaster/Id/0";
   const API_URL_WAREHOUSE = API_WEB_URLS.MASTER + "/0/token/WarehouseMaster/Id/0";
+  const API_URL_REFUND_PAYMENT_MODE = `${API_WEB_URLS.MASTER}/0/token/GetRefundPaymentMode/Id/0`;
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -83,6 +86,7 @@ function RentReturn() {
       CustomerName: "",
       MobileNo: "",
       PaymentMode: "NEFT / Bank Transfer",
+      F_RefundPaymentMode: "",
     },
     VendorMaster: [],
     ItemGroupMaster: [],
@@ -91,6 +95,7 @@ function RentReturn() {
     DefaultWarehouse: null,
     GlobalOptions: [],
     GSTGroupMaster: [],
+    RefundPaymentModeList: [],
     isEditMode: false,
     isGridEditable: true,
   });
@@ -125,20 +130,33 @@ function RentReturn() {
         const rrData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_RR_LIST);
         
         const globalOptions = await Fn_FillListData(dispatch, () => ({}), "ignored", `${API_WEB_URLS.MASTER}/0/token/GlobalOptions/Id/0`);
+        const refundPaymentModes = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_REFUND_PAYMENT_MODE);
 
         const extractArray = (data: any) => Array.isArray(data) ? data : (data?.data?.dataList || data?.dataList || data?.data?.response || data?.response || []);
         
         const reDataArray = extractArray(reData);
         const rrDataArray = extractArray(rrData);
+        const refundModesArray = extractArray(refundPaymentModes);
 
-        setState((prev) => ({
-          ...prev,
-          ItemGroupMaster: extractArray(itemGroups),
-          VendorMaster: extractArray(vendors),
-          CreatedRentEntries: reDataArray,
-          CreatedRentReturns: rrDataArray,
-          GlobalOptions: extractArray(globalOptions),
-        }));
+        setState((prev) => {
+          const defaultModeObj = refundModesArray.find((m: any) => m.Name === prev.formData.PaymentMode) ||
+            refundModesArray.find((m: any) => String(m.Id) === "5" || m.Name?.toLowerCase().includes("neft")) ||
+            refundModesArray[0];
+          return {
+            ...prev,
+            ItemGroupMaster: extractArray(itemGroups),
+            VendorMaster: extractArray(vendors),
+            CreatedRentEntries: reDataArray,
+            CreatedRentReturns: rrDataArray,
+            GlobalOptions: extractArray(globalOptions),
+            RefundPaymentModeList: refundModesArray,
+            formData: {
+              ...prev.formData,
+              F_RefundPaymentMode: prev.formData.F_RefundPaymentMode || defaultModeObj?.Id || "",
+              PaymentMode: prev.formData.PaymentMode || defaultModeObj?.Name || "NEFT / Bank Transfer",
+            }
+          };
+        });
 
         const params = new URLSearchParams(location.search);
         const recordId = params.get("id");
@@ -192,6 +210,11 @@ function RentReturn() {
       console.error("Error parsing RentReturnLDetails", e);
     }
 
+    const refundModeId = rr.F_RefundPaymentMode || rr.F_RefundPaymentModeId || "";
+    const refundModeObj = prevState.RefundPaymentModeList?.find(
+      (m: any) => String(m.Id) === String(refundModeId) || m.Name === (rr.PaymentMode || rr.ModeOfPayment)
+    );
+
     setState((prev) => ({
       ...prev,
       isEditMode: true,
@@ -206,7 +229,8 @@ function RentReturn() {
         Remarks: rr.Remarks || "",
         CustomerName: rr.CustomerName || "",
         MobileNo: rr.MobileNo || "",
-        PaymentMode: rr.PaymentMode || rr.ModeOfPayment || "NEFT / Bank Transfer",
+        PaymentMode: rr.PaymentMode || rr.ModeOfPayment || refundModeObj?.Name || "NEFT / Bank Transfer",
+        F_RefundPaymentMode: refundModeId || refundModeObj?.Id || "",
         F_RentReturnH: rr.Id,
         F_RentEntryH: rr.F_RentEntryH || "",
         TotalTax: Number(rr.TotalTax || rr.TaxAmount || rr.TotalTaxAmount || 0),
@@ -340,6 +364,11 @@ function RentReturn() {
       const header = Array.isArray(headerData) && headerData.length > 0 ? headerData[0] : null;
       const lines = Array.isArray(lineData) ? lineData : [];
 
+      const refundModeId = header.F_RefundPaymentMode || header.F_RefundPaymentModeId || "";
+      const refundModeObj = state.RefundPaymentModeList?.find(
+        (m: any) => String(m.Id) === String(refundModeId) || m.Name === (header.PaymentMode || header.ModeOfPayment)
+      );
+
       if (header) {
         setState((prev) => ({
           ...prev,
@@ -352,7 +381,8 @@ function RentReturn() {
             Remarks: header.Remarks || "",
             CustomerName: header.CustomerName || "",
             MobileNo: header.MobileNo || "",
-            PaymentMode: header.PaymentMode || header.ModeOfPayment || "NEFT / Bank Transfer",
+            PaymentMode: header.PaymentMode || header.ModeOfPayment || refundModeObj?.Name || "NEFT / Bank Transfer",
+            F_RefundPaymentMode: refundModeId || refundModeObj?.Id || "",
             F_RentEntryH: header.F_RentEntryH || "",
           },
         }));
@@ -587,6 +617,9 @@ function RentReturn() {
         };
       });
 
+      const selectedRefundModeId = state.formData.F_RefundPaymentMode || 
+        state.RefundPaymentModeList?.find((m: any) => m.Name === state.formData.PaymentMode)?.Id || "0";
+
       const headerFormData = new FormData();
       headerFormData.append("EntryDate", state.formData.PODate);
       headerFormData.append("TillDate", state.formData.TillDate);
@@ -596,6 +629,7 @@ function RentReturn() {
       headerFormData.append("CustomerName", state.formData.CustomerName || "");
       headerFormData.append("MobileNo", state.formData.MobileNo || "");
       headerFormData.append("PaymentMode", state.formData.PaymentMode || "NEFT / Bank Transfer");
+      headerFormData.append("F_RefundPaymentMode", selectedRefundModeId.toString());
       headerFormData.append("TotalRentAmount", subTotal.toString());
       headerFormData.append("TotalSecurityDeposit", totalSecDep.toString());
       
@@ -618,48 +652,13 @@ function RentReturn() {
       headerFormData.append("F_RentEntryH", state.formData.F_RentEntryH || "0");
       await Fn_AddEditData(dispatch, setState, { arguList: { id: state.id, formData: headerFormData } }, API_URL_SAVE, true, "memberid", navigate, "#");
       if (window.confirm("Rent Return saved successfully. Do you want to print the return receipt?")) {
-        triggerPaymentModeSelect("print");
+        executePrint();
       } else {
         window.location.reload();
       }
     } catch (error) {
       console.error("Error saving rent return:", error);
     }
-  };
-
-  const [paymentModeModalOpen, setPaymentModeModalOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<"print" | "pdf" | "whatsapp" | null>(null);
-  const [selectedModeForPrint, setSelectedModeForPrint] = useState<string>("NEFT / Bank Transfer");
-
-  const triggerPaymentModeSelect = (action: "print" | "pdf" | "whatsapp") => {
-    setSelectedModeForPrint(state.formData.PaymentMode || "NEFT / Bank Transfer");
-    setPendingAction(action);
-    setPaymentModeModalOpen(true);
-  };
-
-  const confirmPaymentModeAndProceed = () => {
-    const updatedMode = selectedModeForPrint || "NEFT / Bank Transfer";
-    setState((prev) => ({
-      ...prev,
-      formData: {
-        ...prev.formData,
-        PaymentMode: updatedMode
-      }
-    }));
-    setPaymentModeModalOpen(false);
-
-    const action = pendingAction;
-    setPendingAction(null);
-
-    setTimeout(() => {
-      if (action === "print") {
-        executePrint();
-      } else if (action === "pdf") {
-        handlePDFExport(updatedMode);
-      } else if (action === "whatsapp") {
-        handleWhatsAppShare(updatedMode);
-      }
-    }, 150);
   };
 
   const latestBarcodeFetch = useRef(handleBarcodeFetch);
@@ -949,13 +948,29 @@ Thank you for choosing ${firmName}!`;
                   </Col>
                   <Col md="2">
                     <label className="form-label">Refund Payment Mode</label>
-                    <select className="form-control" value={state.formData.PaymentMode || "NEFT / Bank Transfer"} onChange={(e) => handleFormFieldChange("PaymentMode", e.target.value)} disabled={!state.isGridEditable}>
-                      <option value="NEFT / Bank Transfer">NEFT / Bank Transfer</option>
-                      <option value="Bank to Bank">Bank to Bank</option>
-                      <option value="UPI / Online">UPI / Online</option>
-                      <option value="Cash">Cash</option>
-                      <option value="Cheque">Cheque</option>
-                      <option value="Credit / Debit Card">Credit / Debit Card</option>
+                    <select 
+                      className="form-control" 
+                      value={state.formData.F_RefundPaymentMode || ""} 
+                      onChange={(e) => {
+                        const selectedId = e.target.value;
+                        const selectedObj = state.RefundPaymentModeList?.find((m: any) => String(m.Id) === String(selectedId));
+                        setState((prev) => ({
+                          ...prev,
+                          formData: {
+                            ...prev.formData,
+                            F_RefundPaymentMode: selectedId,
+                            PaymentMode: selectedObj ? selectedObj.Name : prev.formData.PaymentMode
+                          }
+                        }));
+                      }} 
+                      disabled={!state.isGridEditable}
+                    >
+                      <option value="">Select Payment Mode</option>
+                      {state.RefundPaymentModeList?.map((mode: any) => (
+                        <option key={mode.Id} value={mode.Id}>
+                          {mode.Name}
+                        </option>
+                      ))}
                     </select>
                   </Col>
                   <Col md="2">
@@ -1081,13 +1096,13 @@ Thank you for choosing ${firmName}!`;
                 <button ref={saveButtonRef} type="button" className="btn btn-primary m-0" onClick={handleSave} disabled={!state.isGridEditable}>
                   <i className="bx bx-save me-2"></i>Save
                 </button>
-                <Btn color="success" type="button" className="m-0" onClick={() => triggerPaymentModeSelect("print")}>
+                <Btn color="success" type="button" className="m-0" onClick={executePrint}>
                   <i className="bx bx-printer me-2"></i>Print
                 </Btn>
-                <Btn color="danger" type="button" className="m-0" onClick={() => triggerPaymentModeSelect("pdf")}>
+                <Btn color="danger" type="button" className="m-0" onClick={() => handlePDFExport()}>
                   <i className="bx bxs-file-pdf me-2"></i>PDF
                 </Btn>
-                <Btn color="success" type="button" className="m-0" style={{ backgroundColor: "#25D366", borderColor: "#25D366" }} onClick={() => triggerPaymentModeSelect("whatsapp")}>
+                <Btn color="success" type="button" className="m-0" style={{ backgroundColor: "#25D366", borderColor: "#25D366" }} onClick={() => handleWhatsAppShare()}>
                   <i className="fa fa-whatsapp me-2"></i>WhatsApp Msg
                 </Btn>
                 <Btn color="dark" type="button" className="m-0" onClick={() => navigate("/dashboard")}>
@@ -1099,74 +1114,7 @@ Thank you for choosing ${firmName}!`;
         </Row>
       </Container>
 
-      {/* ── SELECT PAYMENT MODE MODAL (BEFORE PRINT / PDF / WHATSAPP) ── */}
-      <Modal isOpen={paymentModeModalOpen} toggle={() => setPaymentModeModalOpen(false)} centered size="md">
-        <ModalHeader toggle={() => setPaymentModeModalOpen(false)} className="bg-success text-white py-2">
-          <span className="text-white fw-bold">Select Refund Payment Mode</span>
-        </ModalHeader>
-        <ModalBody className="p-3">
-          {(() => {
-            const validRows = gridRows.filter(r => r.ItemCode || r.F_ItemMaster || parseFloat(r.Qty) > 0);
-            const subTotal = validRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
-            const totalSecDep = validRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.SecurityDeposit) || 0)), 0);
-            const taxAmount = state.formData.TotalTax || 0;
-            const totalRentAmount = subTotal + taxAmount;
-            const secDepReturnToCustomer = totalSecDep - totalRentAmount;
 
-            return (
-              <div>
-                <div className="alert alert-success p-2 mb-3 small d-flex justify-content-between align-items-center">
-                  <div>
-                    <div className="fw-bold">Net Security Deposit Refund:</div>
-                    <div className="text-muted small">Customer: {state.formData.CustomerName || "Valued Customer"}</div>
-                  </div>
-                  <div className="fs-5 fw-bold text-success">₹ {secDepReturnToCustomer.toFixed(2)}</div>
-                </div>
-
-                <label className="form-label fw-bold mb-2">Select Refund Payment Mode *</label>
-                <div className="d-grid gap-2">
-                  {[
-                    { id: "NEFT / Bank Transfer", label: "NEFT / Bank Transfer", icon: "bx bx-building-house", color: "primary" },
-                    { id: "Bank to Bank", label: "Bank to Bank (Account Transfer)", icon: "bx bx-transfer-alt", color: "info" },
-                    { id: "UPI / Online", label: "UPI / Online (GPay, PhonePe, Paytm)", icon: "bx bx-mobile-alt", color: "success" },
-                    { id: "Cash", label: "Cash", icon: "bx bx-money", color: "warning" },
-                    { id: "Cheque", label: "Cheque", icon: "bx bx-notepad", color: "secondary" },
-                    { id: "Credit / Debit Card", label: "Credit / Debit Card", icon: "bx bx-credit-card", color: "danger" },
-                  ].map((mode) => (
-                    <div 
-                      key={mode.id} 
-                      className={`p-2 border rounded d-flex align-items-center justify-content-between ${selectedModeForPrint === mode.id ? 'border-success bg-light shadow-sm' : ''}`}
-                      style={{ cursor: 'pointer', transition: 'all 0.2s' }}
-                      onClick={() => setSelectedModeForPrint(mode.id)}
-                    >
-                      <div className="d-flex align-items-center gap-2">
-                        <i className={`${mode.icon} fs-5 text-${mode.color}`}></i>
-                        <span className="fw-semibold small">{mode.label}</span>
-                      </div>
-                      <input 
-                        type="radio" 
-                        name="refundPaymentModeSelect" 
-                        checked={selectedModeForPrint === mode.id} 
-                        onChange={() => setSelectedModeForPrint(mode.id)} 
-                        className="form-check-input"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-        </ModalBody>
-        <ModalFooter className="p-2 border-top-0 d-flex justify-content-end gap-2">
-          <Button color="secondary" className="btn-sm" onClick={() => setPaymentModeModalOpen(false)}>
-            Cancel
-          </Button>
-          <Button color="success" className="btn-sm px-4 fw-bold" onClick={confirmPaymentModeAndProceed}>
-            <i className="bx bx-check-circle me-1"></i>
-            Confirm & Proceed
-          </Button>
-        </ModalFooter>
-      </Modal>
 
       {/* ── RENT RETURN RECEIPT PRINT LAYOUT ── */}
       <div 
