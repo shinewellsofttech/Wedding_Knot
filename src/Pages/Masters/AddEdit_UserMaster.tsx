@@ -98,7 +98,13 @@ const AddEdit_UserMaster = () => {
     () =>
       Yup.object({
         Name: Yup.string().trim().required("Name is required"),
-        Username: Yup.string().trim(),
+        Username: Yup.string()
+          .trim()
+          .test(
+            "not-only-numbers",
+            "Username cannot consist only of numbers",
+            (value) => !value || !/^\d+$/.test(value)
+          ),
         Password: isEditMode
           ? Yup.string().trim().min(6, "Password must be at least 6 characters")
           : Yup.string()
@@ -323,7 +329,9 @@ const AddEdit_UserMaster = () => {
                                 value={values.Username}
                                 onChange={handleChange}
                                 onBlur={handleBlur}
+                                invalid={touched.Username && !!errors.Username}
                               />
+                              <ErrorMessage name="Username" component="div" className="text-danger small" />
                             </FormGroup>
                           </Col>
                           <Col md="6">

@@ -283,14 +283,14 @@ Items:[
       //   type:"link",
       //   bookmark:true
       // },
-      // {
-      //   id:6,
-      //   title:"Customer Outstanding",
-      //   path:`${process.env.PUBLIC_URL}/customerOutstandingReport`,
-      //   icon:"Users",
-      //   type:"link",
-      //   bookmark:true
-      // }
+      {
+        id:6,
+        title:"Outstanding Report",
+        path:`${process.env.PUBLIC_URL}/customerOutstandingReport`,
+        icon:"Users",
+        type:"link",
+        bookmark:true
+      }
     ]
   },
   {

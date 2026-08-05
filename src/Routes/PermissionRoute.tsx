@@ -17,6 +17,7 @@ const UNCONTROLLED_PATHS = [
   "/404",
   "/500",
   "/",
+  "/customerOutstandingReport",
 ];
 
 const PermissionRoute: React.FC<PermissionRouteProps> = ({ children }) => {
