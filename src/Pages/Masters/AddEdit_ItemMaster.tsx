@@ -714,7 +714,28 @@ const AddEdit_ItemMaster = () => {
                   <th style={{ width: 80 }}>Unit Val</th>
                   <th style={{ width: 110 }}>P. Rate</th>
                   <th style={{ width: 110 }}>Price</th>
-                  <th style={{ width: 110 }}>E-Com</th>
+                  <th style={{ width: 110 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                      <input
+                        type="checkbox"
+                        style={{ cursor: 'pointer' }}
+                        checked={sections.length > 0 && sections.every(s => s.rows.every(r => r.isEcom))}
+                        onChange={e => {
+                          const checked = e.target.checked;
+                          setSections(prev => prev.map(s => ({
+                            ...s,
+                            rows: s.rows.map(r => ({ ...r, isEcom: checked }))
+                          })));
+                          sections.forEach(s => {
+                            s.rows.forEach(r => {
+                              handleFieldUpdate(r.id, "ItemDesignMaster", "IsEcom", checked ? "true" : "false");
+                            });
+                          });
+                        }}
+                      />
+                      <span>E-Com</span>
+                    </div>
+                  </th>
                   <th style={{ width: 200 }}>Barcode</th>
                   <th style={{ width: 110 }}>Stock</th>
                   <th style={{ width: 200 }}>Action</th>
@@ -929,6 +950,29 @@ const AddEdit_ItemMaster = () => {
                                         </option>
                                       ))}
                                     </select>
+                                  </div>
+                                  <div className="im-section-info-field" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0, cursor: 'pointer', fontWeight: 'bold' }}>
+                                      <input
+                                        type="checkbox"
+                                        style={{ width: '15px', height: '15px', cursor: 'pointer' }}
+                                        checked={section.rows.length > 0 && section.rows.every(r => r.isEcom)}
+                                        onChange={e => {
+                                          const checked = e.target.checked;
+                                          setSections(prev => prev.map((s, si) => {
+                                            if (si !== secIdx) return s;
+                                            return {
+                                              ...s,
+                                              rows: s.rows.map(r => ({ ...r, isEcom: checked }))
+                                            };
+                                          }));
+                                          section.rows.forEach(r => {
+                                            handleFieldUpdate(r.id, "ItemDesignMaster", "IsEcom", checked ? "true" : "false");
+                                          });
+                                        }}
+                                      />
+                                      <span>Is Ecommerce (All)</span>
+                                    </label>
                                   </div>
                                 </>
                               )}

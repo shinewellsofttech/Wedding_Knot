@@ -40,7 +40,7 @@ const FastEntryOfLedgerBalance: React.FC = () => {
     const loadInitialData = async () => {
       try {
         setIsLoading(true);
-        
+
         // Load ledger groups
         const groupData = await Fn_FillListData(
           dispatch,
@@ -68,10 +68,10 @@ const FastEntryOfLedgerBalance: React.FC = () => {
 
     try {
       setIsLoading(true);
-      
+
       // API URL format: Masters/0/token/LedgerListByGroupId/Id/{groupId}
       const apiURL = `${API_WEB_URLS.MASTER}/0/token/LedgerListByGroupId/Id/${groupId}`;
-      
+
       // Use Fn_FillListData for GET request
       const ledgerData = await Fn_FillListData(
         dispatch,
@@ -107,11 +107,11 @@ const FastEntryOfLedgerBalance: React.FC = () => {
   const handleLedgerGroupChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedId = e.target.value;
     setLedgerGroupId(selectedId);
-    
+
     // Find and set ledger group name
     const selectedGroup = ledgerGroupList.find((g) => g.Id === Number(selectedId));
     setLedgerGroupName(selectedGroup?.Name || "");
-    
+
     // Fetch ledgers for selected group from API
     await fetchLedgersByGroup(selectedId);
   };
@@ -171,7 +171,7 @@ const FastEntryOfLedgerBalance: React.FC = () => {
       setIsLoading(true);
       const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");
       const userId = authUser.uid || "0";
-      const userToken =  "token";
+      const userToken = "token";
 
       // Prepare StrLedgerOpeningBalance in format: Id~OpeningBalance~CrDrType#
       // Example: "1~100~Cr#2~200~Dr#"
@@ -184,7 +184,7 @@ const FastEntryOfLedgerBalance: React.FC = () => {
       formData.append("F_LedgerGroupMaster", String(Number(ledgerGroupId)));
       formData.append("StrLedgerOpeningBalance", strLedgerOpeningBalance);
       formData.append("UserId", String(Number(userId) || 0));
-      formData.append("F_CompanyMaster", (() => { try { const a = JSON.parse(localStorage.getItem("authUser")||"{}"); return String(a?.F_CompanyMaster ?? a?.CompanyId ?? a?.F_Company ?? "0"); } catch(e){return "0";} })());
+      formData.append("F_CompanyMaster", (() => { try { const a = JSON.parse(localStorage.getItem("authUser") || "{}"); return String(a?.F_CompanyMaster ?? a?.CompanyId ?? a?.F_Company ?? "0"); } catch (e) { return "0"; } })());
 
       const arguList = {
         id: 0, // 0 for add, >0 for edit
@@ -193,7 +193,7 @@ const FastEntryOfLedgerBalance: React.FC = () => {
 
       // API: POST /api/V1/UpdateLedgerOpeningBalance/{UserId}/{UserToken}
       const apiURL = `UpdateLedgerOpeningBalance/${userId}/token`;
-      
+
       await Fn_AddEditData(
         dispatch,
         (prevState: any) => ({ ...prevState, isProgress: false }),

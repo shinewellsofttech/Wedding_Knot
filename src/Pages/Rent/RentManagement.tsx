@@ -111,6 +111,9 @@ function RentManagement() {
     },
   ]);
 
+  const [showSharePDFModal, setShowSharePDFModal] = useState(false);
+  const [pendingShareFile, setPendingShareFile] = useState<File | null>(null);
+
   const saveButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -317,18 +320,23 @@ function RentManagement() {
   };
 
   const handleFormFieldChange = (field: string, value: any) => {
-    setState((prev) => {
-      const newFormData = { ...prev.formData, [field]: value };
-      if (field === "PODate" || field === "TillDate") {
-        if (newFormData.PODate && newFormData.TillDate) {
-          if (new Date(newFormData.TillDate) < new Date(newFormData.PODate)) {
-            alert("Till Date cannot be earlier than Entry Date.");
-            return prev;
-          }
-        }
+    setState((prev) => ({
+      ...prev,
+      formData: { ...prev.formData, [field]: value }
+    }));
+  };
+
+  const handleDateValidation = () => {
+    const { PODate, TillDate } = state.formData;
+    if (PODate && TillDate) {
+      if (new Date(TillDate) < new Date(PODate)) {
+        alert("Till Date cannot be earlier than Entry Date.");
+        setState((prev) => ({
+          ...prev,
+          formData: { ...prev.formData, TillDate: PODate }
+        }));
       }
-      return { ...prev, formData: newFormData };
-    });
+    }
   };
 
   const addRow = () => {
@@ -731,19 +739,56 @@ function RentManagement() {
     return pdfBlob;
   };
 
+  const handleSharePDFClick = async () => {
+    if (!pendingShareFile || !('share' in navigator)) return;
+    try {
+      if (navigator.canShare && !navigator.canShare({ files: [pendingShareFile] })) {
+        alert("Your device doesn't support sharing this PDF file directly. Please download it instead.");
+        setShowSharePDFModal(false);
+        setPendingShareFile(null);
+        return;
+      }
+      
+      await navigator.share({
+        title: 'Rent Receipt',
+        text: 'Please find attached the Rent Receipt',
+        files: [pendingShareFile]
+      });
+      alert('PDF shared successfully!');
+      setShowSharePDFModal(false);
+      setPendingShareFile(null);
+    } catch (shareError: any) {
+      if (shareError.name === 'AbortError') {
+        console.log('Share cancelled.');
+      } else {
+        console.error('Share error:', shareError);
+        alert('Share failed. Try again.');
+      }
+      setShowSharePDFModal(false);
+      setPendingShareFile(null);
+    }
+  };
+
   const handlePDFExport = async () => {
     const safeNo = (state.formData.PONo || "Receipt").replace(/[\\/:*?"<>|]/g, "_");
     try {
       const pdfBlob = await handleDownloadPdf();
       const filename = `RentReceipt_${safeNo}.pdf`;
-      const url = window.URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+
+      if ('share' in navigator) {
+        setPendingShareFile(file);
+        setShowSharePDFModal(true);
+      } else {
+        const url = window.URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Error generating PDF. Please try again.');
@@ -868,7 +913,7 @@ Thank you for choosing ${firmName}!`;
                   </Col>
                   <Col md="2">
                     <label className="form-label">Entry Date</label>
-                    <DateInput name="poDate" value={state.formData.PODate} onChange={(e: any) => handleFormFieldChange("PODate", e.target.value)} />
+                    <DateInput name="poDate" value={state.formData.PODate} onChange={(e: any) => handleFormFieldChange("PODate", e.target.value)} onBlur={handleDateValidation} />
                   </Col>
                   <Col md="2">
                     <div className="d-flex justify-content-between align-items-center">
@@ -883,7 +928,7 @@ Thank you for choosing ${firmName}!`;
                   </Col>
                   <Col md="2">
                     <label className="form-label">Till Date</label>
-                    <DateInput name="tillDate" value={state.formData.TillDate} onChange={(e: any) => handleFormFieldChange("TillDate", e.target.value)} />
+                    <DateInput name="tillDate" value={state.formData.TillDate} onChange={(e: any) => handleFormFieldChange("TillDate", e.target.value)} onBlur={handleDateValidation} />
                   </Col>
 
                   <Col md="2">
@@ -1047,6 +1092,29 @@ Thank you for choosing ${firmName}!`;
           </Col>
         </Row>
       </Container>
+
+      {/* Share PDF Modal */}
+      <Modal isOpen={showSharePDFModal} toggle={() => setShowSharePDFModal(false)} className="modal-sm" centered>
+        <ModalHeader toggle={() => setShowSharePDFModal(false)} className="bg-primary text-white pb-2 pt-2 border-bottom-0">
+          <span className="text-white">Share PDF</span>
+        </ModalHeader>
+        <ModalBody className="text-center pt-4 pb-4">
+          <div className="mb-3">
+            <i className="bx bxs-file-pdf text-danger" style={{ fontSize: "3rem" }}></i>
+          </div>
+          <h6>Rent Receipt PDF Ready</h6>
+          <p className="text-muted small mb-0">PDF has been generated successfully.</p>
+        </ModalBody>
+        <ModalFooter className="border-top-0 d-flex justify-content-center pb-3">
+          <Button color="secondary" className="btn-sm px-4" onClick={() => setShowSharePDFModal(false)}>
+            Close
+          </Button>
+          <Button color="primary" className="btn-sm px-4 action-btn" onClick={handleSharePDFClick}>
+            <i className="bx bx-share-alt me-1"></i>
+            Share File
+          </Button>
+        </ModalFooter>
+      </Modal>
 
       {/* ── RENT RECEIPT PRINT LAYOUT ── */}
       <div 

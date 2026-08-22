@@ -115,6 +115,9 @@ function RentReturn() {
     },
   ]);
 
+  const [showSharePDFModal, setShowSharePDFModal] = useState(false);
+  const [pendingShareFile, setPendingShareFile] = useState<File | null>(null);
+
   const saveButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -767,20 +770,57 @@ function RentReturn() {
     return pdfBlob;
   };
 
+  const handleSharePDFClick = async () => {
+    if (!pendingShareFile || !('share' in navigator)) return;
+    try {
+      if (navigator.canShare && !navigator.canShare({ files: [pendingShareFile] })) {
+        alert("Your device doesn't support sharing this PDF file directly. Please download it instead.");
+        setShowSharePDFModal(false);
+        setPendingShareFile(null);
+        return;
+      }
+      
+      await navigator.share({
+        title: 'Rent Return Receipt',
+        text: 'Please find attached the Rent Return Receipt',
+        files: [pendingShareFile]
+      });
+      alert('PDF shared successfully!');
+      setShowSharePDFModal(false);
+      setPendingShareFile(null);
+    } catch (shareError: any) {
+      if (shareError.name === 'AbortError') {
+        console.log('Share cancelled.');
+      } else {
+        console.error('Share error:', shareError);
+        alert('Share failed. Try again.');
+      }
+      setShowSharePDFModal(false);
+      setPendingShareFile(null);
+    }
+  };
+
   const handlePDFExport = async (overrideMode?: string) => {
     const activeState = overrideMode ? { ...state, formData: { ...state.formData, PaymentMode: overrideMode } } : state;
     const safeNo = (activeState.formData.PONo || "ReturnReceipt").replace(/[\\/:*?"<>|]/g, "_");
     try {
       const pdfBlob = await handleDownloadPdf(overrideMode);
       const filename = `RentReturnReceipt_${safeNo}.pdf`;
-      const url = window.URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+
+      if ('share' in navigator) {
+        setPendingShareFile(file);
+        setShowSharePDFModal(true);
+      } else {
+        const url = window.URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Error generating PDF. Please try again.');
@@ -1114,7 +1154,28 @@ Thank you for choosing ${firmName}!`;
         </Row>
       </Container>
 
-
+      {/* Share PDF Modal */}
+      <Modal isOpen={showSharePDFModal} toggle={() => setShowSharePDFModal(false)} className="modal-sm" centered>
+        <ModalHeader toggle={() => setShowSharePDFModal(false)} className="bg-primary text-white pb-2 pt-2 border-bottom-0">
+          <span className="text-white">Share PDF</span>
+        </ModalHeader>
+        <ModalBody className="text-center pt-4 pb-4">
+          <div className="mb-3">
+            <i className="bx bxs-file-pdf text-danger" style={{ fontSize: "3rem" }}></i>
+          </div>
+          <h6>Rent Return Receipt PDF Ready</h6>
+          <p className="text-muted small mb-0">PDF has been generated successfully.</p>
+        </ModalBody>
+        <ModalFooter className="border-top-0 d-flex justify-content-center pb-3">
+          <Button color="secondary" className="btn-sm px-4" onClick={() => setShowSharePDFModal(false)}>
+            Close
+          </Button>
+          <Button color="primary" className="btn-sm px-4 action-btn" onClick={handleSharePDFClick}>
+            <i className="bx bx-share-alt me-1"></i>
+            Share File
+          </Button>
+        </ModalFooter>
+      </Modal>
 
       {/* ── RENT RETURN RECEIPT PRINT LAYOUT ── */}
       <div 

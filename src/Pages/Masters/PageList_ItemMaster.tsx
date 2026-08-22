@@ -323,7 +323,7 @@ const PageList_ItemMaster = () => {
   const [filterGstGroup, setFilterGstGroup] = useState<string>("");
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState<number>(10);
+  const [itemsPerPage, setItemsPerPage] = useState<number | string>(10);
 
   // Direct Variant Print Modal States
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -777,8 +777,9 @@ const PageList_ItemMaster = () => {
                   </div>
 
                   {(() => {
-                    const totalPages = Math.ceil(filteredList.length / itemsPerPage);
-                    const currentItems = filteredList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+                    const effectiveItemsPerPage = Number(itemsPerPage) || 10;
+                    const totalPages = Math.ceil(filteredList.length / effectiveItemsPerPage);
+                    const currentItems = filteredList.slice((currentPage - 1) * effectiveItemsPerPage, currentPage * effectiveItemsPerPage);
                     
                     return state.isProgress ? (
                        <div className="text-center py-5">
@@ -816,7 +817,7 @@ const PageList_ItemMaster = () => {
                             </tr>
                           ) : (
                             currentItems.map((item: any, index: number) => {
-                              const absoluteIndex = (currentPage - 1) * itemsPerPage + index;
+                              const absoluteIndex = (currentPage - 1) * effectiveItemsPerPage + index;
                               let parsedDesign: any[] = [];
                               try {
                                 if (typeof item.DesignDetails === "string") {
@@ -1043,7 +1044,7 @@ const PageList_ItemMaster = () => {
                       <div className="d-flex justify-content-between align-items-center mt-3 p-2 bg-light rounded border">
                         <div className="d-flex align-items-center flex-wrap gap-2">
                           <div className="text-muted small">
-                            Showing {filteredList.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredList.length)} of {filteredList.length} items
+                            Showing {filteredList.length === 0 ? 0 : (currentPage - 1) * effectiveItemsPerPage + 1} to {Math.min(currentPage * effectiveItemsPerPage, filteredList.length)} of {filteredList.length} items
                           </div>
                           <div className="d-flex align-items-center ms-0 ms-md-3">
                             <Label className="mb-0 me-2 small text-muted text-nowrap">Rows:</Label>
@@ -1052,13 +1053,21 @@ const PageList_ItemMaster = () => {
                               bsSize="sm"
                               min="1"
                               max="20"
-                              value={itemsPerPage || ""}
+                              value={itemsPerPage}
                               onChange={(e) => {
-                                const val = parseInt(e.target.value);
-                                if (!isNaN(val)) {
-                                  setItemsPerPage(Math.min(20, Math.max(1, val)));
-                                  setCurrentPage(1);
+                                const valStr = e.target.value;
+                                if (valStr === "") {
+                                  setItemsPerPage("");
                                 } else {
+                                  const val = parseInt(valStr, 10);
+                                  if (!isNaN(val)) {
+                                    setItemsPerPage(Math.min(20, Math.max(1, val)));
+                                    setCurrentPage(1);
+                                  }
+                                }
+                              }}
+                              onBlur={() => {
+                                if (itemsPerPage === "" || Number(itemsPerPage) < 1) {
                                   setItemsPerPage(10);
                                   setCurrentPage(1);
                                 }
