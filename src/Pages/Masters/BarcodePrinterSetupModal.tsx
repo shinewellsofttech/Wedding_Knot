@@ -34,6 +34,7 @@ interface VariantDetail {
   Weight?: string | number;
 }
 
+
 interface ItemDetail {
   Id: number | string;
   ItemName: string;
