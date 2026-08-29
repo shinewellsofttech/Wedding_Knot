@@ -25,6 +25,7 @@ import { toast } from "react-toastify";
 interface VariantDetail {
   Id: number | string;
   SizeName?: string;
+  ItemDesignName?: string;
   SalePrice?: number | string;
   Barcode?: string;
   OpeningStock?: number | string;
@@ -32,6 +33,7 @@ interface VariantDetail {
   Width?: string | number;
   Height?: string | number;
   Weight?: string | number;
+  [key: string]: any;
 }
 
 

@@ -543,7 +543,7 @@ const PageList_ItemMaster = () => {
     const queue = Array(quantity).fill({
       barcode: variant.Barcode || "",
       itemName: item.ItemName || "",
-      sizeName: variant.SizeName || "Std",
+      sizeName: variant.ItemDesignName && variant.ItemDesignName.trim() !== "" ? variant.ItemDesignName : (variant.SizeName || "Std"),
       salePrice: String(variant.SalePrice || "0"),
       hsnCode: item.HSNCode || ""
     });
@@ -794,6 +794,7 @@ const PageList_ItemMaster = () => {
                         <thead className="table-light">
                           <tr>
                             <th>Variant / Info</th>
+                            <th>Design Name</th>
                             <th>Length</th>
                             <th>Width</th>
                             <th>Height</th>
@@ -811,7 +812,7 @@ const PageList_ItemMaster = () => {
                         <tbody>
                           {filteredList.length === 0 ? (
                             <tr>
-                              <td colSpan={13} className="text-center py-4">
+                              <td colSpan={14} className="text-center py-4">
                                 No records found.
                               </td>
                             </tr>
@@ -843,7 +844,7 @@ const PageList_ItemMaster = () => {
                                 <React.Fragment key={item?.Id ?? index}>
                                   {/* Item Master Header Row */}
                                   <tr className="table-primary">
-                                    <td colSpan={12}>
+                                    <td colSpan={13}>
                                       <Btn 
                                         color="primary" 
                                         outline 
@@ -918,7 +919,7 @@ const PageList_ItemMaster = () => {
                                   {isRowExpanded && (
                                     filteredDesign.length === 0 ? (
                                       <tr>
-                                        <td colSpan={13} className="text-center text-muted py-2">
+                                        <td colSpan={14} className="text-center text-muted py-2">
                                           No variants available for this item.
                                         </td>
                                       </tr>
@@ -931,10 +932,13 @@ const PageList_ItemMaster = () => {
                                         { full: cleanUrl(d.DesignPhoto4), thumb: cleanUrl(d.DesignPhoto4_Thumb) || cleanUrl(d.DesignPhoto4) },
                                         { full: cleanUrl(d.DesignPhoto5), thumb: cleanUrl(d.DesignPhoto5_Thumb) || cleanUrl(d.DesignPhoto5) }
                                       ].filter(img => img.full && img.full.trim() !== "");
-
                                       return (
                                         <tr key={d.Id || dIdx}>
-                                          <td className="ps-4">Variant {dIdx + 1} ({d.SizeName || "Std"})</td>
+                                          <td className="ps-4">
+                                            <strong>{d.ItemDesignName && d.ItemDesignName.trim() !== "" ? d.ItemDesignName : `Variant - ${dIdx + 1}`}</strong>
+                                            {d.SizeName ? ` (${d.SizeName})` : ""}
+                                          </td>
+                                          <td>{d.ItemDesignName || "-"}</td>
                                           <td>{d.Length || "-"}</td>
                                           <td>{d.Width || "-"}</td>
                                           <td>{d.Height || "-"}</td>
@@ -1121,7 +1125,7 @@ const PageList_ItemMaster = () => {
             <>
               <div className="mb-3 p-3 bg-light rounded border">
                 <div style={{ fontSize: "14.5px" }} className="mb-1"><strong>Item:</strong> {printItem.ItemName}</div>
-                <div style={{ fontSize: "13.5px" }} className="mb-1"><strong>Variant:</strong> {printVariant.SizeName || "Std"}</div>
+                <div style={{ fontSize: "13.5px" }} className="mb-1"><strong>Variant:</strong> {printVariant.ItemDesignName && printVariant.ItemDesignName.trim() !== "" ? printVariant.ItemDesignName : (printVariant.SizeName || "Variant - 1")}</div>
                 <div style={{ fontSize: "13.5px" }} className="mb-1"><strong>Barcode:</strong> {printVariant.Barcode}</div>
                 <div style={{ fontSize: "13.5px" }}><strong>Price:</strong> ₹{printVariant.SalePrice || "0"}</div>
               </div>
@@ -1211,7 +1215,9 @@ const PageList_ItemMaster = () => {
                   s = s.replace(/\{\{ItemName\}\}/g, printItem.ItemName || "");
                   s = s.replace(/\{\{SalePrice\}\}/g, String(printVariant.SalePrice || "0"));
                   s = s.replace(/\{\{Barcode\}\}/g, printVariant.Barcode || "89012345");
-                  s = s.replace(/\{\{SizeName\}\}/g, printVariant.SizeName || "Std");
+                  s = s.replace(/\{\{ItemDesignName\}\}/g, printVariant.ItemDesignName || "");
+                  s = s.replace(/\{\{DesignName\}\}/g, printVariant.ItemDesignName || "");
+                  s = s.replace(/\{\{SizeName\}\}/g, printVariant.ItemDesignName && printVariant.ItemDesignName.trim() !== "" ? printVariant.ItemDesignName : (printVariant.SizeName || "Std"));
                   s = s.replace(/\{\{HSNCode\}\}/g, printItem.HSNCode || "");
                   return s;
                 };

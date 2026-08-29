@@ -8,8 +8,10 @@ import { Fn_FillListData } from "../../store/Functions";
 interface Variant {
   Id: number | string;
   SizeName?: string;
+  ItemDesignName?: string;
   SalePrice?: number | string;
   Barcode?: string;
+  [key: string]: any;
 }
 interface Item {
   Id: number | string;
@@ -605,7 +607,8 @@ export default function BarcodePrintWizard() {
     return Array(quantities[k]).fill({
       barcode: d.Barcode,
       itemName: item?.ItemName || "",
-      sizeName: d.SizeName || "Std",
+      sizeName: d.ItemDesignName && d.ItemDesignName.trim() !== "" ? d.ItemDesignName : (d.SizeName || "Std"),
+      itemDesignName: d.ItemDesignName || "",
       salePrice: codes[k] || String(d.SalePrice || "0"),
       hsnCode: item?.HSNCode || ""
     });
@@ -623,12 +626,14 @@ export default function BarcodePrintWizard() {
   }, [elements, labelW, labelH, columns]);
 
   // Interpolate dynamic template placeholders
-  const interpolate = (val: string, label: { barcode: string; itemName: string; sizeName: string; salePrice: string; hsnCode: string }) => {
+  const interpolate = (val: string, label: { barcode: string; itemName: string; sizeName: string; salePrice: string; hsnCode: string; itemDesignName?: string }) => {
     let s = val || "";
     s = s.replace(/\{\{FirmName\}\}/g, firmName || "");
     s = s.replace(/\{\{ItemName\}\}/g, label.itemName || "");
     s = s.replace(/\{\{SalePrice\}\}/g, label.salePrice || "0.00");
     s = s.replace(/\{\{Barcode\}\}/g, label.barcode || "");
+    s = s.replace(/\{\{ItemDesignName\}\}/g, label.itemDesignName || "");
+    s = s.replace(/\{\{DesignName\}\}/g, label.itemDesignName || "");
     s = s.replace(/\{\{SizeName\}\}/g, label.sizeName || "Std");
     s = s.replace(/\{\{HSNCode\}\}/g, label.hsnCode || "");
     return s;
@@ -781,7 +786,7 @@ export default function BarcodePrintWizard() {
                   <td className="text-center" style={{ color: "#212529" }}>
                      <input type="checkbox" disabled={!d.Barcode} checked={!!selected[k]} onChange={e => setSelected(p => ({ ...p, [k]: e.target.checked }))} />
                   </td>
-                  <td style={{ color: "#212529" }}><strong>{d.SizeName || `Variant ${i + 1}`}</strong></td>
+                  <td style={{ color: "#212529" }}><strong>{d.ItemDesignName && d.ItemDesignName.trim() !== "" ? d.ItemDesignName : (d.SizeName || `Variant - ${i + 1}`)}</strong></td>
                   <td style={{ color: "#212529" }}><small className="font-monospace">{d.Barcode || <span className="text-danger">No Barcode</span>}</small></td>
                   <td style={{ color: "#212529" }}>
                     <input type="text" className="form-control form-control-sm text-center" style={{ color: "#212529", backgroundColor: "#fff", maxWidth: 120 }} value={codes[k] || ""}

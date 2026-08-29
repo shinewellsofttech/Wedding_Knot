@@ -20,6 +20,7 @@ interface ItemRow {
   photos: (ItemPhoto | null)[];
   videoFile: File | null;
   videoName: string;
+  itemDesignName: string;
   length: string;
   width: string;
   height: string;
@@ -55,7 +56,7 @@ const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const makeRow = (): ItemRow => ({
   id: uid(), photos: [null, null, null, null, null],
-  videoFile: null, videoName: "", length: "", width: "", height: "", weight: "", unitConversion: "", price: "", purchaseRate: "", barcode: "", stock: "0", schemes: [],
+  videoFile: null, videoName: "", itemDesignName: "", length: "", width: "", height: "", weight: "", unitConversion: "", price: "", purchaseRate: "", barcode: "", stock: "0", schemes: [],
   isEcom: false, ecomPrice: "",
 });
 
@@ -317,6 +318,7 @@ const AddEdit_ItemMaster = () => {
                     ],
                     videoFile: null,
                     videoName: d.VideoLink || "",
+                    itemDesignName: d.ItemDesignName || "",
                     length: d.Length || "",
                     width: d.Width || "",
                     height: d.Height || "",
@@ -706,6 +708,7 @@ const AddEdit_ItemMaster = () => {
                 <tr>
                   <th style={{ width: 45 }}>#</th>
                   <th style={{ width: 240 }}>Photo (5)</th>
+                  <th style={{ width: 130 }}>Design Name</th>
                   <th style={{ width: 70 }}>Video</th>
                   <th style={{ width: 80 }}>Length</th>
                   <th style={{ width: 80 }}>Width</th>
@@ -744,7 +747,7 @@ const AddEdit_ItemMaster = () => {
               <tbody>
                 {sections.length === 0 ? (
                   <tr>
-                    <td colSpan={14}>
+                    <td colSpan={15}>
                       <div className="im-empty">
                         <div className="im-empty-icon">📋</div>
                         <h4>No items yet</h4>
@@ -762,7 +765,7 @@ const AddEdit_ItemMaster = () => {
                       <React.Fragment key={section.id}>
                         {/* Section Header Row inside the Table */}
                         <tr className="im-section-header-row" id={`item-section-${section.id}`}>
-                          <td colSpan={14} className="text-start">
+                          <td colSpan={15} className="text-start">
                             <div className="im-section-info-grid" style={{ flexWrap: section.isMinimized ? 'nowrap' : 'wrap' }}>
                               <div className="im-section-info-field">
                                 <label>Item Name <span className="req">*</span></label>
@@ -1053,6 +1056,20 @@ const AddEdit_ItemMaster = () => {
                                     </div>
                                   ))}
                                 </div>
+                              </td>
+
+                              {/* Design Name */}
+                              <td>
+                                <input
+                                  type="text"
+                                  className="im-cell-input"
+                                  placeholder="Design Name"
+                                  value={row.itemDesignName}
+                                  onChange={e => {
+                                    updateRow(secIdx, rowIdx, { itemDesignName: e.target.value });
+                                    handleFieldUpdate(row.id, "ItemDesignMaster", "ItemDesignName", e.target.value);
+                                  }}
+                                />
                               </td>
 
                               {/* Video */}
