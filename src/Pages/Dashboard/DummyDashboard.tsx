@@ -86,7 +86,13 @@ const Dashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setIsLoading(true);
-      const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");
+      let authUser: any = {};
+      try {
+        const raw = localStorage.getItem("authUser");
+        authUser = (raw && raw !== "undefined" && raw !== "null") ? JSON.parse(raw) : {};
+      } catch {
+        authUser = {};
+      }
       const userId = String(authUser?.uid ?? authUser?.Id ?? "0");
       const userToken = authUser?.Token ?? authUser?.token ?? "token";
 
@@ -112,9 +118,14 @@ const Dashboard = () => {
         const jsonKey = "JSON_F52E2B61-18A1-11d1-B105-00805F49916B";
         const fullJsonString = responseData.map((row: any) => row[jsonKey] || "").join("");
         
-        if (fullJsonString) {
-          const parsed = JSON.parse(fullJsonString);
-          const dataObj = parsed.data;
+        if (fullJsonString && fullJsonString !== "undefined" && fullJsonString !== "null") {
+          let parsed: any = null;
+          try {
+            parsed = JSON.parse(fullJsonString);
+          } catch (e) {
+            console.warn("Could not parse dashboard json string:", e);
+          }
+          const dataObj = parsed?.data;
 
           if (dataObj) {
             // Parse double-stringified KPI Data
@@ -125,9 +136,9 @@ const Dashboard = () => {
               pendingReceivables: 0,
               availableStock: 0,
             };
-            if (dataObj.kpiData) {
+            if (dataObj.kpiData && dataObj.kpiData !== "undefined") {
               try {
-                kpisObj = JSON.parse(dataObj.kpiData);
+                kpisObj = typeof dataObj.kpiData === "string" ? JSON.parse(dataObj.kpiData) : dataObj.kpiData;
               } catch (e) {
                 console.error("Error parsing KPI data string:", e);
               }

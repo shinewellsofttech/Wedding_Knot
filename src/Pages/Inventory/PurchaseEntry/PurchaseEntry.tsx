@@ -10,6 +10,7 @@ import DateInput from "../../../CommonElements/DateInput/DateInput";
 import Breadcrumbs from "../../../CommonElements/Breadcrumbs/Breadcrumbs";
 import { Btn } from "../../../AbstractElements";
 import CardHeaderCommon from "../../../CommonElements/CardHeaderCommon/CardHeaderCommon";
+import Select from "react-select";
 
 interface GridRow {
   ItemCode: string;
@@ -200,7 +201,7 @@ function PurchaseEntry() {
         const params = new URLSearchParams(location.search);
         const recordId = params.get("id");
         if (recordId) {
-          await loadPurchaseEntryRecord(parseInt(recordId));
+          await fetchPEDataAndPopulateGrid(recordId, peDataArray);
         } else {
           try {
             const API_ENTRY_NO = API_WEB_URLS.MASTER + "/0/token/GetVoucherNoByVoucherTypeId/Id/5";
@@ -229,6 +230,14 @@ function PurchaseEntry() {
 
     fetchMasterData();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const recordId = params.get("id");
+    if (recordId && String(state.formData.F_PurchaseEntryH) !== String(recordId)) {
+      fetchPEDataAndPopulateGrid(recordId);
+    }
+  }, [location.search, state.CreatedPurchaseEntries]);
 
   const fetchPODataAndPopulateGrid = async (poId: string) => {
     if (!poId) return;
@@ -282,10 +291,19 @@ function PurchaseEntry() {
     }
   };
 
-  const fetchPEDataAndPopulateGrid = async (peId: string) => {
+  const fetchPEDataAndPopulateGrid = async (peId: string | number, peList?: any[]) => {
     if (!peId) return;
-    const prevState = state;
-    const pe = prevState.CreatedPurchaseEntries?.find((p: any) => String(p.Id) === String(peId));
+    const list = peList || state.CreatedPurchaseEntries || [];
+    let pe = list.find((p: any) => String(p.Id) === String(peId));
+    if (!pe) {
+      try {
+        const directData = await Fn_FillListData(dispatch, () => ({}), "ignored", `${API_WEB_URLS.MASTER}/0/token/PurchaseEntryData/Id/${peId}`);
+        const arr = Array.isArray(directData) ? directData : (directData?.data?.dataList || directData?.dataList || directData?.data?.response || directData?.response || []);
+        if (arr.length > 0) pe = arr[0];
+      } catch (e) {
+        console.error("Error fetching single PE data:", e);
+      }
+    }
     if (!pe) return;
 
     let lines: any[] = [];
@@ -1163,17 +1181,89 @@ function PurchaseEntry() {
                 <Row className="g-2 g-sm-3">
                   <Col md>
                     <label className="form-label">Created Purchase Entry</label>
-                    <select className="form-control" value={state.formData.F_PurchaseEntryH || ""} onChange={(e) => { 
-                      const val = e.target.value;
-                      handleFormFieldChange("F_PurchaseEntryH", val); 
-                      if (!val) window.location.reload();
-                      else fetchPEDataAndPopulateGrid(val); 
-                    }}>
-                      <option value="">Select PE</option>
-                      {state.CreatedPurchaseEntries?.map((pe: any) => (
-                        <option key={pe.Id} value={pe.Id}>{pe.EntryNo || pe.Id}</option>
-                      ))}
-                    </select>
+                    {(() => {
+                      const purchaseEntryOptions = state.CreatedPurchaseEntries?.map((pe: any) => {
+                        const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(pe.F_LedgerMaster));
+                        const vendorName = (pe.VendorName || vendor?.CompanyName || vendor?.Name || vendor?.LedgerName || "").trim();
+                        
+                        const getValidPhone = (val: any) => {
+                          if (!val) return "";
+                          const str = String(val).trim();
+                          if (str === "0" || str === "0.00" || str === "null" || str === "undefined") return "";
+                          return str;
+                        };
+
+                        const mobileNo = getValidPhone(pe.MobileNo) || getValidPhone(pe.PhoneNo) || getValidPhone(vendor?.MobileNo) || getValidPhone(vendor?.PhoneNo) || getValidPhone(vendor?.Phone) || "";
+                        
+                        const labelParts = [
+                          pe.EntryNo || `#${pe.Id}`,
+                          vendorName,
+                          mobileNo
+                        ].filter(Boolean);
+
+                        return {
+                          value: pe.Id,
+                          label: labelParts.join(" - ")
+                        };
+                      }) || [];
+
+                      const selectedOption = purchaseEntryOptions.find((opt: any) => String(opt.value) === String(state.formData.F_PurchaseEntryH)) || null;
+
+                      return (
+                        <Select
+                          className="react-select-container"
+                          classNamePrefix="react-select"
+                          placeholder="Select Purchase Entry..."
+                          isClearable
+                          isSearchable
+                          options={purchaseEntryOptions}
+                          value={selectedOption}
+                          onChange={(opt: any) => {
+                            const val = opt ? opt.value : "";
+                            handleFormFieldChange("F_PurchaseEntryH", val);
+                            if (!val) window.location.reload();
+                            else fetchPEDataAndPopulateGrid(val);
+                          }}
+                          styles={{
+                            control: (base: any) => ({
+                              ...base,
+                              minHeight: "33px",
+                              height: "33px",
+                              fontSize: "0.85rem",
+                              borderRadius: "0.25rem",
+                              borderColor: "#dee2e6",
+                              boxShadow: "none",
+                              "&:hover": {
+                                borderColor: "#86b7fe"
+                              }
+                            }),
+                            valueContainer: (base: any) => ({
+                              ...base,
+                              padding: "0 6px",
+                            }),
+                            input: (base: any) => ({
+                              ...base,
+                              margin: "0",
+                              padding: "0",
+                            }),
+                            indicatorsContainer: (base: any) => ({
+                              ...base,
+                              height: "33px",
+                            }),
+                            menu: (base: any) => ({
+                              ...base,
+                              zIndex: 9999,
+                              fontSize: "0.85rem",
+                            }),
+                            menuPortal: (base: any) => ({
+                              ...base,
+                              zIndex: 9999,
+                            })
+                          }}
+                          menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                        />
+                      );
+                    })()}
                   </Col>
 
                   <Col md>
@@ -1182,7 +1272,7 @@ function PurchaseEntry() {
                   </Col>
                   <Col md>
                     <label className="form-label">Entry Date</label>
-                    <DateInput name="poDate" value={state.formData.PODate} onChange={(val: string) => handleFormFieldChange("PODate", val)} />
+                    <DateInput name="poDate" value={state.formData.PODate} onChange={(e: any) => handleFormFieldChange("PODate", e?.target ? e.target.value : e)} />
                   </Col>
                   <Col md>
                     <div className="d-flex justify-content-between align-items-center">

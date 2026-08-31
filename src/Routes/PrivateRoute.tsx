@@ -1,10 +1,18 @@
 import { Navigate, Outlet } from "react-router-dom";
 
 const PrivateRoute = () => {
-  const login = JSON.parse(localStorage.getItem("login")!) ? JSON.parse(localStorage.getItem("login")!) : false;
-  return login !== false ? (
+  let login = false;
+  try {
+    const raw = localStorage.getItem("login");
+    if (raw && raw !== "undefined" && raw !== "null") {
+      login = JSON.parse(raw);
+    }
+  } catch {
+    login = false;
+  }
+  return login ? (
     <Outlet />
-    ) : (
+  ) : (
     <Navigate to={`${process.env.PUBLIC_URL}/login`} />
   );
 };

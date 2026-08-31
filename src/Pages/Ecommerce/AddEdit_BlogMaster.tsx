@@ -380,6 +380,8 @@ const AddEdit_BlogMaster = () => {
                                 type="date"
                                 name="Date"
                                 value={values.Date}
+                                min="1000-01-01"
+                                max="9999-12-31"
                                 onChange={handleChange}
                                 onBlur={handleBlur}
                               />

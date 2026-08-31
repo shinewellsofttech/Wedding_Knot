@@ -192,6 +192,8 @@ const AddEdit_BatchMaster = () => {
                                 type="date"
                                 name="ExpiryDate"
                                 value={values.ExpiryDate}
+                                min="1000-01-01"
+                                max="9999-12-31"
                                 onChange={handleChange}
                                 onBlur={handleBlur}
                                 invalid={touched.ExpiryDate && !!errors.ExpiryDate}

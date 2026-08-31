@@ -69,9 +69,14 @@ export const UserRightsProvider = ({ children }) => {
   };
 
   const isAdmin = () => {
-    const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");
-    const username = (authUser?.Email || authUser?.UserName || '').toString().toLowerCase();
-    return username === 'admin';
+    try {
+      const raw = localStorage.getItem("authUser");
+      const authUser = (raw && raw !== "undefined" && raw !== "null") ? JSON.parse(raw) : {};
+      const username = (authUser?.Email || authUser?.UserName || '').toString().toLowerCase();
+      return username === 'admin';
+    } catch {
+      return false;
+    }
   };
 
   return (

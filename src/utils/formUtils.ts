@@ -1,11 +1,31 @@
 /**
+ * Safely parse JSON strings, returning fallback if string is null, empty, "undefined", or invalid JSON.
+ */
+export function safeJsonParse<T = any>(val: any, fallback: T = {} as T): T {
+  if (!val || val === "undefined" || val === "null") return fallback;
+  if (typeof val === "object") return val;
+  try {
+    return JSON.parse(val);
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Safely retrieves authUser object from localStorage.
+ */
+export function getAuthUser(): any {
+  return safeJsonParse(localStorage.getItem("authUser"), {});
+}
+
+/**
  * Returns the current logged-in user ID from localStorage authUser (set at login).
  * Use when appending UserId to FormData in masters/transactions.
  * Returns "0" if not logged in or authUser missing.
  */
 export function getCurrentUserId(): string {
   try {
-    const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");
+    const authUser = getAuthUser();
     const id = authUser?.Id ?? authUser?.uid ?? authUser?.id;
     return id !== undefined && id !== null ? String(id) : "0";
   } catch {
@@ -19,7 +39,7 @@ export function getCurrentUserId(): string {
  */
 export function getLoggedInCompanyId(): string {
   try {
-    const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");
+    const authUser = getAuthUser();
     const id = authUser?.F_CompanyMaster ?? authUser?.CompanyId ?? authUser?.F_Company;
     return id !== undefined && id !== null ? String(id) : "0";
   } catch {

@@ -563,7 +563,7 @@ const SalesOrder = () => {
       formDataLedger.append("Id", "0");
       formDataLedger.append("Name", companyName);
       formDataLedger.append("Alias", "0");
-      formDataLedger.append("F_LedgerGroupMaster", "40");
+      formDataLedger.append("F_LedgerGroupMaster", "36"); // Sundry Debtors
       formDataLedger.append("Address", address);
       formDataLedger.append("Address1", "0");
       formDataLedger.append("F_CountryMaster", "0");

@@ -5,6 +5,7 @@ import Breadcrumbs from "../../CommonElements/Breadcrumbs/Breadcrumbs";
 import CardHeaderCommon from "../../CommonElements/CardHeaderCommon/CardHeaderCommon";
 import { API_WEB_URLS } from "../../constants/constAPI";
 import { toast } from "react-toastify";
+import { formatDateDDMMYYYY } from "../../helpers/dateUtils";
 
 interface WebsiteLead {
   Id: number | string;
@@ -216,7 +217,7 @@ const PageList_WebsiteLeads = () => {
                         filteredLeads.map((item, index) => {
                           const isSelected = selectedIds.includes(item.Id);
                           const dateStr = item.CreatedDate
-                            ? new Date(item.CreatedDate).toLocaleString()
+                            ? formatDateDDMMYYYY(item.CreatedDate)
                             : "-";
                           return (
                             <tr key={item.Id} className={isSelected ? "table-active" : ""}>

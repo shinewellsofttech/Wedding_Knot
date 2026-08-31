@@ -11,6 +11,8 @@ import DateInput from "../../../CommonElements/DateInput/DateInput";
 import Breadcrumbs from "../../../CommonElements/Breadcrumbs/Breadcrumbs";
 import { Btn } from "../../../AbstractElements";
 import CardHeaderCommon from "../../../CommonElements/CardHeaderCommon/CardHeaderCommon";
+import Select from "react-select";
+import { getCurrentUserId, getLoggedInCompanyId } from "../../../utils/formUtils";
 
 interface GridRow {
   ItemCode: string;
@@ -143,6 +145,9 @@ function SalesInvoice() {
     { F_LedgerMaster: "", Amount: "" }
   ]);
 
+  const [discountInput, setDiscountInput] = useState<string>("");
+  const [discountType, setDiscountType] = useState<"amount" | "percent">("amount");
+
   const [quickItemModalOpen, setQuickItemModalOpen] = useState(false);
   const [quickItemTargetRow, setQuickItemTargetRow] = useState<number | null>(null);
   const [quickItemSubmitting, setQuickItemSubmitting] = useState(false);
@@ -221,7 +226,7 @@ function SalesInvoice() {
         const params = new URLSearchParams(location.search);
         const recordId = params.get("id");
         if (recordId) {
-          await loadSalesInvoiceRecord(parseInt(recordId));
+          await fetchPEDataAndPopulateGrid(recordId, peDataArray);
         } else {
           try {
             const API_ENTRY_NO = API_WEB_URLS.MASTER + "/0/token/GetVoucherNoByVoucherTypeId/Id/4";
@@ -250,6 +255,14 @@ function SalesInvoice() {
 
     fetchMasterData();
   }, [dispatch]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const recordId = params.get("id");
+    if (recordId && String(state.formData.F_SalesInvoiceH) !== String(recordId)) {
+      fetchPEDataAndPopulateGrid(recordId);
+    }
+  }, [location.search, state.CreatedSalesEntries]);
 
   useEffect(() => {
     if (state.formData.F_VendorMaster && state.formData.F_VendorMaster !== "0") {
@@ -318,10 +331,19 @@ function SalesInvoice() {
     }
   };
 
-  const fetchPEDataAndPopulateGrid = async (peId: string) => {
+  const fetchPEDataAndPopulateGrid = async (peId: string | number, peList?: any[]) => {
     if (!peId) return;
-    const prevState = state;
-    const pe = prevState.CreatedSalesEntries?.find((p: any) => String(p.Id) === String(peId));
+    const list = peList || state.CreatedSalesEntries || [];
+    let pe = list.find((p: any) => String(p.Id) === String(peId));
+    if (!pe) {
+      try {
+        const directData = await Fn_FillListData(dispatch, () => ({}), "ignored", `${API_WEB_URLS.MASTER}/0/token/Salesentrydata/Id/${peId}`);
+        const arr = Array.isArray(directData) ? directData : (directData?.data?.dataList || directData?.dataList || directData?.data?.response || directData?.response || []);
+        if (arr.length > 0) pe = arr[0];
+      } catch (e) {
+        console.error("Error fetching single SE data:", e);
+      }
+    }
     if (!pe) return;
 
     let lines: any[] = [];
@@ -358,6 +380,13 @@ function SalesInvoice() {
       SGST: pe.TotalSGST !== undefined ? String(pe.TotalSGST) : undefined,
       IGST: pe.TotalIGST !== undefined ? String(pe.TotalIGST) : undefined,
     });
+
+    if (pe.TotalDiscount !== undefined && pe.TotalDiscount !== null && Number(pe.TotalDiscount) > 0) {
+      setDiscountInput(String(pe.TotalDiscount));
+      setDiscountType("amount");
+    } else {
+      setDiscountInput("");
+    }
 
     setState((prev) => ({
       ...prev,
@@ -977,12 +1006,11 @@ function SalesInvoice() {
     }
     setVendorSubmitting(true);
     try {
-      const obj = JSON.parse(localStorage.getItem("user") || "{}");
       const formData = new FormData();
       formData.append("Id", "0");
       formData.append("Name", companyName);
       formData.append("Alias", "0");
-      formData.append("F_LedgerGroupMaster", "40");
+      formData.append("F_LedgerGroupMaster", "36"); // Sundry Debtors (Customers)
       formData.append("Address", address);
       formData.append("Address1", "0");
       formData.append("F_CountryMaster", "0");
@@ -1004,7 +1032,7 @@ function SalesInvoice() {
       formData.append("F_GSTGroupMaster", "0");
       formData.append("F_TaxPayerType", "0");
       formData.append("F_LedgerMasterSales", "0");
-      formData.append("F_LedgerMasterSales", "0");
+      formData.append("F_LedgerMasterPurchase", "0");
       formData.append("F_YearScheme", "0");
       formData.append("F_IntCalcMethod", "0");
       formData.append("BankName", "0");
@@ -1014,14 +1042,26 @@ function SalesInvoice() {
       formData.append("F_LedgerMasterDalal", "0");
       formData.append("IsTransport", "false");
       formData.append("F_TCSonSales", "0");
-      formData.append("UserId", obj?.uid || "0");
-      formData.append("F_CompanyMaster", (() => { try { const a = JSON.parse(localStorage.getItem("authUser")||"{}"); return String(a?.F_CompanyMaster ?? a?.CompanyId ?? a?.F_Company ?? "0"); } catch(e){return "0";} })());
+      formData.append("UserId", getCurrentUserId());
+      formData.append("F_CompanyMaster", getLoggedInCompanyId());
 
-      await Fn_AddEditData(dispatch, setState, { arguList: { id: 0, formData } }, API_VENDOR_SAVE, true, "memberid", navigate, "#");
+      await Fn_AddEditData(dispatch, () => undefined, { arguList: { id: 0, formData } }, API_VENDOR_SAVE, true, "memberid", navigate, "#");
       const vendors = await Fn_FillListData(dispatch, setState, "VendorMaster", API_URL_VENDOR);
-      const newVendor = vendors?.find((v: any) => (v.CompanyName || v.Name || v.LedgerName)?.toLowerCase() === companyName.toLowerCase());
+      const extractArray = (data: any) => Array.isArray(data) ? data : (data?.data?.dataList || data?.dataList || data?.data?.response || data?.response || []);
+      const vendorsList = extractArray(vendors);
+      const newVendor = vendorsList.find((v: any) => (v.CompanyName || v.Name || v.LedgerName)?.trim().toLowerCase() === companyName.toLowerCase());
       if (newVendor) {
-        setState((prev) => ({ ...prev, formData: { ...prev.formData, F_VendorMaster: newVendor.Id }, VendorMaster: vendors || [] }));
+        setState((prev) => ({
+          ...prev,
+          formData: { ...prev.formData, F_VendorMaster: String(newVendor.Id) },
+          VendorMaster: vendorsList,
+          SelectedVendor: newVendor
+        }));
+      } else {
+        setState((prev) => ({
+          ...prev,
+          VendorMaster: vendorsList
+        }));
       }
       setVendorModalOpen(false);
     } catch (error) {
@@ -1048,6 +1088,7 @@ function SalesInvoice() {
       let totalCGST = 0;
       let totalSGST = 0;
       let totalIGST = 0;
+      let totalDiscount = 0;
       let highestCGSTPercent = 0;
       let highestSGSTPercent = 0;
       let highestIGSTPercent = 0;
@@ -1058,6 +1099,15 @@ function SalesInvoice() {
         const qty = Number(row.Qty) || 0;
         const rate = Number(row.Rate) || 0;
         const amount = qty * rate;
+
+        const rowGstPercent = row.GSTPercent || 0;
+        const origBaseRate = row.OriginalSalePrice !== undefined && Number(row.OriginalSalePrice) > 0
+          ? Number(row.OriginalSalePrice) / (1 + Number(rowGstPercent) / 100)
+          : rate;
+
+        if (origBaseRate > rate) {
+          totalDiscount += (origBaseRate - rate) * qty;
+        }
 
         let itemCGST = 0;
         let itemSGST = 0;
@@ -1126,6 +1176,19 @@ function SalesInvoice() {
       const finalIGST = Number((taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST).toFixed(2));
       const finalTotalTax = finalCGST + finalSGST + finalIGST;
 
+      const subTotal = validGridRows.reduce((sum, r) => sum + ((Number(r.Qty) || 0) * (Number(r.Rate) || 0)), 0);
+      const grossTotal = subTotal + finalTotalTax + totalOtherCharges;
+      const rawDiscountVal = parseFloat(discountInput) || 0;
+      const parsedManualDiscount = discountType === "percent" 
+        ? Math.max(0, Math.min(100, rawDiscountVal)) 
+        : Math.max(0, rawDiscountVal);
+
+      const manualDiscountAmount = discountType === "percent" 
+        ? (grossTotal * parsedManualDiscount) / 100 
+        : parsedManualDiscount;
+
+      const finalTotalDiscount = Number((totalDiscount + manualDiscountAmount).toFixed(2));
+
       const headerFormData = new FormData();
       headerFormData.append("EntryDate", state.formData.PODate);
       headerFormData.append("EntryNo", state.formData.PONo || "");
@@ -1139,6 +1202,8 @@ function SalesInvoice() {
       headerFormData.append("F_LedgerMaster_CGST", finalCGST > 0 ? "18" : "0");
       headerFormData.append("F_LedgerMaster_SGST", finalSGST > 0 ? "19" : "0");
       headerFormData.append("F_LedgerMaster_IGST", finalIGST > 0 ? "17" : "0");
+      headerFormData.append("TotalDiscount", finalTotalDiscount.toFixed(2));
+      headerFormData.append("F_LedgerMaster_Discount", "39");
       headerFormData.append("TotalTax", finalTotalTax.toFixed(2));
       headerFormData.append("UserId", obj?.uid || "0");
       headerFormData.append("F_CompanyMaster", "0");
@@ -1184,7 +1249,15 @@ function SalesInvoice() {
     } else {
         finalIGST = taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0) * (row.GSTPercent || 0) / 100), 0);
     }
-    const grandTotal = Math.round(subTotal + finalCGST + finalSGST + finalIGST + totalOtherCharges);
+    const grossTotal = subTotal + finalCGST + finalSGST + finalIGST + totalOtherCharges;
+    const rawDiscountVal = parseFloat(discountInput) || 0;
+    const parsedManualDiscount = discountType === "percent"
+      ? Math.max(0, Math.min(100, rawDiscountVal))
+      : Math.max(0, rawDiscountVal);
+    const manualDiscountAmount = discountType === "percent"
+      ? (grossTotal * parsedManualDiscount) / 100
+      : parsedManualDiscount;
+    const grandTotal = Math.max(0, Math.round(grossTotal - manualDiscountAmount));
 
     try {
       const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");
@@ -1253,7 +1326,7 @@ function SalesInvoice() {
   
   const handleDownloadPdf = async () => {
     const { generateInvoiceHTML } = require('../../../helpers/PDFTemplate');
-    const htmlString = generateInvoiceHTML("SALES INVOICE", state, gridRows, otherChargesRows, taxOverrides);
+    const htmlString = generateInvoiceHTML("SALES INVOICE", state, gridRows, otherChargesRows, taxOverrides, { discountInput, discountType });
 
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = htmlString;
@@ -1512,17 +1585,89 @@ function SalesInvoice() {
                 <Row className="g-2 g-sm-3">
                   <Col md>
                     <label className="form-label">Created Sales Invoice</label>
-                    <select className="form-control" value={state.formData.F_SalesInvoiceH || ""} onChange={(e) => { 
-                      const val = e.target.value;
-                      handleFormFieldChange("F_SalesInvoiceH", val); 
-                      if (!val) window.location.reload();
-                      else fetchPEDataAndPopulateGrid(val); 
-                    }}>
-                      <option value="">Select PE</option>
-                      {state.CreatedSalesEntries?.map((pe: any) => (
-                        <option key={pe.Id} value={pe.Id}>{pe.EntryNo || pe.Id}</option>
-                      ))}
-                    </select>
+                    {(() => {
+                      const salesEntryOptions = state.CreatedSalesEntries?.map((pe: any) => {
+                        const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(pe.F_LedgerMaster));
+                        const customerName = (pe.CustomerName || vendor?.CompanyName || vendor?.Name || vendor?.LedgerName || "").trim();
+                        
+                        const getValidPhone = (val: any) => {
+                          if (!val) return "";
+                          const str = String(val).trim();
+                          if (str === "0" || str === "0.00" || str === "null" || str === "undefined") return "";
+                          return str;
+                        };
+
+                        const mobileNo = getValidPhone(pe.MobileNo) || getValidPhone(pe.PhoneNo) || getValidPhone(vendor?.MobileNo) || getValidPhone(vendor?.PhoneNo) || getValidPhone(vendor?.Phone) || "";
+                        
+                        const labelParts = [
+                          pe.EntryNo || `#${pe.Id}`,
+                          customerName,
+                          mobileNo
+                        ].filter(Boolean);
+
+                        return {
+                          value: pe.Id,
+                          label: labelParts.join(" - ")
+                        };
+                      }) || [];
+
+                      const selectedOption = salesEntryOptions.find((opt: any) => String(opt.value) === String(state.formData.F_SalesInvoiceH)) || null;
+
+                      return (
+                        <Select
+                          className="react-select-container"
+                          classNamePrefix="react-select"
+                          placeholder="Select Invoice..."
+                          isClearable
+                          isSearchable
+                          options={salesEntryOptions}
+                          value={selectedOption}
+                          onChange={(opt: any) => {
+                            const val = opt ? opt.value : "";
+                            handleFormFieldChange("F_SalesInvoiceH", val);
+                            if (!val) window.location.reload();
+                            else fetchPEDataAndPopulateGrid(val);
+                          }}
+                          styles={{
+                            control: (base: any) => ({
+                              ...base,
+                              minHeight: "33px",
+                              height: "33px",
+                              fontSize: "0.85rem",
+                              borderRadius: "0.25rem",
+                              borderColor: "#dee2e6",
+                              boxShadow: "none",
+                              "&:hover": {
+                                borderColor: "#86b7fe"
+                              }
+                            }),
+                            valueContainer: (base: any) => ({
+                              ...base,
+                              padding: "0 6px",
+                            }),
+                            input: (base: any) => ({
+                              ...base,
+                              margin: "0",
+                              padding: "0",
+                            }),
+                            indicatorsContainer: (base: any) => ({
+                              ...base,
+                              height: "33px",
+                            }),
+                            menu: (base: any) => ({
+                              ...base,
+                              zIndex: 9999,
+                              fontSize: "0.85rem",
+                            }),
+                            menuPortal: (base: any) => ({
+                              ...base,
+                              zIndex: 9999,
+                            })
+                          }}
+                          menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
+                        />
+                      );
+                    })()}
                   </Col>
 
                   <Col md>
@@ -1531,7 +1676,7 @@ function SalesInvoice() {
                   </Col>
                   <Col md>
                     <label className="form-label">Entry Date</label>
-                    <DateInput name="poDate" value={state.formData.PODate} onChange={(val: string) => handleFormFieldChange("PODate", val)} />
+                    <DateInput name="poDate" value={state.formData.PODate} onChange={(e: any) => handleFormFieldChange("PODate", e?.target ? e.target.value : e)} />
                   </Col>
                   <Col md>
                     <div className="d-flex justify-content-between align-items-center">
@@ -1715,7 +1860,18 @@ function SalesInvoice() {
 
                       const totalTax = finalCGST + finalSGST + finalIGST;
                       const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
-                      const grandTotal = subTotal + totalTax + totalOtherCharges;
+                      const grossTotal = subTotal + totalTax + totalOtherCharges;
+
+                      const rawDiscountVal = parseFloat(discountInput) || 0;
+                      const parsedManualDiscount = discountType === "percent" 
+                        ? Math.max(0, Math.min(100, rawDiscountVal)) 
+                        : Math.max(0, rawDiscountVal);
+
+                      const manualDiscountAmount = discountType === "percent" 
+                        ? (grossTotal * parsedManualDiscount) / 100 
+                        : parsedManualDiscount;
+
+                      const grandTotal = Math.max(0, grossTotal - manualDiscountAmount);
 
                       return (
                         <div className="table-responsive">
@@ -1775,6 +1931,63 @@ function SalesInvoice() {
                               <tr>
                                 <th className="text-end text-danger">Total Tax:</th>
                                 <td className="text-end text-danger fw-bold">{totalTax.toFixed(2)}</td>
+                              </tr>
+                              <tr>
+                                <th className="text-end text-primary" style={{ whiteSpace: "nowrap" }}>
+                                  Discount on Total:
+                                </th>
+                                <td>
+                                  <div className="d-flex align-items-center gap-1 justify-content-end">
+                                    <Input
+                                      type="number"
+                                      bsSize="sm"
+                                      className="text-end m-0 p-1"
+                                      style={{ width: "100px" }}
+                                      placeholder="0.00"
+                                      min="0"
+                                      max={discountType === "percent" ? "100" : undefined}
+                                      value={discountInput}
+                                      onChange={(e) => {
+                                        let val = e.target.value;
+                                        if (discountType === "percent") {
+                                          const num = parseFloat(val);
+                                          if (!isNaN(num)) {
+                                            if (num > 100) val = "100";
+                                            else if (num < 0) val = "0";
+                                          }
+                                        }
+                                        setDiscountInput(val);
+                                      }}
+                                    />
+                                    <select
+                                      className="form-select form-select-sm p-1"
+                                      style={{ width: "50px" }}
+                                      value={discountType}
+                                      onChange={(e) => {
+                                        const newType = e.target.value as "amount" | "percent";
+                                        setDiscountType(newType);
+                                        if (newType === "percent") {
+                                          const num = parseFloat(discountInput);
+                                          if (!isNaN(num) && num > 100) {
+                                            setDiscountInput("100");
+                                          }
+                                        }
+                                      }}
+                                    >
+                                      <option value="amount">₹</option>
+                                      <option value="percent">%</option>
+                                    </select>
+                                  </div>
+                                  {manualDiscountAmount > 0 && (
+                                    <div className="text-end mt-1">
+                                      <span className="badge bg-danger-subtle text-danger border border-danger-subtle fw-semibold" style={{ fontSize: "11px" }}>
+                                        {discountType === "percent"
+                                          ? `Disc Amount (${parsedManualDiscount}%): - ₹ ${manualDiscountAmount.toFixed(2)}`
+                                          : `Disc Amount: - ₹ ${manualDiscountAmount.toFixed(2)}`}
+                                      </span>
+                                    </div>
+                                  )}
+                                </td>
                               </tr>
                               <tr>
                                 <th className="text-end text-success fs-5">Grand Total:</th>
@@ -1906,7 +2119,7 @@ function SalesInvoice() {
       <div 
         className="sales-print-layout" 
         dangerouslySetInnerHTML={{ 
-          __html: require('../../../helpers/PDFTemplate').generateInvoiceHTML("SALES INVOICE", state, gridRows, otherChargesRows, taxOverrides) 
+          __html: require('../../../helpers/PDFTemplate').generateInvoiceHTML("SALES INVOICE", state, gridRows, otherChargesRows, taxOverrides, { discountInput, discountType }) 
         }} 
       />
     </div>

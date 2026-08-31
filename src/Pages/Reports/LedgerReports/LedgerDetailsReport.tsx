@@ -9,6 +9,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Fn_FillListData, Fn_GetReport } from "../../../store/Functions";
 import { API_WEB_URLS } from "../../../constants/constAPI";
 import { exportDataToExcel } from "../../../utils/excelExportHelper";
+import { formatDateDDMMYYYY } from "../../../helpers/dateUtils";
 
 interface Transaction {
   date?: string;
@@ -702,7 +703,7 @@ const LedgerDetailsReport: React.FC = () => {
                                   style={viewType === "Detailed" && (transaction.voucherNo || transaction.voucherId) ? { cursor: "pointer" } : {}}
                                   title={viewType === "Detailed" && (transaction.voucherNo || transaction.voucherId) ? "Double-click to open voucher" : undefined}
                                 >
-                                  <td>{transaction.date || "-"}</td>
+                                  <td>{formatDateDDMMYYYY(transaction.date)}</td>
                                   {showPartyName && <td>{transaction.party || "-"}</td>}
                                   {showVoucherNo && <td>{transaction.voucherNo || "-"}</td>}
                                   {showVoucherType && <td>{transaction.voucherType || "-"}</td>}
@@ -821,7 +822,7 @@ const LedgerDetailsReport: React.FC = () => {
             {/* Transaction Rows */}
             {transactions.map((t, i) => (
               <tr key={i}>
-                <td>{t.date || ""}</td>
+                <td>{formatDateDDMMYYYY(t.date)}</td>
                 <td>{t.party || ""}</td>
                 {viewType === "Detailed" && <td>{t.voucherNo || ""}</td>}
                 {viewType === "Detailed" && <td>{t.voucherType || ""}</td>}

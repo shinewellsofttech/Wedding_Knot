@@ -3,6 +3,7 @@ import { Container, Row, Col, Card, CardBody, CardHeader, Table, Badge, Modal, M
 import Breadcrumbs from "../../CommonElements/Breadcrumbs/Breadcrumbs";
 import { API_WEB_URLS } from "../../constants/constAPI";
 import { Eye } from "react-feather";
+import { formatDateDDMMYYYY } from "../../helpers/dateUtils";
 
 interface Status {
   Id: number;
@@ -138,13 +139,7 @@ const Orders = () => {
   };
 
   const formatDate = (dateString: string | null) => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric"
-    });
+    return formatDateDDMMYYYY(dateString);
   };
 
   const toggleModal = () => setModalOpen(!modalOpen);

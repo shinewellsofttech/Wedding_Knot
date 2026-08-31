@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Container, Row, Col, Card, CardBody, CardFooter, Input, Table, ButtonGroup } from "reactstrap";
 import Breadcrumbs from "../../../CommonElements/Breadcrumbs/Breadcrumbs";
 import DateInput from "../../../CommonElements/DateInput/DateInput";
-import { getCurrentDateYYYYMMDD } from "../../../helpers/dateUtils";
+import { getCurrentDateYYYYMMDD, formatDateDDMMYYYY } from "../../../helpers/dateUtils";
 import CardHeaderCommon from "../../../CommonElements/CardHeaderCommon/CardHeaderCommon";
 import { Btn } from "../../../AbstractElements";
 import { useDispatch } from "react-redux";
@@ -441,7 +441,7 @@ const MoneyReceipt = () => {
                             <tr key={index}>
                               <td>{row.SNo}</td>
                               <td>{row.InvoiceNo}</td>
-                              <td>{row.Date}</td>
+                              <td>{formatDateDDMMYYYY(row.Date)}</td>
                               <td>{row.DueAmount.toFixed(2)}</td>
                               <td>
                                 {formData.Mode === "Manual" ? (

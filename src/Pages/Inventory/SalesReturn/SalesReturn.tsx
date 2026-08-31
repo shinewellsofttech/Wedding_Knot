@@ -836,7 +836,7 @@ function SalesReturn() {
       formData.append("Id", "0");
       formData.append("Name", companyName);
       formData.append("Alias", "0");
-      formData.append("F_LedgerGroupMaster", "40");
+      formData.append("F_LedgerGroupMaster", "36"); // Sundry Debtors
       formData.append("Address", address);
       formData.append("Address1", "0");
       formData.append("F_CountryMaster", "0");
@@ -871,11 +871,15 @@ function SalesReturn() {
       formData.append("UserId", obj?.uid || "0");
       formData.append("F_CompanyMaster", (() => { try { const a = JSON.parse(localStorage.getItem("authUser")||"{}"); return String(a?.F_CompanyMaster ?? a?.CompanyId ?? a?.F_Company ?? "0"); } catch(e){return "0";} })());
 
-      await Fn_AddEditData(dispatch, setState, { arguList: { id: 0, formData } }, API_VENDOR_SAVE, true, "memberid", navigate, "#");
+      await Fn_AddEditData(dispatch, () => undefined, { arguList: { id: 0, formData } }, API_VENDOR_SAVE, true, "memberid", navigate, "#");
       const vendors = await Fn_FillListData(dispatch, setState, "VendorMaster", API_URL_VENDOR);
-      const newVendor = vendors?.find((v: any) => (v.CompanyName || v.Name || v.LedgerName)?.toLowerCase() === companyName.toLowerCase());
+      const extractArray = (data: any) => Array.isArray(data) ? data : (data?.data?.dataList || data?.dataList || data?.data?.response || data?.response || []);
+      const vendorsList = extractArray(vendors);
+      const newVendor = vendorsList.find((v: any) => (v.CompanyName || v.Name || v.LedgerName)?.trim().toLowerCase() === companyName.toLowerCase());
       if (newVendor) {
-        setState((prev) => ({ ...prev, formData: { ...prev.formData, F_VendorMaster: newVendor.Id }, VendorMaster: vendors || [] }));
+        setState((prev) => ({ ...prev, formData: { ...prev.formData, F_VendorMaster: String(newVendor.Id) }, VendorMaster: vendorsList, SelectedVendor: newVendor }));
+      } else {
+        setState((prev) => ({ ...prev, VendorMaster: vendorsList }));
       }
       setVendorModalOpen(false);
     } catch (error) {

@@ -84,7 +84,13 @@ export const OrderNotificationProvider: React.FC<{ children: ReactNode }> = ({ c
 
   const fetchOrdersCheck = async () => {
     try {
-      const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");
+      let authUser: any = {};
+      try {
+        const raw = localStorage.getItem("authUser");
+        authUser = (raw && raw !== "undefined" && raw !== "null") ? JSON.parse(raw) : {};
+      } catch {
+        authUser = {};
+      }
       const userToken = authUser?.Token ?? authUser?.token ?? authUser?.UserToken ?? "token";
 
       const payload = new FormData();

@@ -22,7 +22,13 @@ const Layout = () => {
   
 
   useEffect(() => {
-    const authUser = JSON.parse(localStorage.getItem("authUser") || "{}")
+    let authUser: any = {};
+    try {
+      const raw = localStorage.getItem("authUser");
+      authUser = (raw && raw !== "undefined" && raw !== "null") ? JSON.parse(raw) : {};
+    } catch {
+      authUser = {};
+    }
     const userId = authUser?.Id ?? authUser?.uid
     if (!userId) return
     const fetchRights = async () => {

@@ -18,6 +18,7 @@ import { useDispatch } from "react-redux";
 import { Fn_GetReport, Fn_FillListData } from "../../../store/Functions";
 import { API_WEB_URLS } from "../../../constants/constAPI";
 import { useNavigate } from "react-router-dom";
+import { formatDateDDMMYYYY } from "../../../helpers/dateUtils";
 
 interface VoucherSearchResult {
   Id: number;
@@ -709,7 +710,7 @@ const VouterSearch: React.FC = () => {
                               }}
                             >
                               <td className="text-center">{voucher.VoucherNo}</td>
-                              <td>{formatDateForDisplay(voucher.VoucherDate)}</td>
+                              <td>{formatDateDDMMYYYY(voucher.VoucherDate)}</td>
                               <td>
                                 {voucher.DrLedger && voucher.CrLedger
                                   ? `${voucher.DrLedger} / ${voucher.CrLedger}`
@@ -717,7 +718,7 @@ const VouterSearch: React.FC = () => {
                               </td>
                               <td className="text-end">{formatCurrency(voucher.Amount)}</td>
                               <td className="text-center">{voucher.ChequeNo || "-"}</td>
-                              <td>{formatDateForDisplay(voucher.ChequeDate)}</td>
+                              <td>{formatDateDDMMYYYY(voucher.ChequeDate)}</td>
                               <td>{voucher.Narration || "-"}</td>
                             </tr>
                           ))

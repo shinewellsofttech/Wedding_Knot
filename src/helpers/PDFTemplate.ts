@@ -1,3 +1,5 @@
+import { formatDateDDMMYYYY } from "./dateUtils";
+
 export const numberToWords = (num: number): string => {
     const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
     const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
@@ -29,7 +31,8 @@ export const generateInvoiceHTML = (
   state: any,
   gridRows: any[],
   otherChargesRows: any[] = [],
-  taxOverrides: any = {}
+  taxOverrides: any = {},
+  discountOverride: any = 0
 ) => {
   const vendorId = state.formData?.F_VendorMaster || state.formData?.F_PartyMaster || state.formData?.F_LedgerMaster || "";
   const vendorMasterObj = state.VendorMaster?.find((v: any) => String(v.Id) === String(vendorId)) || state.PartyMaster?.find((v: any) => String(v.Id) === String(vendorId));
@@ -124,7 +127,26 @@ export const generateInvoiceHTML = (
     (sum, row) => sum + (parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0),
     0
   );
-  const grandTotal = subTotal + totalTax + totalOtherCharges;
+  
+  let totalDiscount = 0;
+  let discountLabel = "DISCOUNT ALLOWED";
+  if (typeof discountOverride === "number") {
+    totalDiscount = discountOverride;
+  } else if (discountOverride && typeof discountOverride === "object") {
+    const rawVal = parseFloat(discountOverride.discountInput) || 0;
+    if (discountOverride.discountType === "percent") {
+      totalDiscount = ((subTotal + totalTax + totalOtherCharges) * rawVal) / 100;
+      if (rawVal > 0) {
+        discountLabel = `DISCOUNT ALLOWED (${rawVal}%)`;
+      }
+    } else {
+      totalDiscount = rawVal;
+    }
+  } else if (state?.formData?.TotalDiscount) {
+    totalDiscount = parseFloat(state.formData.TotalDiscount) || 0;
+  }
+
+  const grandTotal = Math.max(0, subTotal + totalTax + totalOtherCharges - totalDiscount);
 
   const dispatchDocNo = state.formData.DispatchDocNo || "N/A";
   const dispatchedThrough = state.formData.DispatchedThrough || "N/A";
@@ -155,7 +177,8 @@ export const generateInvoiceHTML = (
   const companyEmail = state.GlobalOptions?.[0]?.Email || state.GlobalOptions?.[0]?.EmailId || "N/A";
 
   const invoiceNo = state.formData.PONo || state.formData.EntryNo || state.formData.ChallanNo || "N/A";
-  const invoiceDate = state.formData.PODate || state.formData.EntryDate || state.formData.ChallanDate || "N/A";
+  const rawInvoiceDate = state.formData.PODate || state.formData.EntryDate || state.formData.ChallanDate || "";
+  const invoiceDate = rawInvoiceDate ? formatDateDDMMYYYY(rawInvoiceDate) : "N/A";
 
   let firstItemObj = gridRows[0]?.ItemData?.find((i: any) => String(i.Id) === String(gridRows[0]?.F_ItemMaster)) ||
                      state.ItemMaster?.find((i: any) => String(i.Id) === String(gridRows[0]?.F_ItemMaster));
@@ -246,6 +269,19 @@ export const generateInvoiceHTML = (
       </tr>
     `;
   }).join("");
+
+  let discountRow = "";
+  if (totalDiscount > 0) {
+    discountRow = `
+      <tr>
+        <td colspan="5" style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px 6px; text-align: right; color: #d9534f;"><em>${discountLabel}</em></td>
+        <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
+        <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
+        <td style="border-right: 1px solid #000; border-bottom: 1px solid #000;"></td>
+        <td style="padding: 2px 6px; border-bottom: 1px solid #000; text-align: right; font-weight: bold; color: #d9534f;">- ${totalDiscount.toFixed(2)}</td>
+      </tr>
+    `;
+  }
 
   return `
     <div style="font-family: Arial, sans-serif; background: white; color: black; padding: 15px; width: 100%; max-width: 800px; box-sizing: border-box; margin: 0 auto; line-height: 1.3;">
@@ -353,6 +389,7 @@ export const generateInvoiceHTML = (
             }).join("")}
             ${forwardingRow}
             ${igstOrCgstSgstRows}
+            ${discountRow}
             <!-- empty space filler -->
             <tr>
               <td style="border-right: 1px solid #000; height: 100px;"></td>
@@ -458,8 +495,10 @@ export const generateRentReceiptHTML = (
   const companyEmail = state.GlobalOptions?.[0]?.Email || state.GlobalOptions?.[0]?.EmailId || "N/A";
 
   const entryNo = state.formData.PONo || state.formData.EntryNo || "N/A";
-  const entryDate = state.formData.PODate || state.formData.EntryDate || "N/A";
-  const tillDate = state.formData.TillDate || "N/A";
+  const rawEntryDate = state.formData.PODate || state.formData.EntryDate || "";
+  const entryDate = rawEntryDate ? formatDateDDMMYYYY(rawEntryDate) : "N/A";
+  const rawTillDate = state.formData.TillDate || "";
+  const tillDate = rawTillDate ? formatDateDDMMYYYY(rawTillDate) : "N/A";
   const paymentMode = state.formData.PaymentMode || "Cash";
   const customerName = state.formData.CustomerName || vendor?.CompanyName || vendor?.Name || vendor?.LedgerName || "Valued Customer";
   const mobileNo = state.formData.MobileNo || vendor?.Phone || vendor?.Mobile || "N/A";
@@ -660,8 +699,10 @@ export const generateRentReturnReceiptHTML = (
   const companyEmail = state.GlobalOptions?.[0]?.Email || state.GlobalOptions?.[0]?.EmailId || "N/A";
 
   const entryNo = state.formData.PONo || state.formData.EntryNo || "N/A";
-  const entryDate = state.formData.PODate || state.formData.EntryDate || "N/A";
-  const tillDate = state.formData.TillDate || "N/A";
+  const rawEntryDate = state.formData.PODate || state.formData.EntryDate || "";
+  const entryDate = rawEntryDate ? formatDateDDMMYYYY(rawEntryDate) : "N/A";
+  const rawTillDate = state.formData.TillDate || "";
+  const tillDate = rawTillDate ? formatDateDDMMYYYY(rawTillDate) : "N/A";
   const paymentMode = state.formData.PaymentMode || "Cash";
   const customerName = state.formData.CustomerName || vendor?.CompanyName || vendor?.Name || vendor?.LedgerName || "Valued Customer";
   const mobileNo = state.formData.MobileNo || vendor?.Phone || vendor?.Mobile || "N/A";

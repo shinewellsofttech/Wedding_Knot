@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { Fn_FillListData, Fn_GetReport } from "../../../store/Functions";
 import { API_WEB_URLS } from "../../../constants/constAPI";
 import { exportDataToExcel } from "../../../utils/excelExportHelper";
+import { formatDateDDMMYYYY } from "../../../helpers/dateUtils";
 
 interface Transaction {
   date?: string;
@@ -474,7 +475,7 @@ const CashReport: React.FC = () => {
                                   title="Double-click to view voucher details"
                                 >
                                   <td>{transaction.voucherNo || "-"}</td>
-                                  <td>{transaction.date || "-"}</td>
+                                  <td>{formatDateDDMMYYYY(transaction.date)}</td>
                                   <td>
                                     <div className="particulars-cell">
                                       <span className="particulars-name">{transaction.party || "-"}</span>
@@ -544,10 +545,10 @@ const CashReport: React.FC = () => {
                 <strong>Ledger Name:</strong> {selectedLedgerName || "—"}
               </td>
               <td style={{ width: "25%" }}>
-                <strong>From Date:</strong> {formatDateForAPI(fromDate)}
+                <strong>From Date:</strong> {formatDateDDMMYYYY(fromDate)}
               </td>
               <td style={{ width: "25%" }}>
-                <strong>To Date:</strong> {formatDateForAPI(toDate)}
+                <strong>To Date:</strong> {formatDateDDMMYYYY(toDate)}
               </td>
             </tr>
           </tbody>
@@ -575,7 +576,7 @@ const CashReport: React.FC = () => {
             {transactions.map((t, i) => (
               <tr key={i}>
                 <td>{t.voucherNo || "—"}</td>
-                <td>{t.date || ""}</td>
+                <td>{formatDateDDMMYYYY(t.date)}</td>
                 <td>
                   <div>{t.party || ""}</div>
                   {t.narration && (

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { Card, CardBody, Col, Container, FormGroup, Row, Table } from "reactstrap";
+import React, { useState, useEffect, useMemo } from "react";
+import { Card, CardBody, Col, Container, FormGroup, Row, Table, Input } from "reactstrap";
+import { useNavigate } from "react-router-dom";
 import { Btn } from "../../../AbstractElements";
 import Breadcrumbs from "../../../CommonElements/Breadcrumbs/Breadcrumbs";
 import DateInput from "../../../CommonElements/DateInput";
@@ -7,23 +8,41 @@ import { useDispatch } from "react-redux";
 import { Fn_GetReport } from "../../../store/Functions";
 import { API_WEB_URLS } from "../../../constants/constAPI";
 import { exportDataToExcel } from "../../../utils/excelExportHelper";
+import { formatDateDDMMYYYY } from "../../../helpers/dateUtils";
 
 interface OutstandingRow {
   CustomerName?: string;
   City?: string;
   Mobile?: string;
+  MobileNo?: string;
+  PhoneNo?: string;
+  Phone?: string;
   CreditLimit?: number;
   CreditDays?: number;
   Outstanding?: number;
   NotDue?: number;
   Overdue?: number;
   LastPayment?: string;
+  PartyName?: string;
+  PartyCategory?: string;
+  PartyType?: string;
+  InvoiceNo?: string;
+  RefInvoice?: string;
+  BillNo?: string;
+  EntryNo?: string;
+  DueDate?: string;
+  OverdueDays?: number;
+  BillAmount?: number;
+  PaidAmount?: number;
+  OutstandingBalance?: number;
+  InvoiceId?: number;
   [key: string]: any;
 }
 
 interface FormattedOutstandingRow {
   SNo: number;
   PartyName: string;
+  MobileNo: string;
   PartyCategory: "Debtor (Customer)" | "Creditor (Supplier)";
   RefInvoice: string;
   DueDate: string;
@@ -31,12 +50,15 @@ interface FormattedOutstandingRow {
   BillAmount: number;
   PaidAmount: number;
   OutstandingBalance: number;
+  InvoiceId?: number;
+  PartyType?: string;
 }
 
 const MOCK_DATA: FormattedOutstandingRow[] = [
   {
     SNo: 1,
     PartyName: "Global Tech Solutions",
+    MobileNo: "9876543210",
     PartyCategory: "Debtor (Customer)",
     RefInvoice: "INV-2026-002",
     DueDate: "2026-05-05",
@@ -48,6 +70,7 @@ const MOCK_DATA: FormattedOutstandingRow[] = [
   {
     SNo: 2,
     PartyName: "Zenith Retail Corp",
+    MobileNo: "9812345678",
     PartyCategory: "Debtor (Customer)",
     RefInvoice: "INV-2026-003",
     DueDate: "2026-04-25",
@@ -59,6 +82,7 @@ const MOCK_DATA: FormattedOutstandingRow[] = [
   {
     SNo: 3,
     PartyName: "Reliable Hardware Traders",
+    MobileNo: "9898989898",
     PartyCategory: "Creditor (Supplier)",
     RefInvoice: "PUR-2026-102",
     DueDate: "2026-05-08",
@@ -70,6 +94,7 @@ const MOCK_DATA: FormattedOutstandingRow[] = [
   {
     SNo: 4,
     PartyName: "Metro Packaging Pvt Ltd",
+    MobileNo: "9765432109",
     PartyCategory: "Creditor (Supplier)",
     RefInvoice: "PUR-2026-103",
     DueDate: "2026-04-30",
@@ -91,39 +116,29 @@ const PAGE_CSS = `
     border-radius: 12px;
     background: #fff;
   }
-  .header-container {
-    padding: 10px 0;
+  .search-input-wrap {
+    position: relative;
   }
-  .icon-circle {
-    width: 42px;
-    height: 42px;
-    background-color: #eef2ff;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #4f46e5;
-    margin-right: 12px;
+  .search-input-wrap .search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    font-size: 16px;
+    pointer-events: none;
   }
-  .header-title {
-    font-weight: 700;
-    color: #1e293b;
-    font-size: 22px;
+  .search-input-wrap input {
+    padding-left: 40px !important;
+    border-radius: 10px !important;
+    border: 1.5px solid #cbd5e1 !important;
+    height: 45px !important;
+    font-size: 14px !important;
+    transition: all 0.2s ease;
   }
-  .btn-print {
-    background-color: #4f46e5 !important;
+  .search-input-wrap input:focus {
     border-color: #4f46e5 !important;
-    color: #fff !important;
-    border-radius: 30px !important;
-    padding: 8px 24px !important;
-    font-weight: 600;
-    box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
-    transition: all 0.2s ease-in-out;
-  }
-  .btn-print:hover {
-    background-color: #4338ca !important;
-    transform: translateY(-1px);
-    box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12) !important;
   }
   
   /* Floating Label Filters */
@@ -138,8 +153,8 @@ const PAGE_CSS = `
     background: #fff;
     padding: 0 6px;
     font-size: 11px;
-    color: #8c98a5;
-    font-weight: 500;
+    color: #64748b;
+    font-weight: 600;
     z-index: 2;
     transition: color 0.2s;
   }
@@ -162,47 +177,39 @@ const PAGE_CSS = `
     outline: none;
     box-shadow: none;
   }
-  .floating-group input[type="date"] {
-    padding-top: 12px !important;
-    padding-bottom: 6px !important;
-    line-height: normal !important;
-  }
-  .floating-group input[type="date"]::-webkit-date-and-time-value {
-    margin: 0;
-    height: auto;
-    min-height: auto;
-  }
 
-  /* Summary Cards */
-  .summary-card {
+  /* Summary KPI Cards */
+  .summary-kpi-card {
     background: #fff;
-    border: 1px solid #f1f5f9;
-    border-radius: 14px;
-    padding: 24px 16px;
-    text-align: center;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.015);
-    transition: all 0.2s ease;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    display: flex;
+    align-items: center;
+    gap: 14px;
   }
-  .summary-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.04);
+  .summary-kpi-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
   }
-  .summary-val {
-    font-size: 28px;
+  .summary-kpi-val {
+    font-size: 20px;
     font-weight: 700;
-    margin-bottom: 4px;
+    line-height: 1.2;
   }
-  .summary-lbl {
-    font-size: 13px;
+  .summary-kpi-lbl {
+    font-size: 12px;
     color: #64748b;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
-  
-  /* Color classes for summary cards */
-  .val-receivables { color: #10b981; }
-  .val-payables { color: #f43f5e; }
-  .val-net { color: #4f46e5; }
-  .val-pending { color: #f59e0b; }
 
   /* Styled Table */
   .table-responsive {
@@ -218,8 +225,9 @@ const PAGE_CSS = `
     color: #475569;
     font-weight: 600;
     font-size: 13px;
-    padding: 14px 16px;
+    padding: 12px 14px;
     border-bottom: 1.5px solid #e2e8f0;
+    white-space: nowrap;
   }
   .outstanding-table thead th.highlight-col {
     background-color: #eef2ff !important;
@@ -227,10 +235,10 @@ const PAGE_CSS = `
     font-weight: 700;
   }
   .outstanding-table tbody td {
-    padding: 12px 16px;
+    padding: 10px 14px;
     vertical-align: middle;
     color: #334155;
-    font-size: 13.5px;
+    font-size: 13px;
     border-bottom: 1px solid #f1f5f9;
   }
   .outstanding-table tbody tr:hover td {
@@ -239,10 +247,10 @@ const PAGE_CSS = `
 
   /* Tags & Links styling */
   .badge-debtor {
-    background-color: #22c55e;
+    background-color: #10b981;
     color: #fff;
-    padding: 5px 12px;
-    border-radius: 30px;
+    padding: 4px 10px;
+    border-radius: 20px;
     font-size: 11px;
     font-weight: 600;
     display: inline-block;
@@ -250,8 +258,8 @@ const PAGE_CSS = `
   .badge-creditor {
     background-color: #f97316;
     color: #fff;
-    padding: 5px 12px;
-    border-radius: 30px;
+    padding: 4px 10px;
+    border-radius: 20px;
     font-size: 11px;
     font-weight: 600;
     display: inline-block;
@@ -316,17 +324,16 @@ const PAGE_CSS = `
       font-family: Arial, sans-serif; font-size: 12px;
     }
     .out-print table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    .out-print th, .out-print td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
+    .out-print th, .out-print td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; font-size: 11px; }
     .out-print thead th { background: #f1f5f9; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .out-print .print-header { text-align: center; border-bottom: 2px solid #334155; padding-bottom: 12px; margin-bottom: 20px; }
-    .out-print .print-summary-box { display: flex; justify-content: space-around; margin-bottom: 20px; border: 1px solid #ccc; padding: 10px; border-radius: 6px; }
-    .out-print .print-summary-item { text-align: center; }
     .page-wrapper, .page-body-wrapper { margin: 0 !important; padding: 0 !important; }
   }
 `;
 
 const CustomerOutstandingReport: React.FC = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   const [fromDate, setFromDate] = useState(() => {
     const d = new Date();
@@ -349,6 +356,7 @@ const CustomerOutstandingReport: React.FC = () => {
   const [printFirmAddress, setPrintFirmAddress] = useState("");
 
   // Filters State
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedParty, setSelectedParty] = useState("All Parties");
   const [partyType, setPartyType] = useState("ALL");
 
@@ -460,32 +468,65 @@ const CustomerOutstandingReport: React.FC = () => {
       return MOCK_DATA;
     }
     return reportData.map((row, idx) => {
-      const name = row.PartyName || "Unknown Party";
+      const name = (row.PartyName || row.CustomerName || row.LedgerName || row.Name || "Unknown Party").trim();
       const category = row.PartyCategory || (row.PartyType === "Payable" ? "Creditor (Supplier)" : "Debtor (Customer)");
+      const mobile = (row.MobileNo || row.Mobile || row.PhoneNo || row.Phone || row.ContactNo || "").trim();
+      const invoiceNo = (row.InvoiceNo || row.RefInvoice || row.BillNo || row.EntryNo || `${row.PartyType === "Payable" ? "PUR" : "INV"}-2026-${row.PartyId || idx}`).trim();
       
       return {
         SNo: Number(row.SrNo || row.SNo || idx + 1),
         PartyName: name,
+        MobileNo: mobile,
         PartyCategory: category === "Creditor (Supplier)" ? "Creditor (Supplier)" : "Debtor (Customer)",
-        RefInvoice: row.InvoiceNo || row.RefInvoice || `${row.PartyType === "Payable" ? "PUR" : "INV"}-2026-${row.PartyId || idx}`,
+        RefInvoice: invoiceNo,
         DueDate: row.DueDate || "-",
         OverdueDays: Number(row.OverdueDays ?? 0),
         BillAmount: Number(row.BillAmount ?? 0),
         PaidAmount: Number(row.PaidAmount ?? 0),
         OutstandingBalance: Number(row.OutstandingBalance ?? 0),
+        InvoiceId: Number(row.InvoiceId || row.F_SalesInvoiceH || row.F_PurchaseEntryH || 0),
+        PartyType: row.PartyType || (category === "Creditor (Supplier)" ? "Payable" : "Receivable"),
       };
     });
   };
 
   const mappedData = getMappedData();
 
-  // Filters logic
-  const filteredData = mappedData.filter((row) => {
-    const matchesParty = selectedParty === "All Parties" || row.PartyName === selectedParty;
-    return matchesParty;
-  });
+  // Multi-field search & filters logic
+  const filteredData = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    return mappedData.filter((row) => {
+      const matchesParty = selectedParty === "All Parties" || row.PartyName === selectedParty;
+      if (!matchesParty) return false;
+      if (!q) return true;
+
+      const partyNameMatch = row.PartyName.toLowerCase().includes(q);
+      const mobileMatch = row.MobileNo.toLowerCase().includes(q);
+      const invoiceMatch = row.RefInvoice.toLowerCase().includes(q);
+      const categoryMatch = row.PartyCategory.toLowerCase().includes(q);
+
+      return partyNameMatch || mobileMatch || invoiceMatch || categoryMatch;
+    });
+  }, [mappedData, selectedParty, searchTerm]);
 
   const uniqueParties = ["All Parties", ...Array.from(new Set(mappedData.map(r => r.PartyName)))];
+
+  // Summary Metrics
+  const totalReceivables = useMemo(() => {
+    return filteredData
+      .filter(r => r.PartyCategory === "Debtor (Customer)")
+      .reduce((sum, r) => sum + r.OutstandingBalance, 0);
+  }, [filteredData]);
+
+  const totalPayables = useMemo(() => {
+    return filteredData
+      .filter(r => r.PartyCategory === "Creditor (Supplier)")
+      .reduce((sum, r) => sum + r.OutstandingBalance, 0);
+  }, [filteredData]);
+
+  const totalOutstanding = useMemo(() => {
+    return filteredData.reduce((sum, r) => sum + r.OutstandingBalance, 0);
+  }, [filteredData]);
 
   const formatNumber = (num: number) => {
     return Math.round(num).toLocaleString("en-IN");
@@ -495,7 +536,8 @@ const CustomerOutstandingReport: React.FC = () => {
     if (!filteredData || filteredData.length === 0) return;
     const exportRows = filteredData.map((row) => ({
       "S.No": row.SNo,
-      "Party Name": row.PartyName,
+      "Party / Customer Name": row.PartyName,
+      "Phone / Mobile No": row.MobileNo || "-",
       "Party Category": row.PartyCategory,
       "Ref Invoice / Bill No": row.RefInvoice,
       "Due Date": row.DueDate,
@@ -510,16 +552,86 @@ const CustomerOutstandingReport: React.FC = () => {
   const handlePrint = () => window.print();
   const handleClose = () => window.history.back();
 
+  const handleResetFilters = () => {
+    setSearchTerm("");
+    setSelectedParty("All Parties");
+    setPartyType("ALL");
+  };
+
   return (
     <div className="page-body out-report-wrap report-page">
       <style>{PAGE_CSS}</style>
       <Breadcrumbs mainTitle="Outstanding Receivables & Payables" parent="Reports" />
       <Container fluid>
 
+        {/* Top KPI Summary Cards */}
+        <Row className="g-3 mb-3">
+          <Col lg="3" sm="6">
+            <div className="summary-kpi-card">
+              <div className="summary-kpi-icon bg-success-subtle text-success">
+                <i className="fa fa-arrow-down" />
+              </div>
+              <div>
+                <div className="summary-kpi-lbl">Total Receivables (Customers)</div>
+                <div className="summary-kpi-val text-success">₹ {formatNumber(totalReceivables)}</div>
+              </div>
+            </div>
+          </Col>
+          <Col lg="3" sm="6">
+            <div className="summary-kpi-card">
+              <div className="summary-kpi-icon bg-warning-subtle text-warning">
+                <i className="fa fa-arrow-up" />
+              </div>
+              <div>
+                <div className="summary-kpi-lbl">Total Payables (Suppliers)</div>
+                <div className="summary-kpi-val text-warning">₹ {formatNumber(totalPayables)}</div>
+              </div>
+            </div>
+          </Col>
+          <Col lg="3" sm="6">
+            <div className="summary-kpi-card">
+              <div className="summary-kpi-icon bg-primary-subtle text-primary">
+                <i className="fa fa-balance-scale" />
+              </div>
+              <div>
+                <div className="summary-kpi-lbl">Total Outstanding Balance</div>
+                <div className="summary-kpi-val text-primary">₹ {formatNumber(totalOutstanding)}</div>
+              </div>
+            </div>
+          </Col>
+          <Col lg="3" sm="6">
+            <div className="summary-kpi-card">
+              <div className="summary-kpi-icon bg-info-subtle text-info">
+                <i className="fa fa-file-text-o" />
+              </div>
+              <div>
+                <div className="summary-kpi-lbl">Total Pending Bills</div>
+                <div className="summary-kpi-val text-dark">{filteredData.length} Bills</div>
+              </div>
+            </div>
+          </Col>
+        </Row>
 
-        {/* Filters Section */}
-        <Card className="report-card mb-4">
-          <CardBody className="p-4">
+        {/* Filters & Live Search Section */}
+        <Card className="report-card mb-3">
+          <CardBody className="p-3 p-md-4">
+            
+            {/* Live Search Bar for Name / Phone / Bill No */}
+            <Row className="g-3 mb-3">
+              <Col xs="12">
+                <div className="search-input-wrap">
+                  <i className="fa fa-search search-icon" />
+                  <Input
+                    type="text"
+                    placeholder="Search by Customer / Party Name, Phone / Mobile No, Bill / Invoice No..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </Col>
+            </Row>
+
+            {/* Detailed Filters & Date Pickers */}
             <Row className="gy-3 align-items-end">
               <Col lg="3" md="6">
                 <FormGroup className="floating-group">
@@ -551,7 +663,7 @@ const CustomerOutstandingReport: React.FC = () => {
                   </select>
                 </FormGroup>
               </Col>
-              <Col lg="3" md="6">
+              <Col lg="2" md="6">
                 <FormGroup className="floating-group">
                   <label>From Date</label>
                   <DateInput
@@ -560,7 +672,7 @@ const CustomerOutstandingReport: React.FC = () => {
                   />
                 </FormGroup>
               </Col>
-              <Col lg="3" md="6">
+              <Col lg="2" md="6">
                 <FormGroup className="floating-group">
                   <label>To Date</label>
                   <DateInput
@@ -569,11 +681,17 @@ const CustomerOutstandingReport: React.FC = () => {
                   />
                 </FormGroup>
               </Col>
+              <Col lg="2" md="12" className="d-flex gap-2 justify-content-end">
+                <Btn color="light" className="border text-dark" onClick={handleResetFilters} title="Reset all filters">
+                  <i className="fa fa-refresh me-1" /> Reset
+                </Btn>
+                <Btn color="success" className="btn-excel" onClick={handleExportExcel} disabled={filteredData.length === 0} title="Export to Excel">
+                  <i className="fa fa-file-excel-o me-1" /> Excel
+                </Btn>
+              </Col>
             </Row>
           </CardBody>
         </Card>
-
-
 
         {/* Styled Outstanding Table */}
         <Card className="report-card mb-4">
@@ -582,9 +700,10 @@ const CustomerOutstandingReport: React.FC = () => {
               <Table hover className="outstanding-table">
                 <thead>
                   <tr>
-                    <th>S.No</th>
-                    <th>Party Name</th>
-                    <th>Party Category</th>
+                    <th style={{ width: "50px" }}>S.No</th>
+                    <th>Party / Customer Name</th>
+                    <th>Phone / Mobile No</th>
+                    <th>Category</th>
                     <th>Ref Invoice / Bill No</th>
                     <th>Due Date</th>
                     <th>Overdue (Days)</th>
@@ -596,7 +715,7 @@ const CustomerOutstandingReport: React.FC = () => {
                 <tbody>
                   {isLoading ? (
                     <tr>
-                      <td colSpan={9} className="text-center py-5">
+                      <td colSpan={10} className="text-center py-5">
                         <div className="spinner-border text-primary" role="status">
                           <span className="visually-hidden">Loading...</span>
                         </div>
@@ -608,7 +727,19 @@ const CustomerOutstandingReport: React.FC = () => {
                       {filteredData.map((row, idx) => (
                         <tr key={idx}>
                           <td>{idx + 1}</td>
-                          <td className="fw-semibold">{row.PartyName}</td>
+                          <td className="fw-semibold">
+                            {row.PartyName}
+                          </td>
+                          <td>
+                            {row.MobileNo ? (
+                              <span className="fw-medium text-dark">
+                                <i className="fa fa-phone me-1 text-muted small" />
+                                {row.MobileNo}
+                              </span>
+                            ) : (
+                              <span className="text-muted">-</span>
+                            )}
+                          </td>
                           <td>
                             <span
                               className={
@@ -621,11 +752,31 @@ const CustomerOutstandingReport: React.FC = () => {
                             </span>
                           </td>
                           <td>
-                            <a href="#/" className="invoice-link">
+                            <span
+                              className="invoice-link text-primary fw-bold text-decoration-underline"
+                              style={{ cursor: "pointer" }}
+                              title={`Click to open ${row.RefInvoice}`}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (row.InvoiceId && row.InvoiceId > 0) {
+                                  if (row.PartyCategory === "Debtor (Customer)") {
+                                    navigate(`${process.env.PUBLIC_URL}/salesInvoice?id=${row.InvoiceId}`);
+                                  } else {
+                                    navigate(`${process.env.PUBLIC_URL}/purchaseEntry?id=${row.InvoiceId}`);
+                                  }
+                                } else {
+                                  if (row.PartyCategory === "Debtor (Customer)") {
+                                    navigate(`${process.env.PUBLIC_URL}/salesInvoice`);
+                                  } else {
+                                    navigate(`${process.env.PUBLIC_URL}/purchaseEntry`);
+                                  }
+                                }
+                              }}
+                            >
                               {row.RefInvoice}
-                            </a>
+                            </span>
                           </td>
-                          <td>{row.DueDate}</td>
+                          <td>{formatDateDDMMYYYY(row.DueDate)}</td>
                           <td>
                             <span className="text-overdue-days">
                               {row.OverdueDays} d
@@ -640,8 +791,9 @@ const CustomerOutstandingReport: React.FC = () => {
                       ))}
                       {filteredData.length === 0 && (
                         <tr>
-                          <td colSpan={9} className="text-center text-muted py-5">
-                            No data available.
+                          <td colSpan={10} className="text-center text-muted py-5">
+                            <i className="fa fa-search-minus fa-2x mb-2 d-block text-muted" />
+                            {searchTerm ? `No matching records found for "${searchTerm}".` : "No data available."}
                           </td>
                         </tr>
                       )}
@@ -656,7 +808,7 @@ const CustomerOutstandingReport: React.FC = () => {
               <i className="fa fa-file-excel-o me-1" /> Export Excel
             </Btn>
             <Btn color="primary" className="btn-print-footer me-2" style={{ backgroundColor: "#4f46e5", borderColor: "#4f46e5" }} onClick={handlePrint}>
-              Print
+              <i className="fa fa-print me-1" /> Print
             </Btn>
             <Btn color="secondary" className="btn-close-report" onClick={handleClose}>
               Close
@@ -676,14 +828,13 @@ const CustomerOutstandingReport: React.FC = () => {
           </p>
         </div>
 
-
-
         <table>
           <thead>
             <tr>
               <th>S.No</th>
-              <th>Party Name</th>
-              <th>Party Category</th>
+              <th>Party / Customer Name</th>
+              <th>Phone / Mobile No</th>
+              <th>Category</th>
               <th>Ref Invoice / Bill No</th>
               <th>Due Date</th>
               <th>Overdue (Days)</th>
@@ -697,6 +848,7 @@ const CustomerOutstandingReport: React.FC = () => {
               <tr key={idx}>
                 <td>{idx + 1}</td>
                 <td style={{ fontWeight: "bold" }}>{row.PartyName}</td>
+                <td>{row.MobileNo || "-"}</td>
                 <td>{row.PartyCategory}</td>
                 <td>{row.RefInvoice}</td>
                 <td>{row.DueDate}</td>
@@ -708,7 +860,7 @@ const CustomerOutstandingReport: React.FC = () => {
             ))}
             {filteredData.length === 0 && (
               <tr>
-                <td colSpan={9} style={{ textAlign: "center", padding: "20px" }}>
+                <td colSpan={10} style={{ textAlign: "center", padding: "20px" }}>
                   No data available.
                 </td>
               </tr>
