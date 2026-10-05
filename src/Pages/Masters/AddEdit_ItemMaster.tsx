@@ -715,9 +715,7 @@ const AddEdit_ItemMaster = () => {
   };
 
   const removeSchemeRow = (index: number) => {
-    if (schemeRows.length > 1) {
-      setSchemeRows(schemeRows.filter((_, i) => i !== index));
-    }
+    setSchemeRows(schemeRows.filter((_, i) => i !== index));
   };
 
   const updateSchemeRow = (index: number, field: keyof typeof schemeRows[0], value: string) => {
@@ -729,10 +727,6 @@ const AddEdit_ItemMaster = () => {
   const saveScheme = async () => {
     try {
       const validRows = schemeRows.filter(r => r.FromRange && r.ToRange && r.Rate);
-      if (validRows.length === 0) {
-        toast.error("Please enter valid scheme data.");
-        return;
-      }
       
       const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");
       const userId = authUser?.uid ?? authUser?.Id ?? "0";
@@ -753,7 +747,7 @@ const AddEdit_ItemMaster = () => {
         }));
       });
 
-      toast.update(toastId, { render: "Scheme saved successfully", type: "success", isLoading: false, autoClose: 1200, hideProgressBar: true });
+      toast.update(toastId, { render: validRows.length === 0 ? "Scheme removed successfully" : "Scheme saved successfully", type: "success", isLoading: false, autoClose: 1200, hideProgressBar: true });
       closeSchemeModal();
     } catch (error) {
       console.error("Error saving scheme:", error);
@@ -1406,25 +1400,36 @@ const AddEdit_ItemMaster = () => {
               </tr>
             </thead>
             <tbody>
-              {schemeRows.map((row, index) => (
-                <tr key={index}>
-                  <td>
-                    <input type="number" className="form-control form-control-sm" value={row.FromRange} onChange={(e) => updateSchemeRow(index, "FromRange", e.target.value)} />
-                  </td>
-                  <td>
-                    <input type="number" className="form-control form-control-sm" value={row.ToRange} onChange={(e) => updateSchemeRow(index, "ToRange", e.target.value)} />
-                  </td>
-                  <td>
-                    <input type="number" className="form-control form-control-sm" value={row.Rate} onChange={(e) => updateSchemeRow(index, "Rate", e.target.value)} />
-                  </td>
-                  <td className="text-center">
-                    <div className="d-flex justify-content-center gap-2">
-                      <Button color="success" size="sm" onClick={addSchemeRow}>+</Button>
-                      <Button color="danger" size="sm" onClick={() => removeSchemeRow(index)} disabled={schemeRows.length === 1}>-</Button>
+              {schemeRows.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="text-center text-muted py-3">
+                    No schemes added. Click <strong>"Add Scheme"</strong> to create one, or click <strong>"Save Scheme"</strong> to clear schemes.
+                    <div className="mt-2">
+                      <Button color="success" size="sm" onClick={addSchemeRow}>+ Add Scheme</Button>
                     </div>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                schemeRows.map((row, index) => (
+                  <tr key={index}>
+                    <td>
+                      <input type="number" className="form-control form-control-sm" value={row.FromRange} onChange={(e) => updateSchemeRow(index, "FromRange", e.target.value)} />
+                    </td>
+                    <td>
+                      <input type="number" className="form-control form-control-sm" value={row.ToRange} onChange={(e) => updateSchemeRow(index, "ToRange", e.target.value)} />
+                    </td>
+                    <td>
+                      <input type="number" className="form-control form-control-sm" value={row.Rate} onChange={(e) => updateSchemeRow(index, "Rate", e.target.value)} />
+                    </td>
+                    <td className="text-center">
+                      <div className="d-flex justify-content-center gap-2">
+                        <Button color="success" size="sm" onClick={addSchemeRow}>+</Button>
+                        <Button color="danger" size="sm" onClick={() => removeSchemeRow(index)}>-</Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </Table>
         </ModalBody>
