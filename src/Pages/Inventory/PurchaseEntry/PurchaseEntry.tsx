@@ -875,7 +875,7 @@ function PurchaseEntry() {
       formData.append("Id", "0");
       formData.append("Name", companyName);
       formData.append("Alias", "0");
-      formData.append("F_LedgerGroupMaster", "40");
+      formData.append("F_LedgerGroupMaster", "35");
       formData.append("Address", address);
       formData.append("Address1", "0");
       formData.append("F_CountryMaster", "0");

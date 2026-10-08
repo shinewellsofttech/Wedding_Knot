@@ -6,6 +6,7 @@ import Breadcrumbs from "../../CommonElements/Breadcrumbs/Breadcrumbs";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Fn_AddEditData, Fn_FillListData, Fn_DeleteData } from "../../store/Functions";
 import { API_WEB_URLS } from "../../constants/constAPI";
+import { getCurrentUserId } from "../../utils/formUtils";
 import "./ItemMaster.css";
 
 /* ───── API URLs ───── */
@@ -209,19 +210,43 @@ const AddEdit_ItemMaster = () => {
     try {
       const res = await Fn_FillListData(dispatch, () => {}, "new_id", endpoint);
       const list = Array.isArray(res) ? res : res?.dataList ?? res?.data?.dataList ?? [];
-      if (list.length > 0 && list[0].Id) return String(list[0].Id);
+      if (list.length > 0) {
+        const first = list[0];
+        const extractedId = first?.Id ?? first?.id ?? first?.ID ?? first?.NewId ?? first?.newId ?? first?.ItemDesignId ?? first?.ItemMasterId;
+        if (extractedId !== undefined && extractedId !== null && String(extractedId).trim() !== "") {
+          return String(extractedId);
+        }
+      }
       if (res?.Id) return String(res.Id);
+      if (res?.id) return String(res.id);
       if (res?.data?.Id) return String(res.data.Id);
-      if (typeof res === "string" || typeof res === "number") return String(res);
-      if (typeof res?.data === "string" || typeof res?.data === "number") return String(res.data);
+      if (res?.data?.id) return String(res.data.id);
+      if (typeof res === "string" || typeof res === "number") {
+        if (String(res).trim() !== "") return String(res);
+      }
+      if (typeof res?.data === "string" || typeof res?.data === "number") {
+        if (String(res.data).trim() !== "") return String(res.data);
+      }
     } catch (e) {
       console.error("fetchNewId Error", e);
     }
     return uid();
   }, [dispatch]);
 
+  const createNewItem = useCallback(async (): Promise<ItemSection> => {
+    const newId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemCreate/Id/0`);
+    const newRowId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemDesignCreate/Id/${newId}`);
+    const sec = makeSection();
+    sec.id = newId;
+    sec.rows = [{ ...makeRow(), id: newRowId }];
+    return sec;
+  }, [fetchNewId]);
+
   const handleFieldUpdate = useCallback((id: string, tableName: string, fieldName: string, fieldValue: string, filesMap?: Record<string, File>, immediate = false) => {
-    if (!id || id.includes("-")) return;
+    if (!id || id === "0" || id.includes("-")) {
+      console.warn("Skipping field update due to temporary/invalid ID:", { id, tableName, fieldName, fieldValue });
+      return;
+    }
     
     const timerKey = `${id}_${fieldName}`;
     if (timersRef.current[timerKey]) clearTimeout(timersRef.current[timerKey]);
@@ -229,10 +254,10 @@ const AddEdit_ItemMaster = () => {
     const execute = async () => {
       const formData = new FormData();
       formData.append("Id", id);
-      formData.append("UserId", "0");
+      formData.append("UserId", getCurrentUserId());
       formData.append("TableName", tableName);
       formData.append("FieldName", fieldName);
-      formData.append("FieldValue", fieldValue);
+      formData.append("FieldValue", fieldValue !== undefined && fieldValue !== null ? String(fieldValue) : "");
       
       let isPhoto = false;
       if (filesMap) {
@@ -274,7 +299,12 @@ const AddEdit_ItemMaster = () => {
     const stateId = location.state?.Id ?? location.state?.id ?? queryId;
 
     if (!stateId || stateId === 0 || stateId === "0") {
-      setSections([makeSection()]);
+      createNewItem()
+        .then(newSec => setSections([newSec]))
+        .catch(err => {
+          console.error("Error creating initial section:", err);
+          setSections([makeSection()]);
+        });
       return;
     }
 
@@ -363,7 +393,7 @@ const AddEdit_ItemMaster = () => {
 
                     const rowSchemes = combinedSchemes.map((s: any) => ({
                        FromRange: parseStr(s.FromRange ?? s.fromRange ?? s.FromQuantity ?? s.fromQuantity ?? s.FromQty ?? s.fromQty),
-                       ToRange: parseStr(s.ToRange ?? s.toRange ?? s.ToQuantity ?? s.toQuantity ?? s.ToQty ?? s.toQty),
+                       ToRange: parseStr(s.ToRange ?? s.toRange ?? s.ToQuantity ?? s.toQty ?? s.toQty),
                        Rate: parseStr(s.Rate ?? s.rate ?? s.SchemeRate ?? s.schemeRate ?? s.RateAmount ?? s.rateAmount ?? s.SalePrice ?? s.salePrice)
                     }));
                       
@@ -403,13 +433,17 @@ const AddEdit_ItemMaster = () => {
           });
           setSections(prefilledSections);
         } else {
-          setSections([makeSection()]);
+          createNewItem()
+            .then(newSec => setSections([newSec]))
+            .catch(() => setSections([makeSection()]));
         }
       })
       .catch(() => {
-        setSections([makeSection()]);
+        createNewItem()
+          .then(newSec => setSections([newSec]))
+          .catch(() => setSections([makeSection()]));
       });
-  }, [dispatch, location.state, location.search, fetchNewId]);
+  }, [dispatch, location.state, location.search, createNewItem]);
 
   useEffect(() => {
     loadData();
@@ -532,14 +566,10 @@ const AddEdit_ItemMaster = () => {
   const addNewItemSection = useCallback(async (secIdx?: number) => {
     const toastId = toast.loading("Creating new item...", { position: "bottom-right" });
     try {
-      const newId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemCreate/Id/0`);
-      const newRowId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemDesignCreate/Id/${newId}`);
+      const newSec = await createNewItem();
       
       setSections(prev => {
         const copy: ItemSection[] = prev.map(s => ({ ...s, isMinimized: true }));
-        const newSec = makeSection();
-        newSec.id = newId;
-        newSec.rows[0].id = newRowId;
         if (typeof secIdx === "number") {
           copy.splice(secIdx + 1, 0, newSec);
         } else {
@@ -561,7 +591,7 @@ const AddEdit_ItemMaster = () => {
     } catch (e) {
       toast.update(toastId, { render: "Failed to create item", type: "error", isLoading: false, autoClose: 2000, hideProgressBar: true });
     }
-  }, [fetchNewId]);
+  }, [createNewItem]);
 
   /* ── Photo handling ── */
   const handlePhoto = useCallback((secIdx: number, rowIdx: number, slotIdx: number, files: FileList | null) => {
