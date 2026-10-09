@@ -6,6 +6,7 @@ import Breadcrumbs from "../../CommonElements/Breadcrumbs/Breadcrumbs";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Fn_AddEditData, Fn_FillListData, Fn_DeleteData } from "../../store/Functions";
 import { API_WEB_URLS } from "../../constants/constAPI";
+import { getCurrentUserId } from "../../utils/formUtils";
 import "./ItemMaster.css";
 
 /* ───── API URLs ───── */
@@ -100,6 +101,28 @@ const cleanUrl = (url?: string) => {
   return cleaned;
 };
 
+const safeParseArray = (raw: any): any[] => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  let parsed = raw;
+  if (typeof raw === "string") {
+    try {
+      parsed = JSON.parse(raw);
+      if (typeof parsed === "string") {
+        parsed = JSON.parse(parsed);
+      }
+    } catch (e) {
+      return [];
+    }
+  }
+  if (Array.isArray(parsed)) return parsed;
+  if (parsed && typeof parsed === "object") {
+    const list = parsed.dataList ?? parsed.data ?? parsed.list ?? parsed.SchemeList ?? parsed.schemeList ?? [];
+    if (Array.isArray(list)) return list;
+    return [parsed];
+  }
+  return [];
+};
 
 /* ───── Component ───── */
 const AddEdit_ItemMaster = () => {
@@ -187,19 +210,43 @@ const AddEdit_ItemMaster = () => {
     try {
       const res = await Fn_FillListData(dispatch, () => {}, "new_id", endpoint);
       const list = Array.isArray(res) ? res : res?.dataList ?? res?.data?.dataList ?? [];
-      if (list.length > 0 && list[0].Id) return String(list[0].Id);
+      if (list.length > 0) {
+        const first = list[0];
+        const extractedId = first?.Id ?? first?.id ?? first?.ID ?? first?.NewId ?? first?.newId ?? first?.ItemDesignId ?? first?.ItemMasterId;
+        if (extractedId !== undefined && extractedId !== null && String(extractedId).trim() !== "") {
+          return String(extractedId);
+        }
+      }
       if (res?.Id) return String(res.Id);
+      if (res?.id) return String(res.id);
       if (res?.data?.Id) return String(res.data.Id);
-      if (typeof res === "string" || typeof res === "number") return String(res);
-      if (typeof res?.data === "string" || typeof res?.data === "number") return String(res.data);
+      if (res?.data?.id) return String(res.data.id);
+      if (typeof res === "string" || typeof res === "number") {
+        if (String(res).trim() !== "") return String(res);
+      }
+      if (typeof res?.data === "string" || typeof res?.data === "number") {
+        if (String(res.data).trim() !== "") return String(res.data);
+      }
     } catch (e) {
       console.error("fetchNewId Error", e);
     }
     return uid();
   }, [dispatch]);
 
+  const createNewItem = useCallback(async (): Promise<ItemSection> => {
+    const newId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemCreate/Id/0`);
+    const newRowId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemDesignCreate/Id/${newId}`);
+    const sec = makeSection();
+    sec.id = newId;
+    sec.rows = [{ ...makeRow(), id: newRowId }];
+    return sec;
+  }, [fetchNewId]);
+
   const handleFieldUpdate = useCallback((id: string, tableName: string, fieldName: string, fieldValue: string, filesMap?: Record<string, File>, immediate = false) => {
-    if (!id || id.includes("-")) return;
+    if (!id || id === "0" || id.includes("-")) {
+      console.warn("Skipping field update due to temporary/invalid ID:", { id, tableName, fieldName, fieldValue });
+      return;
+    }
     
     const timerKey = `${id}_${fieldName}`;
     if (timersRef.current[timerKey]) clearTimeout(timersRef.current[timerKey]);
@@ -207,10 +254,10 @@ const AddEdit_ItemMaster = () => {
     const execute = async () => {
       const formData = new FormData();
       formData.append("Id", id);
-      formData.append("UserId", "0");
+      formData.append("UserId", getCurrentUserId());
       formData.append("TableName", tableName);
       formData.append("FieldName", fieldName);
-      formData.append("FieldValue", fieldValue);
+      formData.append("FieldValue", fieldValue !== undefined && fieldValue !== null ? String(fieldValue) : "");
       
       let isPhoto = false;
       if (filesMap) {
@@ -247,12 +294,17 @@ const AddEdit_ItemMaster = () => {
 
   /* ── Load pre-filled data ── */
   const loadData = useCallback(() => {
-    const stateId = location.state?.Id;
+    const searchParams = new URLSearchParams(location.search);
+    const queryId = searchParams.get("id") || searchParams.get("Id");
+    const stateId = location.state?.Id ?? location.state?.id ?? queryId;
+
     if (!stateId || stateId === 0 || stateId === "0") {
-      const initEmpty = async () => {
-        setSections([]);
-      };
-      initEmpty();
+      createNewItem()
+        .then(newSec => setSections([newSec]))
+        .catch(err => {
+          console.error("Error creating initial section:", err);
+          setSections([makeSection()]);
+        });
       return;
     }
 
@@ -263,87 +315,135 @@ const AddEdit_ItemMaster = () => {
         const list = Array.isArray(data) ? data : data?.dataList ?? data?.data?.dataList ?? [];
         if (list.length > 0) {
           const prefilledSections = list.map((item: any) => {
+             let rawDesign = item.DesignDetails ?? item.designDetails ?? item.ItemDesignDetails ?? item.ItemDesignMaster ?? item.ItemDesigns ?? item.itemDesigns ?? item.DesignList ?? item.designList ?? [];
              let parsedDesignDetails: any[] = [];
              try {
-                if (typeof item.DesignDetails === "string") {
-                  parsedDesignDetails = JSON.parse(item.DesignDetails || "[]");
-                } else if (Array.isArray(item.DesignDetails)) {
-                  parsedDesignDetails = item.DesignDetails;
+                if (typeof rawDesign === "string") {
+                  let parsed = JSON.parse(rawDesign || "[]");
+                  if (typeof parsed === "string") parsed = JSON.parse(parsed || "[]");
+                  parsedDesignDetails = Array.isArray(parsed) ? parsed : [parsed];
+                } else if (Array.isArray(rawDesign)) {
+                  parsedDesignDetails = rawDesign;
+                } else if (typeof rawDesign === "object" && rawDesign !== null) {
+                  parsedDesignDetails = [rawDesign];
                 }
-             } catch (e) { console.error("Parse Error:", e); }
+             } catch (e) { console.error("Parse Error DesignDetails:", e); }
 
              if (parsedDesignDetails.length === 0) parsedDesignDetails = [{}];
 
-             let parsedSchemeDetails: any[] = [];
-             try {
-                if (typeof item.SchemeDetails === "string") {
-                  parsedSchemeDetails = JSON.parse(item.SchemeDetails || "[]");
-                } else if (Array.isArray(item.SchemeDetails)) {
-                  parsedSchemeDetails = item.SchemeDetails;
-                }
-             } catch (e) { console.error("Parse Error Scheme:", e); }
+             let rawScheme = item.SchemeDetails ?? item.schemeDetails ?? item.ItemSchemeDetails ?? item.ItemSchemeMaster ?? item.Schemes ?? item.schemes ?? item.SchemeList ?? item.schemeList ?? [];
+             let parsedSchemeDetails = safeParseArray(rawScheme);
 
              const rawCover = item.iCoverImage || item.CoverImage || item.icoverimage || item.coverImage || item.ICoverImage || item.ItemCoverImage || item.CoverPhoto || item.coverPhoto || "";
              const coverFull = cleanUrl(rawCover);
 
+             const parseBool = (val: any) => {
+               if (val === true || val === 1) return true;
+               if (typeof val === "string") {
+                 const s = val.trim().toLowerCase();
+                 return s === "true" || s === "1";
+               }
+               return false;
+             };
+
+             const parseStr = (val: any, fallback = "") => {
+               if (val === undefined || val === null) return fallback;
+               return String(val);
+             };
+
              return {
-                id: String(item.Id || uid()),
-                itemName: item.ItemName || "",
+                id: String(item.Id || item.id || uid()),
+                itemName: item.ItemName || item.itemName || item.Name || item.name || "",
                 coverImage: coverFull ? { file: null, preview: coverFull, fullUrl: coverFull } : null,
-                shortDescription: item.ShortDescription || "",
-                fullDescription: item.FullDescription || "",
+                shortDescription: item.ShortDescription || item.shortDescription || "",
+                fullDescription: item.FullDescription || item.fullDescription || "",
                 hasSize: item.HasSize ? "Yes" : "No",
                 category: item.F_CategoryMaster ? String(item.F_CategoryMaster) : "",
-                hsnCode: item.HSNCode || "",
+                hsnCode: item.HSNCode || item.hsnCode || "",
                 gstGroup: item.F_GSTGroupMaster ? String(item.F_GSTGroupMaster) : "",
                 unit: item.F_UnitMaster ? String(item.F_UnitMaster) : "",
                 material: item.F_MaterialMaster ? String(item.F_MaterialMaster) : "",
                 rows: parsedDesignDetails.map((d: any) => {
-                    const rowSchemes = parsedSchemeDetails
-                      .filter((s: any) => String(s.F_ItemDesignMaster) === String(d.Id))
-                      .map((s: any) => ({
-                         FromRange: String(s.FromRange ?? ""),
-                         ToRange: String(s.ToRange ?? ""),
-                         Rate: String(s.Rate ?? "")
-                      }));
+                    const dId = String(d.Id ?? d.id ?? d.ItemDesignId ?? d.ItemDesignMasterId ?? d.F_ItemDesignMaster ?? uid()).trim();
+                    
+                    const itemLevelSchemes = parsedSchemeDetails.filter((s: any) => {
+                      if (!s || typeof s !== "object") return false;
+                      const sDesignId = String(
+                        s.F_ItemDesignMaster ??
+                        s.f_ItemDesignMaster ??
+                        s.ItemDesignMaster ??
+                        s.itemDesignMaster ??
+                        s.F_ItemDesignMasterId ??
+                        s.ItemDesignId ??
+                        s.itemDesignId ??
+                        s.DesignId ??
+                        s.designId ??
+                        s.F_DesignMaster ??
+                        ""
+                      ).trim();
+                      if (sDesignId !== "" && sDesignId === dId) return true;
+                      if (sDesignId !== "" && dId !== "" && !isNaN(Number(sDesignId)) && !isNaN(Number(dId)) && Number(sDesignId) === Number(dId)) return true;
+                      return false;
+                    });
+
+                    const dSchemesRaw = d.SchemeDetails ?? d.schemeDetails ?? d.ItemSchemeDetails ?? d.Schemes ?? d.schemes ?? d.SchemeList ?? d.schemeList ?? [];
+                    const designLevelSchemes = safeParseArray(dSchemesRaw);
+
+                    const combinedSchemes = [...itemLevelSchemes, ...designLevelSchemes];
+
+                    const rowSchemes = combinedSchemes.map((s: any) => ({
+                       FromRange: parseStr(s.FromRange ?? s.fromRange ?? s.FromQuantity ?? s.fromQuantity ?? s.FromQty ?? s.fromQty),
+                       ToRange: parseStr(s.ToRange ?? s.toRange ?? s.ToQuantity ?? s.toQty ?? s.toQty),
+                       Rate: parseStr(s.Rate ?? s.rate ?? s.SchemeRate ?? s.schemeRate ?? s.RateAmount ?? s.rateAmount ?? s.SalePrice ?? s.salePrice)
+                    }));
                       
+                    const photo1 = d.DesignPhoto || d.designPhoto;
+                    const photo2 = d.DesignPhoto2 || d.designPhoto2;
+                    const photo3 = d.DesignPhoto3 || d.designPhoto3;
+                    const photo4 = d.DesignPhoto4 || d.designPhoto4;
+                    const photo5 = d.DesignPhoto5 || d.designPhoto5;
+
                     return {
-                    id: String(d.Id || uid()),
-                    photos: [
-                        d.DesignPhoto ? { file: null, preview: cleanUrl(d.DesignPhoto_Thumb) || cleanUrl(d.DesignPhoto), fullUrl: cleanUrl(d.DesignPhoto) } : null,
-                        d.DesignPhoto2 ? { file: null, preview: cleanUrl(d.DesignPhoto2_Thumb) || cleanUrl(d.DesignPhoto2), fullUrl: cleanUrl(d.DesignPhoto2) } : null,
-                        d.DesignPhoto3 ? { file: null, preview: cleanUrl(d.DesignPhoto3_Thumb) || cleanUrl(d.DesignPhoto3), fullUrl: cleanUrl(d.DesignPhoto3) } : null,
-                        d.DesignPhoto4 ? { file: null, preview: cleanUrl(d.DesignPhoto4_Thumb) || cleanUrl(d.DesignPhoto4), fullUrl: cleanUrl(d.DesignPhoto4) } : null,
-                        d.DesignPhoto5 ? { file: null, preview: cleanUrl(d.DesignPhoto5_Thumb) || cleanUrl(d.DesignPhoto5), fullUrl: cleanUrl(d.DesignPhoto5) } : null,
-                    ],
-                    videoFile: null,
-                    videoName: d.VideoLink || "",
-                    itemDesignName: d.ItemDesignName || "",
-                    length: d.Length || "",
-                    width: d.Width || "",
-                    height: d.Height || "",
-                    weight: d.Weight || "",
-                    unitConversion: d.UnitConversion ? String(d.UnitConversion) : "",
-                    price: d.SalePrice ? String(d.SalePrice) : "",
-                    purchaseRate: d.PurchaseRate ? String(d.PurchaseRate) : "",
-                    barcode: d.Barcode || "",
-                    stock: d.OpeningStock ? String(d.OpeningStock) : "0",
-                    schemes: rowSchemes,
-                    isEcom: d.IsEcom ? true : false,
-                    ecomPrice: d.EcomPrice ? String(d.EcomPrice) : ""
-                };
-              })
+                      id: dId,
+                      photos: [
+                        photo1 ? { file: null, preview: cleanUrl(d.DesignPhoto_Thumb || d.designPhoto_Thumb) || cleanUrl(photo1), fullUrl: cleanUrl(photo1) } : null,
+                        photo2 ? { file: null, preview: cleanUrl(d.DesignPhoto2_Thumb || d.designPhoto2_Thumb) || cleanUrl(photo2), fullUrl: cleanUrl(photo2) } : null,
+                        photo3 ? { file: null, preview: cleanUrl(d.DesignPhoto3_Thumb || d.designPhoto3_Thumb) || cleanUrl(photo3), fullUrl: cleanUrl(photo3) } : null,
+                        photo4 ? { file: null, preview: cleanUrl(d.DesignPhoto4_Thumb || d.designPhoto4_Thumb) || cleanUrl(photo4), fullUrl: cleanUrl(photo4) } : null,
+                        photo5 ? { file: null, preview: cleanUrl(d.DesignPhoto5_Thumb || d.designPhoto5_Thumb) || cleanUrl(photo5), fullUrl: cleanUrl(photo5) } : null,
+                      ],
+                      videoFile: null,
+                      videoName: parseStr(d.VideoLink ?? d.videoLink ?? d.VideoName ?? d.videoName),
+                      itemDesignName: parseStr(d.ItemDesignName ?? d.itemDesignName ?? d.SizeName ?? d.sizeName ?? d.Name ?? d.name),
+                      length: parseStr(d.Length ?? d.length),
+                      width: parseStr(d.Width ?? d.width),
+                      height: parseStr(d.Height ?? d.height),
+                      weight: parseStr(d.Weight ?? d.weight),
+                      unitConversion: parseStr(d.UnitConversion ?? d.unitConversion),
+                      price: parseStr(d.SalePrice ?? d.salePrice ?? d.Price ?? d.price),
+                      purchaseRate: parseStr(d.PurchaseRate ?? d.purchaseRate),
+                      barcode: parseStr(d.Barcode ?? d.barcode),
+                      stock: parseStr(d.OpeningStock ?? d.openingStock ?? d.AvailableQty ?? d.availableQty ?? d.Stock ?? d.stock, "0"),
+                      schemes: rowSchemes,
+                      isEcom: parseBool(d.IsEcom ?? d.isEcom ?? d.IsEcommerce ?? d.isEcommerce),
+                      ecomPrice: parseStr(d.EcomPrice ?? d.ecomPrice)
+                    };
+                })
              };
           });
           setSections(prefilledSections);
         } else {
-          setSections([]);
+          createNewItem()
+            .then(newSec => setSections([newSec]))
+            .catch(() => setSections([makeSection()]));
         }
       })
       .catch(() => {
-        setSections([]);
+        createNewItem()
+          .then(newSec => setSections([newSec]))
+          .catch(() => setSections([makeSection()]));
       });
-  }, [dispatch, location.state?.Id, fetchNewId]);
+  }, [dispatch, location.state, location.search, createNewItem]);
 
   useEffect(() => {
     loadData();
@@ -466,14 +566,10 @@ const AddEdit_ItemMaster = () => {
   const addNewItemSection = useCallback(async (secIdx?: number) => {
     const toastId = toast.loading("Creating new item...", { position: "bottom-right" });
     try {
-      const newId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemCreate/Id/0`);
-      const newRowId = await fetchNewId(`${API_WEB_URLS.MASTER}/0/token/NewItemDesignCreate/Id/${newId}`);
+      const newSec = await createNewItem();
       
       setSections(prev => {
         const copy: ItemSection[] = prev.map(s => ({ ...s, isMinimized: true }));
-        const newSec = makeSection();
-        newSec.id = newId;
-        newSec.rows[0].id = newRowId;
         if (typeof secIdx === "number") {
           copy.splice(secIdx + 1, 0, newSec);
         } else {
@@ -495,7 +591,7 @@ const AddEdit_ItemMaster = () => {
     } catch (e) {
       toast.update(toastId, { render: "Failed to create item", type: "error", isLoading: false, autoClose: 2000, hideProgressBar: true });
     }
-  }, [fetchNewId]);
+  }, [createNewItem]);
 
   /* ── Photo handling ── */
   const handlePhoto = useCallback((secIdx: number, rowIdx: number, slotIdx: number, files: FileList | null) => {
@@ -619,7 +715,13 @@ const AddEdit_ItemMaster = () => {
   const openSchemeModal = (designId: string, initialSchemes?: any[]) => {
     setActiveDesignId(designId);
     if (initialSchemes && initialSchemes.length > 0) {
-      setSchemeRows(initialSchemes);
+      setSchemeRows(
+        initialSchemes.map((s: any) => ({
+          FromRange: String(s.FromRange ?? s.fromRange ?? s.FromQuantity ?? s.fromQty ?? ""),
+          ToRange: String(s.ToRange ?? s.toRange ?? s.ToQuantity ?? s.toQty ?? ""),
+          Rate: String(s.Rate ?? s.rate ?? s.SchemeRate ?? "")
+        }))
+      );
     } else {
       setSchemeRows([{ FromRange: "", ToRange: "", Rate: "" }]);
     }
@@ -643,9 +745,7 @@ const AddEdit_ItemMaster = () => {
   };
 
   const removeSchemeRow = (index: number) => {
-    if (schemeRows.length > 1) {
-      setSchemeRows(schemeRows.filter((_, i) => i !== index));
-    }
+    setSchemeRows(schemeRows.filter((_, i) => i !== index));
   };
 
   const updateSchemeRow = (index: number, field: keyof typeof schemeRows[0], value: string) => {
@@ -657,10 +757,6 @@ const AddEdit_ItemMaster = () => {
   const saveScheme = async () => {
     try {
       const validRows = schemeRows.filter(r => r.FromRange && r.ToRange && r.Rate);
-      if (validRows.length === 0) {
-        toast.error("Please enter valid scheme data.");
-        return;
-      }
       
       const authUser = JSON.parse(localStorage.getItem("authUser") || "{}");
       const userId = authUser?.uid ?? authUser?.Id ?? "0";
@@ -681,7 +777,7 @@ const AddEdit_ItemMaster = () => {
         }));
       });
 
-      toast.update(toastId, { render: "Scheme saved successfully", type: "success", isLoading: false, autoClose: 1200, hideProgressBar: true });
+      toast.update(toastId, { render: validRows.length === 0 ? "Scheme removed successfully" : "Scheme saved successfully", type: "success", isLoading: false, autoClose: 1200, hideProgressBar: true });
       closeSchemeModal();
     } catch (error) {
       console.error("Error saving scheme:", error);
@@ -1188,8 +1284,20 @@ const AddEdit_ItemMaster = () => {
                                   }}
                                 />
                                 <div style={{ marginTop: '5px', textAlign: 'center' }}>
-                                  <button type="button" className="im-btn" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', backgroundColor: '#3b82f6', color: 'white' }} onClick={() => openSchemeModal(row.id, row.schemes)}>
-                                    Add Scheme
+                                  <button 
+                                    type="button" 
+                                    className="im-btn" 
+                                    style={{ 
+                                      padding: '0.2rem 0.5rem', 
+                                      fontSize: '0.75rem', 
+                                      backgroundColor: row.schemes && row.schemes.length > 0 ? '#10b981' : '#3b82f6', 
+                                      color: 'white',
+                                      fontWeight: row.schemes && row.schemes.length > 0 ? '600' : 'normal',
+                                      borderRadius: '4px'
+                                    }} 
+                                    onClick={() => openSchemeModal(row.id, row.schemes)}
+                                  >
+                                    {row.schemes && row.schemes.length > 0 ? `Scheme (${row.schemes.length})` : '+ Add Scheme'}
                                   </button>
                                 </div>
                               </td>
@@ -1322,25 +1430,36 @@ const AddEdit_ItemMaster = () => {
               </tr>
             </thead>
             <tbody>
-              {schemeRows.map((row, index) => (
-                <tr key={index}>
-                  <td>
-                    <input type="number" className="form-control form-control-sm" value={row.FromRange} onChange={(e) => updateSchemeRow(index, "FromRange", e.target.value)} />
-                  </td>
-                  <td>
-                    <input type="number" className="form-control form-control-sm" value={row.ToRange} onChange={(e) => updateSchemeRow(index, "ToRange", e.target.value)} />
-                  </td>
-                  <td>
-                    <input type="number" className="form-control form-control-sm" value={row.Rate} onChange={(e) => updateSchemeRow(index, "Rate", e.target.value)} />
-                  </td>
-                  <td className="text-center">
-                    <div className="d-flex justify-content-center gap-2">
-                      <Button color="success" size="sm" onClick={addSchemeRow}>+</Button>
-                      <Button color="danger" size="sm" onClick={() => removeSchemeRow(index)} disabled={schemeRows.length === 1}>-</Button>
+              {schemeRows.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="text-center text-muted py-3">
+                    No schemes added. Click <strong>"Add Scheme"</strong> to create one, or click <strong>"Save Scheme"</strong> to clear schemes.
+                    <div className="mt-2">
+                      <Button color="success" size="sm" onClick={addSchemeRow}>+ Add Scheme</Button>
                     </div>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                schemeRows.map((row, index) => (
+                  <tr key={index}>
+                    <td>
+                      <input type="number" className="form-control form-control-sm" value={row.FromRange} onChange={(e) => updateSchemeRow(index, "FromRange", e.target.value)} />
+                    </td>
+                    <td>
+                      <input type="number" className="form-control form-control-sm" value={row.ToRange} onChange={(e) => updateSchemeRow(index, "ToRange", e.target.value)} />
+                    </td>
+                    <td>
+                      <input type="number" className="form-control form-control-sm" value={row.Rate} onChange={(e) => updateSchemeRow(index, "Rate", e.target.value)} />
+                    </td>
+                    <td className="text-center">
+                      <div className="d-flex justify-content-center gap-2">
+                        <Button color="success" size="sm" onClick={addSchemeRow}>+</Button>
+                        <Button color="danger" size="sm" onClick={() => removeSchemeRow(index)}>-</Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </Table>
         </ModalBody>

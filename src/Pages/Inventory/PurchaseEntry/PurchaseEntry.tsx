@@ -66,6 +66,8 @@ interface StateData {
   GSTGroupMaster: any[];
   StateMaster: any[];
   CityMaster: any[];
+  OtherChargesLedgers?: any[];
+  LedgerGroupMaster?: any[];
 }
 
 function PurchaseEntry() {
@@ -75,6 +77,8 @@ function PurchaseEntry() {
   const API_URL_ITEMGROUP = API_WEB_URLS.MASTER + "/0/token/CategoryMaster/Id/0";
   const API_URL_ITEMS = API_WEB_URLS.MASTER + "/0/token/ItemMaster/Id";
   const API_URL_VENDOR = API_WEB_URLS.MASTER + "/0/token/PurchasePartyLedgerMaster/Id/0";
+  const API_URL_OTHER_LEDGER = `${API_WEB_URLS.MASTER}/0/token/${API_WEB_URLS.LedgerMaster}/TBL.F_LedgerGroupMaster/15`;
+  const API_URL_LEDGERGROUP = API_WEB_URLS.MASTER + "/0/token/LedgerGroupMaster/Id/0";
   const API_URL_WAREHOUSE = API_WEB_URLS.MASTER + "/0/token/WarehouseMaster/Id/0";
   const API_URL_COLOR = API_WEB_URLS.MASTER + "/0/token/ColorMaster/Id/0";
   const API_URL_BATCH = API_WEB_URLS.MASTER + "/0/token/BatchMaster/Id/0";
@@ -113,10 +117,24 @@ function PurchaseEntry() {
     isGridEditable: true,
     GlobalOptions: [],
     GSTGroupMaster: [],
+    OtherChargesLedgers: [],
+    LedgerGroupMaster: [],
   });
 
   const [showSharePDFModal, setShowSharePDFModal] = useState(false);
   const [pendingShareFile, setPendingShareFile] = useState<File | null>(null);
+
+  const [otherChargesRows, setOtherChargesRows] = useState<any[]>([
+    { F_LedgerMaster: "", Amount: "" }
+  ]);
+
+  const [chargeLedgerModalOpen, setChargeLedgerModalOpen] = useState(false);
+  const [chargeLedgerSubmitting, setChargeLedgerSubmitting] = useState(false);
+  const [chargeLedgerTargetIndex, setChargeLedgerTargetIndex] = useState<number | null>(null);
+  const [chargeLedgerForm, setChargeLedgerForm] = useState({
+    Name: "",
+    F_LedgerGroupMaster: "",
+  });
 
   const [gridRows, setGridRows] = useState<GridRow[]>([
     {
@@ -177,6 +195,8 @@ function PurchaseEntry() {
 
         const API_URL_GSTGROUP = API_WEB_URLS.MASTER + "/0/token/GSTGroupMaster/Id/0";
         const gstData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_GSTGROUP);
+        const otherLedgersData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_OTHER_LEDGER);
+        const ledgerGroupData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_LEDGERGROUP);
         const globalOptions = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_GLOBALOPTIONS);
 
         const API_URL_STATEMASTER = API_WEB_URLS.MASTER + "/0/token/StateMaster/Id/0";
@@ -193,6 +213,8 @@ function PurchaseEntry() {
           VendorMaster: extractArray(vendors),
           CreatedPurchaseEntries: peDataArray,
           GSTGroupMaster: extractArray(gstData),
+          OtherChargesLedgers: extractArray(otherLedgersData),
+          LedgerGroupMaster: extractArray(ledgerGroupData),
           GlobalOptions: extractArray(globalOptions),
           StateMaster: extractArray(stateMasterData),
           CityMaster: extractArray(cityMasterData),
@@ -276,6 +298,7 @@ function PurchaseEntry() {
         F_PurchaseOrderL: l.PurchaseOrderLId || l.Id || 0,
       }));
       setGridRows(mappedRows);
+      setOtherChargesRows([{ F_LedgerMaster: "", Amount: "" }]);
       
       let newVendorMasterId = prevState.formData.F_VendorMaster;
       const poHeader = prevState.CreatedPurchaseOrders?.find((p: any) => String(p.Id) === String(poId));
@@ -314,6 +337,33 @@ function PurchaseEntry() {
       }
     } catch (e) {
       console.error("Error parsing PurchaseLDetails", e);
+    }
+
+    let otherChargesLines: any[] = [];
+    try {
+      const rawCharges = pe.PurchaseLOtherChargesDetails || pe.OtherChargesDetails || pe.SalesLOtherChargesDetails;
+      if (rawCharges) {
+        const parsed = typeof rawCharges === "string" ? JSON.parse(rawCharges) : rawCharges;
+        otherChargesLines = Array.isArray(parsed) ? parsed : [];
+      }
+    } catch (e) {
+      console.error("Error parsing Purchase other charges", e);
+    }
+
+    if (otherChargesLines.length > 0) {
+      const missingLedgers = otherChargesLines
+        .filter((l: any) => l.F_LedgerMaster && !state.OtherChargesLedgers?.some((ol: any) => String(ol.Id) === String(l.F_LedgerMaster)))
+        .map((l: any) => ({ Id: l.F_LedgerMaster, Name: l.LedgerName || l.Name || `Ledger ${l.F_LedgerMaster}`, F_LedgerGroupMaster: 15 }));
+      if (missingLedgers.length > 0) {
+        setState((prev) => ({ ...prev, OtherChargesLedgers: [...(prev.OtherChargesLedgers || []), ...missingLedgers] }));
+      }
+
+      setOtherChargesRows(otherChargesLines.map((l: any) => ({
+        F_LedgerMaster: String(l.F_LedgerMaster || ""),
+        Amount: String(l.Amount || "")
+      })));
+    } else {
+      setOtherChargesRows([{ F_LedgerMaster: "", Amount: "" }]);
     }
 
     setTaxOverrides({
@@ -445,6 +495,31 @@ function PurchaseEntry() {
             })
           );
           setGridRows(rowsData);
+        }
+
+        try {
+          const rawCharges = header.PurchaseLOtherChargesDetails || header.OtherChargesDetails || header.SalesLOtherChargesDetails;
+          if (rawCharges) {
+            const parsed = typeof rawCharges === "string" ? JSON.parse(rawCharges) : rawCharges;
+            const otherChargesLines = Array.isArray(parsed) ? parsed : [];
+            if (otherChargesLines.length > 0) {
+              const missingLedgers = otherChargesLines
+                .filter((l: any) => l.F_LedgerMaster && !state.OtherChargesLedgers?.some((ol: any) => String(ol.Id) === String(l.F_LedgerMaster)))
+                .map((l: any) => ({ Id: l.F_LedgerMaster, Name: l.LedgerName || l.Name || `Ledger ${l.F_LedgerMaster}`, F_LedgerGroupMaster: 15 }));
+              if (missingLedgers.length > 0) {
+                setState((prev) => ({ ...prev, OtherChargesLedgers: [...(prev.OtherChargesLedgers || []), ...missingLedgers] }));
+              }
+
+              setOtherChargesRows(otherChargesLines.map((l: any) => ({
+                F_LedgerMaster: String(l.F_LedgerMaster || ""),
+                Amount: String(l.Amount || "")
+              })));
+            } else {
+              setOtherChargesRows([{ F_LedgerMaster: "", Amount: "" }]);
+            }
+          }
+        } catch (e) {
+          console.error("Error parsing header other charges", e);
         }
       }
     } catch (error) {
@@ -818,7 +893,7 @@ function PurchaseEntry() {
       formData.append("Id", "0");
       formData.append("Name", companyName);
       formData.append("Alias", "0");
-      formData.append("F_LedgerGroupMaster", "40");
+      formData.append("F_LedgerGroupMaster", "35");
       formData.append("Address", address);
       formData.append("Address1", "0");
       formData.append("F_CountryMaster", "0");
@@ -867,6 +942,109 @@ function PurchaseEntry() {
     }
   };
 
+  const openChargeLedgerModal = (rowIndex: number | null = null) => {
+    if (!state.isGridEditable) return;
+    setChargeLedgerTargetIndex(rowIndex);
+    
+    // Direct Expenses is Group ID 15 in LedgerGroupMaster
+    const directExpGroup = state.LedgerGroupMaster?.find((g: any) => 
+      String(g.Id) === "15" ||
+      ((g.Name || g.GroupName || "")?.toLowerCase().includes("direct") && 
+       (g.Name || g.GroupName || "")?.toLowerCase().includes("exp"))
+    );
+    const defaultGroupId = directExpGroup ? String(directExpGroup.Id) : "15";
+
+    setChargeLedgerForm({
+      Name: "",
+      F_LedgerGroupMaster: defaultGroupId,
+    });
+    setChargeLedgerModalOpen(true);
+  };
+
+  const closeChargeLedgerModal = () => {
+    if (chargeLedgerSubmitting) return;
+    setChargeLedgerModalOpen(false);
+    setChargeLedgerTargetIndex(null);
+  };
+
+  const handleChargeLedgerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (chargeLedgerSubmitting) return;
+    const trimmedName = (chargeLedgerForm.Name || "").trim();
+    if (!trimmedName) {
+      alert("Please enter a charge ledger name (e.g. Freight Charges, Packaging Charges)");
+      return;
+    }
+    setChargeLedgerSubmitting(true);
+    try {
+      const obj = JSON.parse(localStorage.getItem("user") || "{}");
+      const formData = new FormData();
+      formData.append("Id", "0");
+      formData.append("Name", trimmedName);
+      formData.append("Alias", "0");
+      formData.append("F_LedgerGroupMaster", chargeLedgerForm.F_LedgerGroupMaster || "15");
+      formData.append("Address", "0");
+      formData.append("Address1", "0");
+      formData.append("F_CountryMaster", "0");
+      formData.append("F_StateMaster", "0");
+      formData.append("F_CityMaster", "0");
+      formData.append("PinCode", "0");
+      formData.append("PhoneNo", "0");
+      formData.append("MobileNo", "0");
+      formData.append("Email", "0");
+      formData.append("GSTIN", "0");
+      formData.append("PANNo", "0");
+      formData.append("CreditDays", "0");
+      formData.append("CreditLimit", "0");
+      formData.append("Rate", "0");
+      formData.append("F_Type", "0");
+      formData.append("F_CalculationType", "0");
+      formData.append("F_AddLess", "0");
+      formData.append("YesNoActs", "false");
+      formData.append("F_GSTGroupMaster", "0");
+      formData.append("F_TaxPayerType", "0");
+      formData.append("F_LedgerMasterSales", "0");
+      formData.append("F_LedgerMasterPurchase", "0");
+      formData.append("F_YearScheme", "0");
+      formData.append("F_IntCalcMethod", "0");
+      formData.append("BankName", "0");
+      formData.append("BankAccountNo", "0");
+      formData.append("BankIFSCCode", "0");
+      formData.append("ISDalal", "false");
+      formData.append("F_LedgerMasterDalal", "0");
+      formData.append("IsTransport", "false");
+      formData.append("F_TCSonSales", "0");
+      formData.append("UserId", obj?.uid || "0");
+      formData.append("F_CompanyMaster", (() => { try { const a = JSON.parse(localStorage.getItem("authUser")||"{}"); return String(a?.F_CompanyMaster ?? a?.CompanyId ?? a?.F_Company ?? "0"); } catch(e){return "0";} })());
+
+      await Fn_AddEditData(dispatch, setState, { arguList: { id: 0, formData } }, API_VENDOR_SAVE, true, "memberid", navigate, "#");
+      
+      const otherLedgersData = await Fn_FillListData(dispatch, () => ({}), "ignored", API_URL_OTHER_LEDGER);
+      const extractArray = (data: any) => Array.isArray(data) ? data : (data?.data?.dataList || data?.dataList || data?.data?.response || data?.response || []);
+      const updatedLedgers = extractArray(otherLedgersData);
+      
+      setState((prev) => ({ ...prev, OtherChargesLedgers: updatedLedgers }));
+
+      const newLedger = updatedLedgers?.find((l: any) => (l.LedgerName || l.Name)?.toLowerCase() === trimmedName.toLowerCase());
+      if (newLedger) {
+        setOtherChargesRows((prevRows) => {
+          const newRows = [...prevRows];
+          const target = chargeLedgerTargetIndex !== null ? chargeLedgerTargetIndex : (newRows.length - 1);
+          if (newRows[target]) {
+            newRows[target].F_LedgerMaster = String(newLedger.Id);
+          }
+          return newRows;
+        });
+      }
+      setChargeLedgerModalOpen(false);
+    } catch (error) {
+      console.error("Error creating charge ledger:", error);
+      alert("Failed to create charge ledger. Please try again.");
+    } finally {
+      setChargeLedgerSubmitting(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!state.formData.F_VendorMaster) { alert("Please select a Vendor"); return; }
     const validGridRows = gridRows.filter(row => row.ItemCode || row.F_ItemMaster);
@@ -884,6 +1062,9 @@ function PurchaseEntry() {
       let totalCGST = 0;
       let totalSGST = 0;
       let totalIGST = 0;
+      let highestCGSTPercent = 0;
+      let highestSGSTPercent = 0;
+      let highestIGSTPercent = 0;
       const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
       const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
 
@@ -902,11 +1083,19 @@ function PurchaseEntry() {
         const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
 
         if (gstGroup) {
+          const cgstP = parseFloat(gstGroup.CGSTPercent) || 0;
+          const sgstP = parseFloat(gstGroup.SGSTPercent) || 0;
+          const igstP = parseFloat(gstGroup.IGSTPercent) || 0;
+
+          if (cgstP > highestCGSTPercent) highestCGSTPercent = cgstP;
+          if (sgstP > highestSGSTPercent) highestSGSTPercent = sgstP;
+          if (igstP > highestIGSTPercent) highestIGSTPercent = igstP;
+
           if (isInState) {
-            itemCGST = amount * (parseFloat(gstGroup.CGSTPercent) / 100);
-            itemSGST = amount * (parseFloat(gstGroup.SGSTPercent) / 100);
+            itemCGST = amount * (cgstP / 100);
+            itemSGST = amount * (sgstP / 100);
           } else {
-            itemIGST = amount * (parseFloat(gstGroup.IGSTPercent) / 100);
+            itemIGST = amount * (igstP / 100);
           }
         }
         
@@ -930,6 +1119,22 @@ function PurchaseEntry() {
         };
       });
 
+      const otherChargesArray = otherChargesRows
+        .filter((row) => row.F_LedgerMaster && row.Amount)
+        .map((row) => ({
+          F_LedgerMaster: Number(row.F_LedgerMaster),
+          Amount: Number(row.Amount),
+        }));
+
+      const totalOtherCharges = otherChargesArray.reduce((sum, r) => sum + r.Amount, 0);
+
+      if (isInState) {
+        totalCGST += totalOtherCharges * (highestCGSTPercent / 100);
+        totalSGST += totalOtherCharges * (highestSGSTPercent / 100);
+      } else {
+        totalIGST += totalOtherCharges * (highestIGSTPercent / 100);
+      }
+
       const finalCGST = Math.round(taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST);
       const finalSGST = Math.round(taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST);
       const finalIGST = Math.round(taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST);
@@ -952,6 +1157,7 @@ function PurchaseEntry() {
       headerFormData.append("F_LedgerMaster_IGST", finalIGST > 0 ? "17" : "0");
       headerFormData.append("TotalTax", finalTotalTax.toFixed(2));
       headerFormData.append("JsonData", JSON.stringify(jsonDataArray));
+      headerFormData.append("OtherChargesJson", JSON.stringify(otherChargesArray));
       headerFormData.append("F_CompanyMaster", "0");
       await Fn_AddEditData(dispatch, setState, { arguList: { id: state.id, formData: headerFormData } }, API_URL_SAVE, true, "memberid", navigate, "#");
       if (window.confirm("Purchase Entry saved successfully. Do you want to print it?")) {
@@ -972,7 +1178,7 @@ function PurchaseEntry() {
 
   const handleDownloadPdf = async () => {
     const { generateInvoiceHTML } = require('../../../helpers/PDFTemplate');
-    const htmlString = generateInvoiceHTML("PURCHASE ENTRY", state, gridRows, [], taxOverrides);
+    const htmlString = generateInvoiceHTML("PURCHASE ENTRY", state, gridRows, otherChargesRows, taxOverrides);
 
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = htmlString;
@@ -1320,13 +1526,121 @@ function PurchaseEntry() {
                   </Col>
                 </Row>
                 
-                {/* Tax Summary Section */}
-                <Row className="mt-4">
-                  <Col md={{ size: 4, offset: 8 }}>
+                {/* Other Charges & Tax Summary Section */}
+                <Row className="mt-4 align-items-start">
+                  {/* Other Charges Table */}
+                  <Col md={6} className="mb-3 mb-md-0">
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <h6 className="mb-0 text-primary fw-bold">Other Charges (Packaging, Freight, etc.)</h6>
+                      <Button 
+                        color="link" 
+                        size="sm" 
+                        className="p-0 text-decoration-none" 
+                        onClick={() => openChargeLedgerModal(null)} 
+                        disabled={!state.isGridEditable}
+                        tabIndex={-1}
+                      >
+                        + New Charge Ledger
+                      </Button>
+                    </div>
+                    <div className="table-responsive">
+                      <table className="table table-bordered table-sm mb-0">
+                        <thead className="table-light">
+                          <tr>
+                            <th>Ledger</th>
+                            <th className="text-end" style={{ width: "130px" }}>Amount</th>
+                            <th className="text-center" style={{ width: "90px" }}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {otherChargesRows.map((row, index) => (
+                            <tr key={index}>
+                              <td>
+                                <div className="d-flex align-items-center gap-1">
+                                  <select 
+                                    className="form-control form-control-sm"
+                                    value={row.F_LedgerMaster}
+                                    onChange={(e) => {
+                                      setTaxOverrides({});
+                                      const newRows = [...otherChargesRows];
+                                      newRows[index].F_LedgerMaster = e.target.value;
+                                      setOtherChargesRows(newRows);
+                                    }}
+                                    disabled={!state.isGridEditable}
+                                  >
+                                    <option value="">Select Ledger</option>
+                                    {state.OtherChargesLedgers?.map((l: any) => (
+                                      <option key={l.Id} value={l.Id}>{l.LedgerName || l.Name}</option>
+                                    ))}
+                                  </select>
+                                  <Button
+                                    color="light"
+                                    size="sm"
+                                    className="p-0 px-2 border"
+                                    title="Add New Charge Ledger"
+                                    onClick={() => openChargeLedgerModal(index)}
+                                    disabled={!state.isGridEditable}
+                                    type="button"
+                                    style={{ height: "26px", lineHeight: "24px" }}
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              </td>
+                              <td>
+                                <Input 
+                                  type="number"
+                                  bsSize="sm"
+                                  className="text-end m-0"
+                                  placeholder="0.00"
+                                  value={row.Amount}
+                                  onChange={(e) => {
+                                    setTaxOverrides({});
+                                    const newRows = [...otherChargesRows];
+                                    newRows[index].Amount = e.target.value;
+                                    setOtherChargesRows(newRows);
+                                  }}
+                                  disabled={!state.isGridEditable}
+                                />
+                              </td>
+                              <td className="text-center">
+                                <Button 
+                                  color="primary" 
+                                  size="sm" 
+                                  className="me-1 p-1 px-2" 
+                                  onClick={() => { setTaxOverrides({}); setOtherChargesRows([...otherChargesRows, { F_LedgerMaster: "", Amount: "" }]); }}
+                                  disabled={!state.isGridEditable}
+                                >
+                                  <i className="fa fa-plus"></i>
+                                </Button>
+                                {otherChargesRows.length > 1 && (
+                                  <Button 
+                                    color="danger" 
+                                    size="sm" 
+                                    className="p-1 px-2"
+                                    onClick={() => { setTaxOverrides({}); setOtherChargesRows(otherChargesRows.filter((_, i) => i !== index)); }}
+                                    disabled={!state.isGridEditable}
+                                  >
+                                    <i className="fa fa-minus"></i>
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Col>
+
+                  {/* Tax Summary Section */}
+                  <Col md={{ size: 5, offset: 1 }}>
                     {(() => {
                       let totalCGST = 0;
                       let totalSGST = 0;
                       let totalIGST = 0;
+                      let highestCGSTPercent = 0;
+                      let highestSGSTPercent = 0;
+                      let highestIGSTPercent = 0;
 
                       const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
                       const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
@@ -1343,14 +1657,31 @@ function PurchaseEntry() {
                         const gstGroup = state.GSTGroupMaster?.find((g: any) => String(g.Id) === String(gstGroupId));
                         
                         if (gstGroup) {
+                          const cgstP = parseFloat(gstGroup.CGSTPercent) || 0;
+                          const sgstP = parseFloat(gstGroup.SGSTPercent) || 0;
+                          const igstP = parseFloat(gstGroup.IGSTPercent) || 0;
+
+                          if (cgstP > highestCGSTPercent) highestCGSTPercent = cgstP;
+                          if (sgstP > highestSGSTPercent) highestSGSTPercent = sgstP;
+                          if (igstP > highestIGSTPercent) highestIGSTPercent = igstP;
+
                           if (isInState) {
-                            totalCGST += amount * (parseFloat(gstGroup.CGSTPercent) / 100);
-                            totalSGST += amount * (parseFloat(gstGroup.SGSTPercent) / 100);
+                            totalCGST += amount * (cgstP / 100);
+                            totalSGST += amount * (sgstP / 100);
                           } else {
-                            totalIGST += amount * (parseFloat(gstGroup.IGSTPercent) / 100);
+                            totalIGST += amount * (igstP / 100);
                           }
                         }
                       });
+
+                      const totalOtherCharges = otherChargesRows.reduce((sum, r) => sum + (parseFloat(r.Amount) || 0), 0);
+
+                      if (isInState) {
+                        totalCGST += totalOtherCharges * (highestCGSTPercent / 100);
+                        totalSGST += totalOtherCharges * (highestSGSTPercent / 100);
+                      } else {
+                        totalIGST += totalOtherCharges * (highestIGSTPercent / 100);
+                      }
 
                       const finalCGST = taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : totalCGST;
                       const finalSGST = taxOverrides.SGST !== undefined ? parseFloat(taxOverrides.SGST) || 0 : totalSGST;
@@ -1358,7 +1689,7 @@ function PurchaseEntry() {
 
                       const totalTax = finalCGST + finalSGST + finalIGST;
                       const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
-                      const grandTotal = subTotal + totalTax;
+                      const grandTotal = subTotal + totalTax + totalOtherCharges;
 
                       return (
                         <div className="table-responsive">
@@ -1368,6 +1699,12 @@ function PurchaseEntry() {
                                 <th className="text-end w-50">Sub Total:</th>
                                 <td className="text-end fw-bold">{subTotal.toFixed(2)}</td>
                               </tr>
+                              {totalOtherCharges > 0 && (
+                                <tr>
+                                  <th className="text-end w-50">Other Charges:</th>
+                                  <td className="text-end fw-bold">{totalOtherCharges.toFixed(2)}</td>
+                                </tr>
+                              )}
                               {isInState ? (
                                 <>
                                   <tr>
@@ -1486,11 +1823,60 @@ function PurchaseEntry() {
         <ModalFooter><Button color="primary" onClick={handleVendorSubmit} disabled={vendorSubmitting}>Save</Button><Button color="secondary" onClick={closeVendorModal}>Cancel</Button></ModalFooter>
       </Modal>
 
+      <Modal isOpen={chargeLedgerModalOpen} toggle={closeChargeLedgerModal} size="md">
+        <ModalHeader toggle={closeChargeLedgerModal}>Add New Charge Ledger</ModalHeader>
+        <ModalBody>
+          <Form onSubmit={handleChargeLedgerSubmit}>
+            <FormGroup>
+              <Label>Ledger Name <span className="text-danger">*</span></Label>
+              <Input 
+                type="text" 
+                placeholder="e.g. Freight Charges, Packaging Charges, Transport"
+                value={chargeLedgerForm.Name} 
+                onChange={(e) => setChargeLedgerForm({ ...chargeLedgerForm, Name: e.target.value })} 
+                autoFocus
+              />
+              <small className="text-muted d-block mt-1">
+                <strong>Accounting Rule:</strong> Purchase par lagne wale charges (Packaging, Freight, Cartage) <strong>Direct Expenses</strong> group me aate hain (Trading Account me Purchase Cost badhane ke liye).
+              </small>
+            </FormGroup>
+            <FormGroup>
+              <Label>Ledger Group <span className="text-danger">*</span></Label>
+              <select 
+                className="form-control" 
+                value={chargeLedgerForm.F_LedgerGroupMaster} 
+                onChange={(e) => setChargeLedgerForm({ ...chargeLedgerForm, F_LedgerGroupMaster: e.target.value })}
+              >
+                <option value="">Select Group</option>
+                {state.LedgerGroupMaster && state.LedgerGroupMaster.length > 0 ? (
+                  state.LedgerGroupMaster.map((g: any) => (
+                    <option key={g.Id} value={g.Id}>
+                      {g.Name || g.GroupName || `Group ${g.Id}`} {String(g.Id) === "15" ? "(Direct Expenses - Recommended for Purchase)" : ""}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="15">Expenses (Direct) - Group 15</option>
+                    <option value="16">Expenses (Indirect) - Group 16</option>
+                  </>
+                )}
+              </select>
+            </FormGroup>
+          </Form>
+        </ModalBody>
+        <ModalFooter>
+          <Button color="primary" onClick={handleChargeLedgerSubmit} disabled={chargeLedgerSubmitting}>
+            {chargeLedgerSubmitting ? "Saving..." : "Save Ledger"}
+          </Button>
+          <Button color="secondary" onClick={closeChargeLedgerModal}>Cancel</Button>
+        </ModalFooter>
+      </Modal>
+
       {/* ── PURCHASE ENTRY PRINT LAYOUT ── */}
       <div 
         className="purchase-print-layout" 
         dangerouslySetInnerHTML={{ 
-          __html: require('../../../helpers/PDFTemplate').generateInvoiceHTML("PURCHASE ENTRY", state, gridRows, [], taxOverrides) 
+          __html: require('../../../helpers/PDFTemplate').generateInvoiceHTML("PURCHASE ENTRY", state, gridRows, otherChargesRows, taxOverrides) 
         }} 
       />
       {/* Share PDF Modal */}
