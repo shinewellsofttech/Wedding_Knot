@@ -381,11 +381,12 @@ function SalesInvoice() {
       IGST: pe.TotalIGST !== undefined ? String(pe.TotalIGST) : undefined,
     });
 
-    if (pe.TotalDiscount !== undefined && pe.TotalDiscount !== null && Number(pe.TotalDiscount) > 0) {
-      setDiscountInput(String(pe.TotalDiscount));
+    if (pe.TotalDiscount !== undefined && pe.TotalDiscount !== null && !isNaN(Number(pe.TotalDiscount)) && Number(pe.TotalDiscount) > 0) {
+      setDiscountInput(String(Number(pe.TotalDiscount)));
       setDiscountType("amount");
     } else {
       setDiscountInput("");
+      setDiscountType("amount");
     }
 
     setState((prev) => ({
