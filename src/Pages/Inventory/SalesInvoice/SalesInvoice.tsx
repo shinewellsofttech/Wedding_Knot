@@ -37,6 +37,7 @@ interface GridRow {
   SchemeDetails?: any[];
   GSTPercent?: number;
   UnitValue?: number;
+  Amount?: string | number;
 }
 
 interface StateData {
@@ -680,9 +681,32 @@ function SalesInvoice() {
       if (row.OriginalSalePrice !== undefined) {
         updatedRows[index].Rate = String(baseRate > 0 ? baseRate.toFixed(2) : "");
       }
+      const curRate = parseFloat(updatedRows[index].Rate) || 0;
+      if (qty > 0 && curRate > 0) {
+        updatedRows[index].Amount = (qty * curRate).toFixed(2);
+      } else {
+        updatedRows[index].Amount = "";
+      }
     } else if (field === "Rate") {
       const gstPercent = updatedRows[index].GSTPercent || 0;
-      updatedRows[index].OriginalSalePrice = (parseFloat(value) || 0) * (1 + gstPercent / 100);
+      const rateVal = parseFloat(value) || 0;
+      updatedRows[index].OriginalSalePrice = rateVal * (1 + gstPercent / 100);
+      const qty = parseFloat(updatedRows[index].Qty) || 0;
+      if (qty > 0 && rateVal > 0) {
+        updatedRows[index].Amount = (qty * rateVal).toFixed(2);
+      } else {
+        updatedRows[index].Amount = "";
+      }
+    } else if (field === "Amount") {
+      const newTaxable = parseFloat(value) || 0;
+      const qty = parseFloat(updatedRows[index].Qty) || 0;
+      if (qty > 0) {
+        const calculatedRate = newTaxable / qty;
+        updatedRows[index].Rate = String(calculatedRate > 0 ? Number(calculatedRate.toFixed(4)) : "");
+        const gstPercent = updatedRows[index].GSTPercent || 0;
+        updatedRows[index].OriginalSalePrice = calculatedRate * (1 + gstPercent / 100);
+      }
+      updatedRows[index].Amount = value;
     }
 
     if (field === "F_ItemMaster" || field === "F_ColorMaster" || field === "F_WarehouseMaster") {
@@ -748,6 +772,7 @@ function SalesInvoice() {
         let gstPercent = dupRow.GSTPercent || 0;
         let baseRate = newSalePrice / (1 + gstPercent / 100);
         dupRow.Rate = String(baseRate > 0 ? baseRate.toFixed(2) : "");
+        dupRow.Amount = (newQty > 0 && baseRate > 0) ? (newQty * baseRate).toFixed(2) : "";
       }
       
       updatedRows[duplicateIndex] = dupRow;
@@ -885,6 +910,7 @@ function SalesInvoice() {
           Photos: photos,
           Qty: qty > 0 ? String(qty) : "",
           Rate: baseRate > 0 ? String(baseRate.toFixed(2)) : "",
+          Amount: (qty > 0 && baseRate > 0) ? (qty * baseRate).toFixed(2) : "",
           F_GSTGroupMaster: item.F_GSTGroupMaster || "",
           ItemData: [{ Id: itemId, ItemName: item.ItemName || "Scanned Item", F_GSTGroupMaster: item.F_GSTGroupMaster }],
           OriginalSalePrice: salePrice,
@@ -1094,12 +1120,14 @@ function SalesInvoice() {
       let highestSGSTPercent = 0;
       let highestIGSTPercent = 0;
       const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
-      const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+      const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : true;
 
       const jsonDataArray = validGridRows.map((row) => {
         const qty = Number(row.Qty) || 0;
         const rate = Number(row.Rate) || 0;
-        const amount = qty * rate;
+        const amount = (row.Amount !== undefined && row.Amount !== "" && !isNaN(Number(row.Amount)))
+          ? Number(row.Amount)
+          : (qty * rate);
 
         const rowGstPercent = row.GSTPercent || 0;
         const origBaseRate = row.OriginalSalePrice !== undefined && Number(row.OriginalSalePrice) > 0
@@ -1177,7 +1205,10 @@ function SalesInvoice() {
       const finalIGST = Number((taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST).toFixed(2));
       const finalTotalTax = finalCGST + finalSGST + finalIGST;
 
-      const subTotal = validGridRows.reduce((sum, r) => sum + ((Number(r.Qty) || 0) * (Number(r.Rate) || 0)), 0);
+      const subTotal = validGridRows.reduce((sum, r) => {
+        const amt = (r.Amount !== undefined && r.Amount !== "" && !isNaN(Number(r.Amount))) ? Number(r.Amount) : ((Number(r.Qty) || 0) * (Number(r.Rate) || 0));
+        return sum + amt;
+      }, 0);
       const grossTotal = subTotal + finalTotalTax + totalOtherCharges;
       const rawDiscountVal = parseFloat(discountInput) || 0;
       const parsedManualDiscount = discountType === "percent" 
@@ -1237,12 +1268,15 @@ function SalesInvoice() {
     }
 
     // Calculate Grand Total
-    const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
+    const subTotal = gridRows.reduce((sum, row) => {
+      const amt = (row.Amount !== undefined && row.Amount !== "" && !isNaN(Number(row.Amount))) ? Number(row.Amount) : ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0));
+      return sum + amt;
+    }, 0);
     const totalOtherCharges = otherChargesRows.reduce((sum, r) => sum + (parseFloat(r.Amount) || 0), 0);
     let finalCGST = 0, finalSGST = 0, finalIGST = 0;
 
     const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
-    const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+    const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : true;
 
     if (isInState) {
         finalCGST = taxOverrides.CGST !== undefined ? parseFloat(taxOverrides.CGST) || 0 : gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0) * (row.GSTPercent || 0) / 200), 0);
@@ -1815,12 +1849,12 @@ function SalesInvoice() {
                       let highestIGSTPercent = 0;
 
                       const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
-                      const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+                      const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : true;
 
                       gridRows.forEach((row) => {
                         const qty = parseFloat(row.Qty) || 0;
                         const rate = parseFloat(row.Rate) || 0;
-                        const amount = qty * rate;
+                        const amount = (row.Amount !== undefined && row.Amount !== "" && !isNaN(Number(row.Amount))) ? Number(row.Amount) : (qty * rate);
 
                         const itemObj = row.ItemData?.find((i: any) => String(i.Id) === String(row.F_ItemMaster)) ||
                                         state.ItemMaster?.find((i: any) => String(i.Id) === String(row.F_ItemMaster));
@@ -1860,7 +1894,10 @@ function SalesInvoice() {
                       const finalIGST = Number((taxOverrides.IGST !== undefined ? parseFloat(taxOverrides.IGST) || 0 : totalIGST).toFixed(2));
 
                       const totalTax = finalCGST + finalSGST + finalIGST;
-                      const subTotal = gridRows.reduce((sum, row) => sum + ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0)), 0);
+                      const subTotal = gridRows.reduce((sum, row) => {
+                        const amt = (row.Amount !== undefined && row.Amount !== "" && !isNaN(Number(row.Amount))) ? Number(row.Amount) : ((parseFloat(row.Qty) || 0) * (parseFloat(row.Rate) || 0));
+                        return sum + amt;
+                      }, 0);
                       const grossTotal = subTotal + totalTax + totalOtherCharges;
 
                       const rawDiscountVal = parseFloat(discountInput) || 0;

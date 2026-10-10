@@ -654,7 +654,7 @@ function SalesReturn() {
         if (designItem.DesignPhoto5) photos.push(designItem.DesignPhoto5);
         
         const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
-        const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+        const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : true;
 
         let gstPercent = 0;
         const gstGroupId = item.F_GSTGroupMaster || "";
@@ -907,7 +907,7 @@ function SalesReturn() {
       let totalSGST = 0;
       let totalIGST = 0;
       const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
-      const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+      const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : true;
 
       const jsonDataArray = validGridRows.map((row) => {
         const qty = Number(row.Qty) || 0;
@@ -1277,7 +1277,7 @@ function SalesReturn() {
                       let totalIGST = 0;
 
                       const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
-                      const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+                      const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : true;
 
                       gridRows.forEach((row) => {
                         const qty = parseFloat(row.Qty) || 0;
@@ -1525,7 +1525,7 @@ function SalesReturn() {
                 let totalSGST = 0;
                 let totalIGST = 0;
                 const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
-                const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+                const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : true;
 
                 gridRows.forEach((row) => {
                   const qty = parseFloat(row.Qty) || 0;

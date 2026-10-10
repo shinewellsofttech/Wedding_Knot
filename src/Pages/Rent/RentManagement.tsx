@@ -549,7 +549,7 @@ function RentManagement() {
       let sgstAmount = 0;
       let igstAmount = 0;
       const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
-      const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+      const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : true;
 
       if (state.GlobalOptions && state.GlobalOptions.length > 0 && state.GSTGroupMaster && state.GSTGroupMaster.length > 0) {
         const globalOpt = state.GlobalOptions[0];
@@ -982,7 +982,7 @@ Thank you for choosing ${firmName}!`;
                     let igstAmount = 0;
 
                     const vendor = state.VendorMaster?.find((v: any) => String(v.Id) === String(state.formData.F_VendorMaster));
-                    const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : false;
+                    const isInState = vendor ? (vendor.IsInState === true || vendor.IsInState === 1 || vendor.IsInState === "1" || vendor.IsInState === "true") : true;
 
                     if (state.GlobalOptions && state.GlobalOptions.length > 0 && state.GSTGroupMaster && state.GSTGroupMaster.length > 0) {
                       const globalOpt = state.GlobalOptions[0];
